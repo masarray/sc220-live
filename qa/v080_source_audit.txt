@@ -1,0 +1,52 @@
+SONKUPIK LIVE v0.8.0 SOURCE AUDIT
+=================================
+Checks : 46
+Passed : 46
+Failed : 0
+
+[PASS] Version is 0.8.0
+[PASS] JUCE matches authority 8.0.14
+[PASS] Authoritative source required
+[PASS] Exact authority commit locked
+[PASS] Forty-preset authority recorded
+[PASS] Build auto-detects and syncs authority
+[PASS] No VST3 host in Live Safe link
+[PASS] No JUCE DSP dependency
+[PASS] DSP-only fast math
+[PASS] Sphere gloss follows authority
+[PASS] Fonts follow authority without bundled binaries
+[PASS] Authoritative header selected through include path
+[PASS] Redundant pre-denoise detector copy removed
+[PASS] Meter scans fused into one loop
+[PASS] Liquid visualizer hot path is time-domain only
+[PASS] Liquid visualizer uses 4096 newest samples
+[PASS] Liquid visualizer fixed 32-node lattice
+[PASS] Liquid visualizer fixed sparse pools
+[PASS] Static visual layers cached
+[PASS] Visual idle sleep
+[PASS] Visual refresh is 24 Hz
+[PASS] Visual tap disabled in tray
+[PASS] Visual queue mirrors VST 16k SPSC
+[PASS] Custom fixed FFT replaces JUCE FFT
+[PASS] FFT plan is prepared outside callback
+[PASS] Legacy GUI spectrum path removed
+[PASS] Increment-wrap FIFO in callback
+[PASS] Numeric preset index used
+[PASS] VST wrapper external bypass contract
+[PASS] VST wrapper external limiter contract
+[PASS] Prepared engine reset after config
+[PASS] Full engine rebuilds coalesced
+[PASS] Triple prepared engine slots retained
+[PASS] Callback peak telemetry
+[PASS] Audio callback excludes new -- new 
+[PASS] Audio callback excludes delete -- delete 
+[PASS] Audio callback excludes ScopedLock -- ScopedLock
+[PASS] Audio callback excludes CriticalSection -- CriticalSection
+[PASS] Audio callback excludes File -- File
+[PASS] Audio callback excludes Xml -- Xml
+[PASS] Audio callback excludes sleep -- sleep
+[PASS] Audio callback excludes wait ( -- wait (
+[PASS] Main layout keeps left before chain
+[PASS] Main layout keeps right after chain
+[PASS] Technical settings stay in callout
+[PASS] Main workspace uses liquid hero

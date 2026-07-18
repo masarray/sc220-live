@@ -1,0 +1,22 @@
+SONKUPIK LIVE v0.8.2 UI RUNTIME AUDIT
+
+Checks : 16
+Passed : 16
+Failed : 0
+
+[PASS] Version is 0.8.2
+[PASS] Application version is 0.8.2
+[PASS] Public explicit UI lifecycle method exists
+[PASS] UI active state is tracked
+[PASS] Constructor no longer starts timer before window show
+[PASS] Active UI starts 24 Hz timer
+[PASS] Inactive UI stops timer
+[PASS] Active UI enables visual tap
+[PASS] Show path explicitly activates UI
+[PASS] Hide path explicitly deactivates UI
+[PASS] Timer updates status only while active
+[PASS] Status refresh updates input meter
+[PASS] Status refresh updates output meter
+[PASS] Status refresh updates visualizer
+[PASS] Visual enable resets analysis
+[PASS] Visual tap still disabled while hidden

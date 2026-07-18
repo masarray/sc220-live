@@ -1,0 +1,60 @@
+# Build output
+dist/
+build/
+out/
+cmake-build-*/
+build-audit/
+build-audit-live/
+build-live/
+
+# CMake local/user files
+CMakeUserPresets.json
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+install_manifest.txt
+compile_commands.json
+
+# JUCE / plugin artefacts
+*_artefacts/
+JuceLibraryCode/
+*.vst3/
+*.component/
+*.aaxplugin/
+*.lv2/
+
+# Compiler and linker output
+*.obj
+*.o
+*.pch
+*.pdb
+*.ilk
+*.idb
+*.lib
+*.exp
+*.dll
+*.exe
+
+# Dev snapshots and local captures
+ui_snapshot.png
+*.log
+
+# IDE and OS files
+.vs/
+.vscode/
+.idea/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# ArSonKuPik private licensing secrets — NEVER COMMIT
+ArSonKuPik-license-private-key*.txt
+*private-signing-key*.txt
+build-key-activator/
+
+# Private synced authority checkout
+.deps/

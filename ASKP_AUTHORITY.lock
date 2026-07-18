@@ -1,0 +1,9 @@
+repository=masarray/askp-vst
+commit=655874dee6ee69df7212b8073ab941f9607d8faa
+version=0.5.14
+engine_blob=f2f64bf032283d08a2d046b993134e2397c022b8
+header_blob=c20c8377c5987c082e73aa439c1bfcb0acafd334
+presets_blob=2e52397c5cb49fb6966b78913a69c36573413aae
+visualizer_blob=9455d518987059c02c763eb24de9a23fa32307b7
+visualizer_header_blob=087fa3e2cd60a515d75d3dc0f641d11443b28677
+preset_count=40

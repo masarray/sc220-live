@@ -1,0 +1,33 @@
+SONKUPIK LIVE v0.8.1 SOURCE AUDIT
+=================================
+Checks : 27
+Passed : 27
+Failed : 0
+
+[PASS] Version is 0.8.1
+[PASS] Application version is 0.8.1
+[PASS] Exact ASK-P authority remains locked
+[PASS] Stale displayProfile reference removed
+[PASS] JUCE display API updated
+[PASS] Intentional alignment warning is locally scoped
+[PASS] Unused audio_utils linkage removed
+[PASS] No explicit audio_processors linkage
+[PASS] Direct audio device module retained
+[PASS] No JUCE DSP dependency
+[PASS] Fixed FFT remains in denoiser
+[PASS] No JUCE FFT in denoiser
+[PASS] Triple prepared engines retained
+[PASS] Numeric preset index retained
+[PASS] External bypass contract retained
+[PASS] External limiter contract retained
+[PASS] Liquid visual remains central
+[PASS] Visual timer remains 24 Hz
+[PASS] Audio callback found
+[PASS] Audio callback excludes new -- new 
+[PASS] Audio callback excludes delete -- delete 
+[PASS] Audio callback excludes ScopedLock -- ScopedLock
+[PASS] Audio callback excludes CriticalSection -- CriticalSection
+[PASS] Audio callback excludes File -- File
+[PASS] Audio callback excludes Xml -- Xml
+[PASS] Audio callback excludes sleep -- sleep
+[PASS] Audio callback excludes wait ( -- wait (

@@ -1,0 +1,7 @@
+SONKUPIK LIVE v0.8.0 FIXED FFT REFERENCE CHECK
+================================================
+N=256: forward max abs error=1.005e-14; inverse=4.441e-16; PASS
+N=512: forward max abs error=1.589e-14; inverse=5.551e-16; PASS
+
+The C++ implementation uses float rather than this double-precision reference,
+so production error is expected to be normal single-precision rounding.

@@ -76,8 +76,31 @@ void KnobControl::paint (juce::Graphics& g)
 
 void StereoMeter::setLevels (float leftDb, float rightDb)
 {
-    if (std::abs (leftDb - levelL) < 0.28f && std::abs (rightDb - levelR) < 0.28f)
+    auto updatePeakHold = [] (float level, float& hold, int& frames)
+    {
+        if (level >= hold)
+        {
+            hold = level;
+            frames = 12; // approximately 500 ms at the 24 Hz UI cadence
+        }
+        else if (frames > 0)
+        {
+            --frames;
+        }
+        else
+        {
+            hold = juce::jmax (level, hold - 0.85f);
+        }
+    };
+
+    updatePeakHold (leftDb, peakHoldL, peakHoldFramesL);
+    updatePeakHold (rightDb, peakHoldR, peakHoldFramesR);
+
+    if (std::abs (leftDb - levelL) < 0.18f
+        && std::abs (rightDb - levelR) < 0.18f
+        && peakHoldFramesL > 0 && peakHoldFramesR > 0)
         return;
+
     levelL = leftDb;
     levelR = rightDb;
     repaint();
@@ -85,44 +108,52 @@ void StereoMeter::setLevels (float leftDb, float rightDb)
 
 void StereoMeter::paint (juce::Graphics& g)
 {
-    auto area = getLocalBounds().toFloat().reduced (compact ? 6.0f : 9.0f, 6.0f);
-    const float labelHeight = compact ? 12.0f : 17.0f;
+    auto area = getLocalBounds().toFloat().reduced (compact ? 5.0f : 8.0f, 5.0f);
+    const float labelHeight = compact ? 13.0f : 17.0f;
     auto meterArea = area.withTrimmedBottom (labelHeight);
     const float gap = compact ? 5.0f : 8.0f;
-    const float barWidth = juce::jmin (compact ? 9.0f : 12.0f,
+    const float barWidth = juce::jmin (compact ? 8.0f : 11.0f,
                                       (meterArea.getWidth() - gap) * 0.5f);
     auto left = meterArea.withWidth (barWidth).withX (meterArea.getCentreX() - gap * 0.5f - barWidth);
     auto right = meterArea.withWidth (barWidth).withX (meterArea.getCentreX() + gap * 0.5f);
 
-    auto drawBar = [&] (juce::Rectangle<float> bar, float db)
+    auto drawBar = [&] (juce::Rectangle<float> bar, float db, float peakHold)
     {
-        g.setColour (colours::black.withAlpha (0.42f));
-        g.fillRoundedRectangle (bar, 3.0f);
-        g.setColour (colours::borderSoft.withAlpha (0.7f));
-        g.drawRoundedRectangle (bar, 3.0f, 1.0f);
+        g.setColour (colours::black.withAlpha (0.54f));
+        g.fillRoundedRectangle (bar.expanded (1.5f, 1.0f), 4.0f);
+        g.setColour (colours::borderSoft.withAlpha (0.82f));
+        g.drawRoundedRectangle (bar.expanded (1.0f, 0.5f), 4.0f, 1.0f);
 
         auto fill = bar.withTop (dbToY (db, bar));
-        juce::ColourGradient gradient (juce::Colour (0xffffb627), fill.getX(), fill.getBottom(),
-                                       juce::Colour (0xffff5f66), fill.getX(), fill.getY(), false);
-        gradient.addColour (0.58, juce::Colour (0xffffb627));
-        gradient.addColour (0.86, juce::Colour (0xffff7d39));
-        g.setGradientFill (gradient);
-        g.fillRoundedRectangle (fill, 3.0f);
+        if (fill.getHeight() > 0.5f)
+        {
+            juce::ColourGradient gradient (juce::Colour (0xffffb627), fill.getCentreX(), fill.getBottom(),
+                                           juce::Colour (0xffff5964), fill.getCentreX(), fill.getY(), false);
+            gradient.addColour (0.62, juce::Colour (0xffffb627));
+            gradient.addColour (0.86, juce::Colour (0xffff7d39));
+            g.setGradientFill (gradient);
+            g.fillRoundedRectangle (fill, 3.0f);
+        }
 
         for (int i = 1; i < 7; ++i)
         {
             const auto y = bar.getY() + bar.getHeight() * static_cast<float> (i) / 7.0f;
-            g.setColour (juce::Colours::black.withAlpha (0.26f));
+            g.setColour (juce::Colours::black.withAlpha (0.30f));
             g.drawHorizontalLine (static_cast<int> (y), bar.getX() + 1.0f, bar.getRight() - 1.0f);
         }
+
+        const float peakY = dbToY (peakHold, bar);
+        g.setColour ((peakHold > -3.0f ? colours::red : colours::amber).withAlpha (0.95f));
+        g.fillRoundedRectangle (juce::Rectangle<float> (bar.getX() - 1.0f, peakY - 0.75f,
+                                                        bar.getWidth() + 2.0f, 1.5f), 0.75f);
     };
 
-    drawBar (left, levelL);
-    drawBar (right, levelR);
+    drawBar (left, levelL, peakHoldL);
+    drawBar (right, levelR, peakHoldR);
 
     auto& lf = static_cast<LiveLookAndFeel&> (getLookAndFeel());
-    g.setFont (lf.jakarta (8.7f, true));
-    g.setColour (colours::textMuted);
+    g.setFont (lf.jakarta (8.5f, true));
+    g.setColour (colours::textMuted.withAlpha (0.86f));
     const auto labels = area.removeFromBottom (labelHeight);
     g.drawText ("L", labels.withWidth (labels.getWidth() * 0.5f), juce::Justification::centred, false);
     g.drawText ("R", labels.withTrimmedLeft (labels.getWidth() * 0.5f), juce::Justification::centred, false);
@@ -158,6 +189,18 @@ void VolumeFader::setLevels (float leftDb, float rightDb)
     meter.setLevels (leftDb, rightDb);
 }
 
+void VolumeFader::setBypassed (bool value) noexcept
+{
+    if (bypassed == value)
+        return;
+
+    bypassed = value;
+    const float alpha = value ? 0.46f : 1.0f;
+    fader.setAlpha (alpha);
+    meter.setAlpha (value ? 0.38f : 1.0f);
+    repaint();
+}
+
 void VolumeFader::sliderValueChanged (juce::Slider*)
 {
     repaint();
@@ -167,44 +210,90 @@ void VolumeFader::sliderValueChanged (juce::Slider*)
 
 void VolumeFader::resized()
 {
-    auto area = getLocalBounds();
-    area.removeFromTop (37);
-    auto meterArea = area.removeFromRight (44);
-    meter.setBounds (meterArea.reduced (1, 0));
-    fader.setBounds (area.reduced (30, 6));
+    auto area = getLocalBounds().reduced (5);
+    area.removeFromTop (58);
+    area.removeFromBottom (5);
+
+    auto meterArea = area.removeFromRight (40);
+    area.removeFromRight (5);
+    meter.setBounds (meterArea);
+
+    auto faderArea = area;
+    faderArea.removeFromLeft (34); // scale and labels
+    faderArea.removeFromRight (5);
+    fader.setBounds (faderArea.reduced (8, 5));
 }
 
 void VolumeFader::paint (juce::Graphics& g)
 {
     auto& lf = static_cast<LiveLookAndFeel&> (getLookAndFeel());
-    auto bounds = getLocalBounds();
+    auto bounds = getLocalBounds().toFloat().reduced (0.5f);
+    const float stateAlpha = bypassed ? 0.48f : 1.0f;
 
-    g.setColour (colours::textMuted);
-    g.setFont (lf.jakarta (9.5f, true));
-    g.drawText (label.toUpperCase(), bounds.removeFromTop (15), juce::Justification::centred, false);
+    juce::ColourGradient chassis (colours::panelHi.brighter (0.018f), bounds.getX(), bounds.getY(),
+                                  colours::panelLo.darker (0.08f), bounds.getRight(), bounds.getBottom(), false);
+    g.setGradientFill (chassis);
+    g.fillRoundedRectangle (bounds, 10.0f);
+    g.setColour (colours::borderSoft.withAlpha (0.94f));
+    g.drawRoundedRectangle (bounds.reduced (0.5f), 10.0f, 1.0f);
+    g.setColour (juce::Colours::white.withAlpha (0.022f));
+    g.drawRoundedRectangle (bounds.reduced (1.5f), 9.0f, 1.0f);
 
-    g.setColour (colours::text);
-    g.setFont (lf.jakarta (12.0f, true));
-    g.drawText (juce::String (fader.getValue(), 1) + " dB", 0, 16, getWidth(), 20,
+    auto header = getLocalBounds().reduced (8, 5).removeFromTop (48);
+    g.setColour (colours::textMuted.withAlpha (0.92f * stateAlpha));
+    g.setFont (lf.jakarta (9.4f, true));
+    g.drawText (label.toUpperCase(), header.removeFromTop (16), juce::Justification::centred, false);
+
+    auto valuePill = header.withSizeKeepingCentre (82, 25);
+    g.setColour ((bypassed ? colours::textMuted : colours::cyan).withAlpha (0.07f));
+    g.fillRoundedRectangle (valuePill.toFloat(), 8.0f);
+    g.setColour ((bypassed ? colours::border : colours::cyan).withAlpha (0.24f));
+    g.drawRoundedRectangle (valuePill.toFloat().reduced (0.5f), 8.0f, 1.0f);
+    g.setColour (colours::text.withAlpha (stateAlpha));
+    g.setFont (lf.jakarta (11.5f, true));
+    g.drawText (juce::String (fader.getValue(), 1) + " dB", valuePill,
                 juce::Justification::centred, false);
+
+    g.setColour (colours::borderSoft.withAlpha (0.62f));
+    g.drawHorizontalLine (56, 9.0f, (float) getWidth() - 9.0f);
 
     const auto faderBounds = fader.getBounds().toFloat();
     auto trackBounds = faderBounds.reduced (2.0f);
     trackBounds = juce::Rectangle<float> (0.0f, trackBounds.getY(), 12.0f, trackBounds.getHeight())
                     .withCentre (trackBounds.getCentre());
-    const float trackX = trackBounds.getCentreX();
+
+    auto lane = juce::Rectangle<float> (trackBounds.getX() - 15.0f, trackBounds.getY() - 7.0f,
+                                        trackBounds.getWidth() + 30.0f, trackBounds.getHeight() + 14.0f);
+    g.setColour (colours::black.withAlpha (0.18f));
+    g.fillRoundedRectangle (lane, 9.0f);
+    g.setColour (colours::borderSoft.withAlpha (0.44f));
+    g.drawRoundedRectangle (lane, 9.0f, 1.0f);
+
     const int ticks[] = { 6, 0, -6, -12, -18, -24, -36, -48, -60 };
-    g.setFont (lf.jakarta (8.5f));
+    g.setFont (lf.jakarta (8.3f));
     for (const int tick : ticks)
     {
         const float proportion = static_cast<float> (fader.valueToProportionOfLength ((double) tick));
         const float y = trackBounds.getBottom() - proportion * trackBounds.getHeight();
-        g.setColour (colours::borderSoft.withAlpha (0.88f));
-        g.drawHorizontalLine (static_cast<int> (std::round (y)), trackBounds.getX() - 8.0f, trackBounds.getX() - 2.0f);
-        g.setColour (colours::textMuted.withAlpha (0.78f));
-        g.drawText (juce::String (tick), 0, static_cast<int> (y - 7.0f),
-                    juce::jmax (0, (int) trackBounds.getX() - 11), 14,
+        const bool unity = tick == 0;
+        g.setColour ((unity ? colours::cyan : colours::borderSoft).withAlpha (unity ? 0.52f : 0.82f));
+        g.drawHorizontalLine ((int) std::round (y), trackBounds.getX() - 9.0f,
+                              trackBounds.getX() - (unity ? 1.0f : 3.0f));
+        g.setColour ((unity ? colours::cyan : colours::textMuted).withAlpha ((unity ? 0.80f : 0.72f) * stateAlpha));
+        g.drawText (juce::String (tick), 1, (int) y - 7,
+                    juce::jmax (0, (int) trackBounds.getX() - 12), 14,
                     juce::Justification::centredRight, false);
+    }
+
+    if (bypassed)
+    {
+        auto pill = juce::Rectangle<int> (8, getHeight() - 25, juce::jmax (0, getWidth() - 16), 18);
+        g.setColour (colours::textMuted.withAlpha (0.10f));
+        g.fillRoundedRectangle (pill.toFloat(), 7.0f);
+        g.setColour (colours::textMuted.withAlpha (0.72f));
+        g.setFont (lf.jakarta (8.4f, true));
+        g.drawText ("BYPASSED - MOVE FADER TO ACTIVATE", pill,
+                    juce::Justification::centred, false);
     }
 }
 
@@ -336,6 +425,8 @@ CompactRackRow::CompactRackRow (int index, const juce::String& iconResource,
           openOnly ? "Open module" : "Power",
           openOnly ? "plus_svg" : "power_svg", colours::cyan))
 {
+    setMouseCursor (juce::MouseCursor::PointingHandCursor);
+    setTooltip (openOnlyState ? "Open this rack slot" : lockedState ? "This protection stage is locked" : "Click the row or power icon to toggle bypass");
     actionButton->setOffColour (colours::textMuted.withAlpha (0.75f));
     addAndMakeVisible (*actionButton);
     actionButton->setClickingTogglesState (! openOnlyState);
@@ -391,47 +482,97 @@ void CompactRackRow::resized()
 void CompactRackRow::paint (juce::Graphics& g)
 {
     auto bounds = getLocalBounds().toFloat().reduced (0.5f);
-    g.setColour (selectedState ? colours::cyan.withAlpha (0.08f)
-                               : colours::panelLo.withAlpha (0.88f));
+    const bool hovered = isMouseOver (true);
+    const bool active = ! bypassed && ! openOnlyState;
+
+    juce::ColourGradient surface (selectedState ? colours::panelHi.brighter (0.045f)
+                                                : hovered ? colours::panelHi.brighter (0.025f)
+                                                          : colours::panelLo,
+                                  bounds.getX(), bounds.getY(),
+                                  colours::panelLo.darker (0.04f), bounds.getRight(), bounds.getBottom(), false);
+    g.setGradientFill (surface);
     g.fillRoundedRectangle (bounds, 8.0f);
-    g.setColour (selectedState ? colours::cyan.withAlpha (0.38f) : colours::borderSoft);
+
+    g.setColour (selectedState ? colours::cyan.withAlpha (0.44f)
+                               : hovered ? colours::border.withAlpha (0.92f)
+                                         : colours::borderSoft.withAlpha (0.90f));
     g.drawRoundedRectangle (bounds, 8.0f, 1.0f);
 
+    const auto railColour = openOnlyState ? colours::violet
+                           : lockedState ? colours::green
+                           : active ? colours::cyan : colours::textMuted;
+    g.setColour (railColour.withAlpha (selectedState || hovered ? 0.88f : 0.52f));
+    g.fillRoundedRectangle (juce::Rectangle<float> (bounds.getX() + 1.0f, bounds.getY() + 8.0f,
+                                                    2.0f, bounds.getHeight() - 16.0f), 1.0f);
+
+    auto iconBay = juce::Rectangle<float> (30.0f, 7.0f, 28.0f, bounds.getHeight() - 14.0f);
+    g.setColour (railColour.withAlpha (active || openOnlyState ? 0.075f : 0.035f));
+    g.fillRoundedRectangle (iconBay, 7.0f);
+    g.setColour (colours::borderSoft.withAlpha (0.72f));
+    g.drawRoundedRectangle (iconBay, 7.0f, 1.0f);
+
     auto& lf = static_cast<LiveLookAndFeel&> (getLookAndFeel());
-    g.setFont (lf.jakarta (10.5f, true));
-    g.setColour (selectedState ? colours::cyan : colours::textMuted);
-    g.drawText (juce::String (rowIndex), 8, 0, 24, getHeight(), juce::Justification::centred, false);
+    g.setFont (lf.jakarta (9.4f, true));
+    g.setColour ((selectedState ? colours::cyan : colours::textMuted).withAlpha (bypassed ? 0.48f : 0.88f));
+    g.drawText (juce::String (rowIndex).paddedLeft ('0', 2), 5, 0, 25, getHeight(),
+                juce::Justification::centred, false);
 
     if (moduleIcon != nullptr)
-        moduleIcon->drawWithin (g, juce::Rectangle<float> (34.0f, 10.0f, 18.0f, 18.0f),
-                                juce::RectanglePlacement::centred, 0.92f);
+        moduleIcon->drawWithin (g, iconBay.reduced (6.0f), juce::RectanglePlacement::centred,
+                                bypassed ? 0.38f : 0.90f);
 
-    g.setColour (selectedState ? colours::cyan : colours::text);
-    g.setFont (lf.jakarta (11.5f, true));
-    g.drawFittedText (moduleName, 60, 0, juce::jmax (0, getWidth() - 104), getHeight(),
+    g.setColour ((selectedState ? colours::cyan : colours::text).withAlpha (bypassed ? 0.46f : 0.96f));
+    g.setFont (lf.jakarta (11.2f, true));
+    g.drawFittedText (moduleName, 67, 0, juce::jmax (0, getWidth() - 143), getHeight(),
                       juce::Justification::centredLeft, 1);
 
-    if (lockedState || openOnlyState)
-    {
-        g.setColour (colours::textMuted.withAlpha (0.72f));
-        g.setFont (lf.jakarta (8.0f, true));
-        g.drawText (lockedState ? "LOCKED" : "ADD", getWidth() - 91, 0, 48, getHeight(),
-                    juce::Justification::centredRight, false);
-    }
+    const juce::String status = openOnlyState ? "ADD"
+                               : lockedState ? "SAFE"
+                               : bypassed ? "BYPASS" : "ON";
+    const auto statusColour = openOnlyState ? colours::violet
+                            : lockedState ? colours::green
+                            : bypassed ? colours::textMuted : colours::cyan;
+    auto statusArea = juce::Rectangle<float> ((float) getWidth() - 91.0f, 13.0f, 43.0f, 22.0f);
+    g.setColour (statusColour.withAlpha (0.08f));
+    g.fillRoundedRectangle (statusArea, 8.0f);
+    g.setColour (statusColour.withAlpha (0.24f));
+    g.drawRoundedRectangle (statusArea, 8.0f, 1.0f);
+    g.setColour (statusColour.withAlpha (bypassed ? 0.65f : 0.90f));
+    g.setFont (lf.jakarta (7.7f, true));
+    g.drawText (status, statusArea.toNearestInt(), juce::Justification::centred, false);
+}
+
+void CompactRackRow::toggleBypassFromUi()
+{
+    if (lockedState || openOnlyState || ! bypassAllowed)
+        return;
+
+    bypassed = ! bypassed;
+    if (actionButton != nullptr)
+        actionButton->setToggleState (! bypassed, juce::dontSendNotification);
+    repaint();
+    if (onBypassChanged)
+        onBypassChanged (bypassed);
 }
 
 void CompactRackRow::mouseUp (const juce::MouseEvent& event)
 {
-    if (openOnlyState && actionButton != nullptr && ! actionButton->getBounds().contains (event.getPosition()))
+    if (actionButton != nullptr && actionButton->getBounds().contains (event.getPosition()))
+        return;
+
+    if (openOnlyState)
     {
         if (onOpen)
             onOpen();
+        return;
     }
+
+    toggleBypassFromUi();
 }
 
 void CompactRackRow::mouseDoubleClick (const juce::MouseEvent&)
 {
-    if (onOpen)
+    if (openOnlyState && onOpen)
         onOpen();
 }
 

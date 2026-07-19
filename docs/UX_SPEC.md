@@ -53,3 +53,7 @@ The authoritative P0 geometry and visual hierarchy are defined in:
 - `P0_LAYOUT_REDESIGN_BLUEPRINT_v0.9.9.md`
 
 Future UI work must preserve the shared `WorkspaceLayout` model rather than creating separate paint/layout calculations. New spacing values should use `metrics` from `LiveTheme.h`.
+
+## v0.10.0 P1 premium polish
+
+See `P1_PREMIUM_POLISH_v0.10.0.md` for the side-fader chassis, peak-hold meter, rack-row state hierarchy, inset processing bays and interaction rules.

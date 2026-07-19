@@ -1,6 +1,6 @@
 # Sonkupik Live Development Context
 
-Current milestone: **v0.9.9 — headless Smart Sound Enhancer processor and QrisLicensePanel linker fix**.
+Current milestone: **v0.10.0 — P1 premium workspace polish and single-click Windows build**.
 
 ## Product intent
 
@@ -32,6 +32,14 @@ Use `scripts/run-p2-parity.ps1` for binary preset verification and the Settings 
 ## Next logical milestone
 
 P3 remains functional third-party VST3 hosting with crash-isolated scanning, latency reporting, state recall and safe bypass. It must not compromise the Live Safe built-in chain.
+
+## v0.10.0 P1 UI and build rule
+
+- Keep fader peak hold and interaction rendering on the message thread only.
+- Do not add a second UI timer; the application remains at 24 Hz.
+- Rack rows may toggle existing bypass states across the full row, but reordering must remain disabled until a real external VST graph exists.
+- `build-live-windows.bat` is the supported single-click Release/package entry point.
+- Generated output, source-authority checkouts, packages, credentials and signing material must remain excluded by `.gitignore`.
 
 ## v0.9.9 P0 layout rule
 

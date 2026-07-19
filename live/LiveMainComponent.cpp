@@ -41,6 +41,22 @@ void drawFieldLabel (juce::Graphics& g, LiveLookAndFeel& lf,
     g.drawText (text.toUpperCase(), bounds, juce::Justification::centredLeft, false);
 }
 
+void drawInsetBay (juce::Graphics& g, juce::Rectangle<float> bounds,
+                   juce::Colour accent = colours::cyan, bool stronger = false)
+{
+    juce::ColourGradient bay (colours::panelLo.darker (0.035f), bounds.getX(), bounds.getY(),
+                              colours::panelHi.withAlpha (0.74f), bounds.getRight(), bounds.getBottom(), false);
+    g.setGradientFill (bay);
+    g.fillRoundedRectangle (bounds, 10.0f);
+    g.setColour (juce::Colours::black.withAlpha (stronger ? 0.22f : 0.14f));
+    g.drawRoundedRectangle (bounds.reduced (1.5f), 8.5f, 1.0f);
+    g.setColour (colours::borderSoft.withAlpha (stronger ? 0.92f : 0.68f));
+    g.drawRoundedRectangle (bounds.reduced (0.5f), 10.0f, 1.0f);
+    g.setColour (accent.withAlpha (stronger ? 0.12f : 0.07f));
+    g.fillRoundedRectangle (juce::Rectangle<float> (bounds.getX() + 10.0f, bounds.getY() + 1.0f,
+                                                    juce::jmax (0.0f, bounds.getWidth() - 20.0f), 2.0f), 1.0f);
+}
+
 void selectComboText (juce::ComboBox& combo, const juce::String& text)
 {
     for (int index = 0; index < combo.getNumItems(); ++index)
@@ -96,12 +112,18 @@ struct WorkspaceLayout
     juce::Rectangle<int> learn;
     juce::Rectangle<int> expanderMeter;
     juce::Rectangle<int> visualizer;
+    juce::Rectangle<int> visualizerCaption;
     juce::Rectangle<int> noiseDivider;
+    juce::Rectangle<int> noiseControlSurface;
+    juce::Rectangle<int> noiseVisualSurface;
 
     juce::Rectangle<int> enhancerHeader;
     juce::Rectangle<int> enhancerBypass;
     juce::Rectangle<int> presetCaption;
     juce::Rectangle<int> presetCombo;
+    juce::Rectangle<int> enhancerPresetSurface;
+    juce::Rectangle<int> enhancerMacroSurface;
+    juce::Rectangle<int> enhancerMacroCaption;
     juce::Rectangle<int> enhancerKnobs[5];
 
     juce::Rectangle<int> stats[5];
@@ -176,12 +198,18 @@ WorkspaceLayout makeWorkspaceLayout (juce::Rectangle<int> bounds)
     l.noiseHeader = noiseInner.removeFromTop (40);
     l.noiseBypass = l.noiseHeader.removeFromRight (34).withSizeKeepingCentre (34, 34);
     auto noiseBody = noiseInner;
-    const int controlWidth = juce::jlimit (350, 382,
-                                           static_cast<int> (noiseBody.getWidth() * 0.42f));
-    auto controls = noiseBody.removeFromLeft (controlWidth);
+    const int controlWidth = juce::jlimit (350, 392,
+                                           static_cast<int> (noiseBody.getWidth() * 0.43f));
+    auto controlRegion = noiseBody.removeFromLeft (controlWidth);
+    l.noiseControlSurface = controlRegion;
+    auto controls = controlRegion.reduced (metrics::space10, metrics::space8);
     l.noiseDivider = noiseBody.removeFromLeft (metrics::space16)
                             .withSizeKeepingCentre (1, juce::jmax (80, noiseBody.getHeight() - 24));
-    l.visualizer = noiseBody.reduced (metrics::space4, 0);
+    l.noiseVisualSurface = noiseBody.reduced (metrics::space4, 0);
+    auto visualContent = l.noiseVisualSurface.reduced (metrics::space10, metrics::space6);
+    l.visualizerCaption = visualContent.removeFromTop (18);
+    visualContent.removeFromTop (metrics::space2);
+    l.visualizer = visualContent;
 
     auto meter = controls.removeFromRight (72);
     controls.removeFromRight (metrics::space12);
@@ -198,16 +226,21 @@ WorkspaceLayout makeWorkspaceLayout (juce::Rectangle<int> bounds)
     auto enhancerInner = l.enhancerCard.reduced (metrics::space14, metrics::space12);
     l.enhancerHeader = enhancerInner.removeFromTop (40);
     l.enhancerBypass = l.enhancerHeader.removeFromRight (34).withSizeKeepingCentre (34, 34);
-    auto presetStrip = enhancerInner.removeFromTop (58);
+    l.enhancerPresetSurface = enhancerInner.removeFromTop (64);
+    auto presetStrip = l.enhancerPresetSurface.reduced (metrics::space10, metrics::space6);
     auto captionRow = presetStrip.removeFromTop (15);
-    l.presetCaption = captionRow.removeFromLeft (350);
+    l.presetCaption = captionRow.removeFromLeft (440);
     auto comboRow = presetStrip.removeFromTop (38);
-    l.presetCombo = comboRow.removeFromLeft (350);
+    l.presetCombo = comboRow.removeFromLeft (440);
     enhancerInner.removeFromTop (metrics::space8);
-    const int enhancerKnobWidth = enhancerInner.getWidth() / 5;
+    l.enhancerMacroSurface = enhancerInner;
+    auto macroContent = enhancerInner.reduced (metrics::space8, metrics::space6);
+    l.enhancerMacroCaption = macroContent.removeFromTop (18);
+    macroContent.removeFromTop (metrics::space2);
+    const int enhancerKnobWidth = macroContent.getWidth() / 5;
     for (int i = 0; i < 5; ++i)
-        l.enhancerKnobs[i] = enhancerInner.removeFromLeft (i == 4 ? enhancerInner.getWidth() : enhancerKnobWidth)
-                                                   .reduced (metrics::space6, metrics::space2);
+        l.enhancerKnobs[i] = macroContent.removeFromLeft (i == 4 ? macroContent.getWidth() : enhancerKnobWidth)
+                                                .reduced (metrics::space6, metrics::space2);
 
     auto footer = l.footer.reduced (metrics::space12, 0);
     const int statWidth = footer.getWidth() / 5;
@@ -580,6 +613,7 @@ void LiveMainComponent::configureControls()
             {
                 audioEngine.setInputTrimBypassed (false);
                 inputTrimRow.setBypassed (false);
+                inputFader.setBypassed (false);
             }
             audioEngine.setInputTrimDb (valueDb);
         }
@@ -592,6 +626,7 @@ void LiveMainComponent::configureControls()
             {
                 audioEngine.setOutputTrimBypassed (false);
                 outputTrimRow.setBypassed (false);
+                outputFader.setBypassed (false);
             }
             audioEngine.setOutputTrimDb (valueDb);
         }
@@ -600,6 +635,7 @@ void LiveMainComponent::configureControls()
     inputTrimRow.onBypassChanged = [this] (bool bypassed)
     {
         audioEngine.setInputTrimBypassed (bypassed);
+        inputFader.setBypassed (bypassed);
     };
     noiseRow.onBypassChanged = [this] (bool bypassed)
     {
@@ -610,6 +646,7 @@ void LiveMainComponent::configureControls()
     outputTrimRow.onBypassChanged = [this] (bool bypassed)
     {
         audioEngine.setOutputTrimBypassed (bypassed);
+        outputFader.setBypassed (bypassed);
     };
     vstPreRow.onOpen = vstPostRow.onOpen = [this] { showExternalVstRoadmap(); };
 }
@@ -634,9 +671,11 @@ void LiveMainComponent::refreshAllControls()
     inputFader.setValue (audioEngine.getInputTrimDb());
     outputFader.setValue (audioEngine.getOutputTrimDb());
     inputTrimRow.setBypassed (audioEngine.isInputTrimBypassed());
+    inputFader.setBypassed (audioEngine.isInputTrimBypassed());
     noiseRow.setBypassed (! audioEngine.getNoiseClean().isEnabled());
     noiseBypass.setToggleState (audioEngine.getNoiseClean().isEnabled(), juce::dontSendNotification);
     outputTrimRow.setBypassed (audioEngine.isOutputTrimBypassed());
+    outputFader.setBypassed (audioEngine.isOutputTrimBypassed());
     enhancerPower.setToggleState (! audioEngine.isBypassed(), juce::dontSendNotification);
     updatingControls = false;
 }
@@ -711,6 +750,11 @@ void LiveMainComponent::paint (juce::Graphics& g)
     fillPremiumPanel (g, layout.noiseCard.toFloat(), metrics::cardRadius);
     fillPremiumPanel (g, layout.enhancerCard.toFloat(), metrics::cardRadius);
 
+    drawInsetBay (g, layout.noiseControlSurface.toFloat(), colours::cyan, false);
+    drawInsetBay (g, layout.noiseVisualSurface.toFloat(), colours::violet, true);
+    drawInsetBay (g, layout.enhancerPresetSurface.toFloat(), colours::cyan, false);
+    drawInsetBay (g, layout.enhancerMacroSurface.toFloat(), colours::violet, false);
+
     drawSectionTitle (g, layout.leftTitle.reduced (2, 0).toFloat(), "BEFORE ENHANCER");
     drawSectionTitle (g, layout.rightTitle.reduced (2, 0).toFloat(), "AFTER CHAIN");
     drawFieldLabel (g, lf, layout.inputLabel, "Input");
@@ -729,13 +773,39 @@ void LiveMainComponent::paint (juce::Graphics& g)
     g.setColour (colours::borderSoft.withAlpha (0.78f));
     g.fillRect (layout.noiseDivider.toFloat());
 
-    g.setColour (colours::cyan.withAlpha (0.70f));
+    g.setColour (colours::cyan.withAlpha (0.74f));
     g.fillRoundedRectangle (juce::Rectangle<float> ((float) layout.presetCaption.getX(),
                                                      (float) layout.presetCaption.getBottom() - 2.0f,
-                                                     18.0f, 2.0f), 1.0f);
+                                                     22.0f, 2.0f), 1.0f);
     g.setColour (colours::textMuted);
     g.setFont (lf.jakarta (9.0f, true));
-    g.drawText ("PRESET", layout.presetCaption, juce::Justification::centredLeft, false);
+    g.drawText ("ACTIVE PRESET", layout.presetCaption, juce::Justification::centredLeft, false);
+
+    g.setColour (colours::violet.withAlpha (0.74f));
+    g.fillEllipse ((float) layout.visualizerCaption.getX(),
+                   (float) layout.visualizerCaption.getCentreY() - 2.5f, 5.0f, 5.0f);
+    g.setColour (colours::textMuted);
+    g.setFont (lf.jakarta (8.8f, true));
+    g.drawText ("LIVE RESPONSE", layout.visualizerCaption.withTrimmedLeft (12),
+                juce::Justification::centredLeft, false);
+
+    g.setColour (colours::violet.withAlpha (0.68f));
+    g.fillRoundedRectangle (juce::Rectangle<float> ((float) layout.enhancerMacroCaption.getX(),
+                                                     (float) layout.enhancerMacroCaption.getCentreY() - 1.0f,
+                                                     18.0f, 2.0f), 1.0f);
+    g.setColour (colours::textMuted);
+    g.setFont (lf.jakarta (8.8f, true));
+    g.drawText ("MACRO CONTROL BAY", layout.enhancerMacroCaption.withTrimmedLeft (26),
+                juce::Justification::centredLeft, false);
+
+    for (int i = 1; i < 5; ++i)
+    {
+        const int separatorX = layout.enhancerKnobs[i].getX() - metrics::space6;
+        g.setColour (colours::borderSoft.withAlpha (0.34f));
+        g.drawVerticalLine (separatorX,
+                            (float) layout.enhancerMacroSurface.getY() + 28.0f,
+                            (float) layout.enhancerMacroSurface.getBottom() - 12.0f);
+    }
 
     g.setColour (colours::border);
     g.drawHorizontalLine (layout.footer.getY(), 12.0f, static_cast<float> (getWidth() - 12));
@@ -844,6 +914,8 @@ void LiveMainComponent::updateStatus()
     const auto status = audioEngine.getStatus();
     inputFader.setLevels (status.inputPeakDbL, status.inputPeakDbR);
     outputFader.setLevels (status.outputPeakDbL, status.outputPeakDbR);
+    inputFader.setBypassed (audioEngine.isInputTrimBypassed());
+    outputFader.setBypassed (audioEngine.isOutputTrimBypassed());
     gainReductionMeter.setReduction (status.expanderReductionDb);
 
     const auto& cleaner = audioEngine.getNoiseClean();

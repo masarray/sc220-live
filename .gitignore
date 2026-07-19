@@ -1,60 +1,169 @@
-# Build output
-dist/
-build/
-out/
-cmake-build-*/
-build-audit/
-build-audit-live/
-build-live/
+# ---------------------------------------------------------------------------
+# Sonkupik Live repository hygiene
+# Keep source, documentation, scripts and intentional assets in Git.
+# Keep every generated build, package, cache, credential and local dependency out.
+# ---------------------------------------------------------------------------
 
-# CMake local/user files
+# CMake / build trees
+/build/
+/build-*/
+/cmake-build-*/
+/out/
+/out-*/
+/dist/
+/package/
+/packages/
+/artifacts/
+/artefacts/
+/qa-results/
+/Testing/
+/_deps/
+/generated/
+
+# Nested generator output
+**/CMakeFiles/
+**/CMakeCache.txt
+**/cmake_install.cmake
+**/install_manifest.txt
+**/compile_commands.json
+**/*_artefacts/
+**/JuceLibraryCode/
+
+# CMake user/local presets
 CMakeUserPresets.json
-CMakeFiles/
-CMakeCache.txt
-cmake_install.cmake
-install_manifest.txt
-compile_commands.json
+CMakeUserPresets.*.json
 
-# JUCE / plugin artefacts
-*_artefacts/
-JuceLibraryCode/
-*.vst3/
-*.component/
-*.aaxplugin/
-*.lv2/
-
-# Compiler and linker output
-*.obj
-*.o
-*.pch
-*.pdb
-*.ilk
-*.idb
-*.lib
-*.exp
-*.dll
-*.exe
-
-# Dev snapshots and local captures
-ui_snapshot.png
-*.log
-
-# IDE and OS files
+# Visual Studio / MSBuild
 .vs/
-.vscode/
-.idea/
+*.sln
+*.vcxproj
+*.vcxproj.filters
+*.vcxproj.user
 *.suo
 *.user
 *.userosscache
 *.sln.docstates
-.DS_Store
-Thumbs.db
-Desktop.ini
+*.VC.db
+*.VC.VC.opendb
+ipch/
 
-# ArSonKuPik private licensing secrets — NEVER COMMIT
+# Other editors / IDEs
+.vscode/
+.idea/
+*.code-workspace
+*.swp
+*.swo
+*~
+
+# Compiler / linker products
+*.obj
+*.o
+*.lo
+*.pch
+*.pdb
+*.ilk
+*.idb
+*.iobj
+*.ipdb
+*.lib
+*.exp
+*.dll
+*.exe
+*.app
+*.dSYM/
+*.map
+*.tlog
+*.lastbuildstate
+
+# Plug-in artefacts
+*.vst3/
+*.component/
+*.aaxplugin/
+*.lv2/
+*.clap
+
+# Installer / release packages
+*.zip
+*.7z
+*.rar
+*.tar
+*.tar.gz
+*.msi
+*.msix
+*.appx
+*.nupkg
+*.cab
+*.sha256.local
+
+# Local JUCE / source authority checkouts and fetched dependencies
+.deps/
+third_party/JUCE/
+third_party/askp-vst/
+
+# Runtime / diagnostics / recordings
+*.log
+*.trace
+*.dmp
+*.mdmp
+*.stackdump
+*.etl
+*.wav
+*.flac
+*.aiff
+*.raw
+ui_snapshot*.png
+screen_capture*.png
+
+# Python / QA cache
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Temporary / backup files
+*.tmp
+*.temp
+*.bak
+*.old
+*.orig
+*.rej
+*.cache
+~$*
+
+# Local environment and machine-specific configuration
+.env
+.env.*
+!.env.example
+*.local
+*.local.*
+*.user.json
+
+# Signing, certificates and private licensing material — NEVER COMMIT
+*.pfx
+*.p12
+*.pem
+*.key
+*.cer
+*.crt
+*.snk
 ArSonKuPik-license-private-key*.txt
 *private-signing-key*.txt
+*private-key*.txt
+*activation-secret*.txt
 build-key-activator/
 
-# Private synced authority checkout
-.deps/
+# OS metadata
+.DS_Store
+.AppleDouble
+.LSOverride
+Thumbs.db
+Desktop.ini
+ehthumbs.db
+$RECYCLE.BIN/
+
+# PowerShell transcripts / local shell state
+PowerShell_transcript.*.txt
+*.clixml

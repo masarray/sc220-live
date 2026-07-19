@@ -1,4 +1,14 @@
-# Implementation Status — v0.9.9
+# Implementation Status — v0.10.0
+
+## v0.10.0 P1 completed
+
+- Premium side fader/meter chassis.
+- UI-only peak hold at the existing 24 Hz cadence.
+- Full-row rack bypass interaction and explicit stage-state capsules.
+- Noise control/visualizer inset bays.
+- Active Preset and Macro Control bays.
+- Hardened `.gitignore` and single-click Windows Release/package BAT.
+
 
 ## Implemented
 

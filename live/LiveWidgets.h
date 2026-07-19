@@ -42,6 +42,10 @@ public:
 private:
     float levelL = -120.0f;
     float levelR = -120.0f;
+    float peakHoldL = -120.0f;
+    float peakHoldR = -120.0f;
+    int peakHoldFramesL = 0;
+    int peakHoldFramesR = 0;
     bool compact = false;
 };
 
@@ -57,6 +61,7 @@ public:
     void setValue (float valueDb, juce::NotificationType notification = juce::dontSendNotification);
     float getValue() const noexcept { return static_cast<float> (fader.getValue()); }
     void setLevels (float leftDb, float rightDb);
+    void setBypassed (bool value) noexcept;
 
     void resized() override;
     void paint (juce::Graphics&) override;
@@ -67,6 +72,7 @@ private:
     juce::String label;
     juce::Slider fader;
     StereoMeter meter;
+    bool bypassed = false;
 };
 
 class GainReductionMeter final : public juce::Component
@@ -93,7 +99,8 @@ private:
     bool statusActive = false;
 };
 
-class CompactRackRow final : public juce::Component
+class CompactRackRow final : public juce::Component,
+                             public juce::SettableTooltipClient
 {
 public:
     CompactRackRow (int index, const juce::String& iconResource,
@@ -111,10 +118,13 @@ public:
 
     void resized() override;
     void paint (juce::Graphics&) override;
+    void mouseEnter (const juce::MouseEvent&) override { repaint(); }
+    void mouseExit (const juce::MouseEvent&) override { repaint(); }
     void mouseUp (const juce::MouseEvent&) override;
     void mouseDoubleClick (const juce::MouseEvent&) override;
 
 private:
+    void toggleBypassFromUi();
     int rowIndex = 0;
     juce::String moduleName;
     bool bypassAllowed = false;

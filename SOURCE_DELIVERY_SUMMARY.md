@@ -1,4 +1,24 @@
-# Sonkupik Live v0.9.9 — Source Delivery Summary
+# Sonkupik Live v0.10.0 — Source Delivery Summary
+
+## P1 premium polish and repository/build hygiene
+
+Implemented in v0.10.0:
+
+- integrated side-fader chassis and realistic premium fader thumb;
+- lightweight 24 Hz peak-hold meter display;
+- rack-row state capsules, hover hierarchy and full-row bypass interaction;
+- inset Noise Clean controls/visualizer bays;
+- dedicated Active Preset and Macro Control bays;
+- strengthened `.gitignore` for generated output, dependencies, packages and secrets;
+- root-level single-click `build-live-windows.bat`;
+- Release portable packaging with optional clean rebuild.
+
+Documentation and audit:
+
+```text
+docs/P1_PREMIUM_POLISH_v0.10.0.md
+qa/v0100_p1_audit.txt
+```
 
 ## P0 premium layout milestone
 
@@ -74,6 +94,14 @@ Presets checked: 40
 Passed: 40
 Failed: 0
 Result: PASS
+```
+
+## P1 source audit
+
+```text
+Checks : 25
+Passed : 25
+Failed : 0
 ```
 
 ## P0 source audit

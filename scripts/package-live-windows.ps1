@@ -2,16 +2,24 @@ param(
     [ValidateSet('Release','Debug')]
     [string]$Configuration = 'Release',
     [string]$BuildDir = 'build-live',
-    [string]$Version = '0.9.3',
+    [string]$Version = '0.10.0',
     [string]$JuceSourceDir = '',
-    [string]$AskpSourceDir = ''
+    [string]$AskpSourceDir = '',
+    [switch]$Clean
 )
 
 $ErrorActionPreference = 'Stop'
 $root = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 
-& (Join-Path $PSScriptRoot 'build-live-windows.ps1') `
-    -Configuration $Configuration -BuildDir $BuildDir -JuceSourceDir $JuceSourceDir -AskpSourceDir $AskpSourceDir
+$buildScriptArgs = @{
+    Configuration = $Configuration
+    BuildDir = $BuildDir
+    JuceSourceDir = $JuceSourceDir
+    AskpSourceDir = $AskpSourceDir
+}
+if ($Clean) { $buildScriptArgs.Clean = $true }
+
+& (Join-Path $PSScriptRoot 'build-live-windows.ps1') @buildScriptArgs
 
 $build = Join-Path $root $BuildDir
 $exe = Get-ChildItem $build -Recurse -Filter '*.exe' |

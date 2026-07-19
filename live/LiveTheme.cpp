@@ -38,6 +38,7 @@ void LiveLookAndFeel::drawRotarySlider (juce::Graphics& g, int x, int y, int wid
     const float angle = rotaryStartAngle + sliderPos * (rotaryEndAngle - rotaryStartAngle);
     const auto accent = slider.findColour (juce::Slider::rotarySliderFillColourId);
     const bool enabled = slider.isEnabled();
+    const bool engaged = slider.isMouseOverOrDragging();
     const float alpha = enabled ? 1.0f : 0.34f;
 
     juce::ColourGradient shadow (juce::Colours::black.withAlpha (0.60f * alpha), centre.x, bounds.getBottom(),
@@ -45,8 +46,8 @@ void LiveLookAndFeel::drawRotarySlider (juce::Graphics& g, int x, int y, int wid
     g.setGradientFill (shadow);
     g.fillEllipse (bounds.translated (0.0f, 3.0f));
 
-    g.setColour (colours::borderSoft.withAlpha (alpha));
-    g.drawEllipse (bounds.expanded (1.0f), 1.0f);
+    g.setColour ((engaged && enabled ? accent : colours::borderSoft).withAlpha (engaged && enabled ? 0.26f : alpha));
+    g.drawEllipse (bounds.expanded (1.0f), engaged && enabled ? 1.4f : 1.0f);
 
     juce::Path track;
     track.addCentredArc (centre.x, centre.y, radius + 1.0f, radius + 1.0f, 0.0f,
@@ -61,7 +62,7 @@ void LiveLookAndFeel::drawRotarySlider (juce::Graphics& g, int x, int y, int wid
     g.setColour (accent.withAlpha (enabled ? 0.22f : 0.06f));
     g.strokePath (active, juce::PathStrokeType (7.0f, juce::PathStrokeType::curved,
                                                 juce::PathStrokeType::rounded));
-    g.setColour ((enabled ? accent : colours::textMuted).withAlpha (enabled ? 1.0f : 0.55f));
+    g.setColour ((enabled ? accent : colours::textMuted).withAlpha (enabled ? (engaged ? 1.0f : 0.90f) : 0.55f));
     g.strokePath (active, juce::PathStrokeType (2.2f, juce::PathStrokeType::curved,
                                                 juce::PathStrokeType::rounded));
 
@@ -84,34 +85,62 @@ void LiveLookAndFeel::drawRotarySlider (juce::Graphics& g, int x, int y, int wid
 
 void LiveLookAndFeel::drawLinearSlider (juce::Graphics& g, int x, int y, int width, int height,
                                          float sliderPos, float, float,
-                                         const juce::Slider::SliderStyle style, juce::Slider&)
+                                         const juce::Slider::SliderStyle style, juce::Slider& slider)
 {
     if (style != juce::Slider::LinearVertical && style != juce::Slider::LinearBarVertical)
         return;
 
+    const bool engaged = slider.isMouseOverOrDragging();
+    const float alpha = slider.isEnabled() ? 1.0f : 0.42f;
     auto area = juce::Rectangle<float> ((float) x, (float) y, (float) width, (float) height).reduced (2.0f);
-    auto track = juce::Rectangle<float> (0.0f, area.getY(), 12.0f, area.getHeight()).withCentre (area.getCentre());
-    g.setColour (colours::black.withAlpha (0.55f));
-    g.fillRoundedRectangle (track, 6.0f);
-    g.setColour (colours::borderSoft.withAlpha (0.9f));
-    g.drawRoundedRectangle (track, 6.0f, 1.0f);
+    auto track = juce::Rectangle<float> (0.0f, area.getY(), 10.0f, area.getHeight()).withCentre (area.getCentre());
+
+    g.setColour (juce::Colours::black.withAlpha (0.20f * alpha));
+    g.fillRoundedRectangle (track.expanded (5.0f, 2.0f), 8.0f);
+    g.setColour (colours::black.withAlpha (0.72f * alpha));
+    g.fillRoundedRectangle (track, 5.0f);
+    g.setColour ((engaged ? colours::cyan : colours::borderSoft).withAlpha (engaged ? 0.32f : 0.88f));
+    g.drawRoundedRectangle (track, 5.0f, 1.0f);
 
     auto fill = track.withTop (sliderPos);
-    juce::ColourGradient grad (colours::cyan, fill.getCentreX(), fill.getBottom(),
-                               colours::blue, fill.getCentreX(), fill.getY(), false);
-    g.setGradientFill (grad);
-    g.fillRoundedRectangle (fill, 6.0f);
+    if (fill.getHeight() > 0.5f)
+    {
+        juce::ColourGradient grad (colours::cyan, fill.getCentreX(), fill.getBottom(),
+                                   colours::blue, fill.getCentreX(), fill.getY(), false);
+        grad.multiplyOpacity (alpha);
+        g.setGradientFill (grad);
+        g.fillRoundedRectangle (fill, 5.0f);
+    }
 
-    auto thumb = juce::Rectangle<float> (track.getX() - 11.0f, sliderPos - 11.0f, track.getWidth() + 22.0f, 22.0f);
-    juce::ColourGradient thumbGrad (juce::Colour (0xffe9eef4), thumb.getCentreX(), thumb.getY(),
-                                    juce::Colour (0xffaab5c2), thumb.getCentreX(), thumb.getBottom(), false);
-    thumbGrad.addColour (0.45, juce::Colour (0xffcfd7e2));
+    auto shadow = juce::Rectangle<float> (track.getX() - 15.0f, sliderPos - 12.0f,
+                                          track.getWidth() + 30.0f, 27.0f);
+    g.setColour (juce::Colours::black.withAlpha (0.34f * alpha));
+    g.fillRoundedRectangle (shadow.translated (0.0f, 2.0f), 7.0f);
+
+    auto thumb = shadow.withTrimmedBottom (3.0f);
+    juce::ColourGradient thumbGrad (engaged ? juce::Colour (0xfff0f5fa) : juce::Colour (0xffdfe6ee),
+                                    thumb.getCentreX(), thumb.getY(),
+                                    juce::Colour (0xff8c98a6), thumb.getCentreX(), thumb.getBottom(), false);
+    thumbGrad.addColour (0.32, juce::Colour (0xffcbd4de));
+    thumbGrad.addColour (0.68, juce::Colour (0xffaab5c1));
+    thumbGrad.multiplyOpacity (alpha);
     g.setGradientFill (thumbGrad);
     g.fillRoundedRectangle (thumb, 6.0f);
-    g.setColour (juce::Colours::white.withAlpha (0.78f));
-    g.drawRoundedRectangle (thumb, 6.0f, 1.0f);
-    g.setColour (juce::Colours::black.withAlpha (0.16f));
-    g.drawLine (thumb.getX() + 8.0f, thumb.getCentreY(), thumb.getRight() - 8.0f, thumb.getCentreY(), 1.2f);
+
+    g.setColour (juce::Colours::white.withAlpha (0.70f * alpha));
+    g.drawRoundedRectangle (thumb.reduced (0.5f), 6.0f, 1.0f);
+    g.setColour (juce::Colours::black.withAlpha (0.18f * alpha));
+    g.drawRoundedRectangle (thumb.reduced (2.0f), 4.5f, 1.0f);
+
+    const float grooveY = thumb.getCentreY();
+    g.setColour (juce::Colours::black.withAlpha (0.28f * alpha));
+    g.drawLine (thumb.getX() + 9.0f, grooveY, thumb.getRight() - 9.0f, grooveY, 1.4f);
+    g.setColour (juce::Colours::white.withAlpha (0.36f * alpha));
+    g.drawLine (thumb.getX() + 9.0f, grooveY - 1.2f, thumb.getRight() - 9.0f, grooveY - 1.2f, 0.8f);
+
+    g.setColour (juce::Colour (0xff66717f).withAlpha (0.65f * alpha));
+    g.fillEllipse (thumb.getX() + 5.0f, thumb.getCentreY() - 1.5f, 3.0f, 3.0f);
+    g.fillEllipse (thumb.getRight() - 8.0f, thumb.getCentreY() - 1.5f, 3.0f, 3.0f);
 }
 
 void LiveLookAndFeel::drawButtonBackground (juce::Graphics& g, juce::Button& button,

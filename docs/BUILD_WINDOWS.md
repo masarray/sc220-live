@@ -7,7 +7,23 @@
 - CMake bundled with Visual Studio or a newer CMake on PATH.
 - Git for Windows with access to the private `masarray/askp-vst` repository.
 
-## One-click build
+## Single-click build
+
+Double-click the root file:
+
+```text
+build-live-windows.bat
+```
+
+The BAT runs the Release build, creates `dist\Sonkupik-Live-v0.10.0-win-x64-portable.zip`, and opens the `dist` folder after success. The console remains open on failure so the complete compiler/linker message is visible.
+
+For a forced clean build:
+
+```bat
+build-live-windows.bat clean
+```
+
+## PowerShell build
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\scripts\build-live-windows.ps1 -Clean

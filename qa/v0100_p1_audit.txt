@@ -1,0 +1,32 @@
+Sonkupik Live v0.10.0 P1 Premium Polish Audit
+
+[PASS] CMake version 0.10.0
+[PASS] Application version 0.10.0
+[PASS] Single-click BAT exists
+[PASS] BAT builds and packages Release
+[PASS] BAT supports clean rebuild
+[PASS] Package script default version updated
+[PASS] Package script forwards clean build
+[PASS] CI runs current P1 audit
+[PASS] Live target remains headless
+[PASS] Git ignores build trees
+[PASS] Git ignores fetched dependencies
+[PASS] Git ignores signing material
+[PASS] Fader bypass state is explicit
+[PASS] Fader has integrated chassis
+[PASS] Stereo meter has lightweight peak hold
+[PASS] Premium fader thumb implemented
+[PASS] Rack row full click toggles bypass
+[PASS] Rack row status capsules implemented
+[PASS] Noise control inset bay exists
+[PASS] Visualizer inset bay exists
+[PASS] Enhancer preset bay exists
+[PASS] Enhancer macro bay exists
+[PASS] Fader bypass follows rack state
+[PASS] 24 Hz policy unchanged
+[PASS] P1 documentation exists
+
+Checks : 25
+Passed : 25
+Failed : 0
+Result : PASS

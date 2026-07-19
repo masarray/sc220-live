@@ -1,6 +1,6 @@
 # Sonkupik Live Development Context
 
-Current milestone: **v0.8.2 — authoritative engine/preset sync and lightweight liquid visualizer**.
+Current milestone: **v0.9.2 — authoritative engine/preset parity with 12 ms Live control response**.
 
 The application is intentionally not a DAW. It is a compact live signal rack for audio-interface input to VB-CABLE/OBS/TikTok Studio.
 
@@ -24,3 +24,7 @@ The application is intentionally not a DAW. It is a compact live signal rack for
 - `docs/REALTIME_SAFETY.md`
 - `docs/UX_SPEC.md`
 - `qa/v080_source_audit.txt`
+
+## Live-only processor delta
+
+The app may generate a local `PluginProcessor_Live.cpp` from the audited askp-vst source. The only permitted processing delta is the creative macro smoothing constant: 80 ms in the VST, 12 ms in Sonkupik Live. Do not fork preset values, DSP recipes, WOW policy, limiter, or preset-transition code.

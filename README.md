@@ -1,4 +1,4 @@
-# Sonkupik Live v0.8.2
+# Sonkupik Live v0.9.2
 
 **Sonkupik Live** is a lightweight native Windows live-audio rack for streamers who need professional enhancement without opening a full DAW.
 
@@ -14,9 +14,9 @@ Audio Interface
   -> OBS or TikTok Studio captures CABLE Output
 ```
 
-## v0.8.0 authority lock
+## v0.9.2 authoritative engine with Live control response
 
-The Live app no longer maintains a divergent copy of the enhancer recipe. CMake compiles the exact DSP and all **40 factory presets** from the audited private repository:
+Sonkupik Live compiles the authoritative DSP, 40 presets, WOW calibration, preset handover, lookahead safety, bypass path, meters, and scope tap from `askp-vst`. The only intentional processing-wrapper delta is a configure-time **12 ms creative-control glide** for live mouse control; the VST's 80 ms glide remains unchanged in the VST repository. Settled sound, preset values, coefficient recipes, limiter behaviour, and output policy remain authoritative.
 
 ```text
 repository : masarray/askp-vst
@@ -26,23 +26,16 @@ commit     : 655874dee6ee69df7212b8073ab941f9607d8faa
 
 The lock is recorded in `ASKP_AUTHORITY.lock`. The build script detects a sibling `askp-vst` checkout or automatically syncs the locked commit into `.deps/askp-vst` after Git authentication.
 
-## v0.8.2 UI lifecycle correction
+## Lightweight aquarium visualizer
 
-The main window explicitly owns the 24 Hz UI heartbeat. Showing the window enables status polling and the lock-free visual tap; hiding to tray stops both while the audio engine continues. This fixes frozen footer values, input/output meters and the liquid sphere after application startup.
-
-## Lightweight visual architecture
-
-The old spectrum graph is removed from the main workspace. The current hero visual follows the latest ArSonKuPik liquid visualizer architecture:
+The centre visual is a rectangular aquarium that consumes the authoritative VST `ScopeTap`. Visual data remains disposable and never blocks the audio callback:
 
 - 24 Hz only while the window is visible;
-- audio callback performs only a lossy lock-free stereo tap copy;
-- newest 4096 samples, six broad time-domain bands;
-- fixed 32-node liquid lattice, 8 bubbles and 12 droplets;
-- cached sphere/glass layers;
-- no visual FFT, tempo detector, beat prediction or dynamic particle allocation;
-- animation sleeps after silence and fully stops in tray mode.
+- fixed-size arrays and a lossy lock-free stereo scope queue;
+- no allocation, lock, FFT plan creation, or message-thread call in the audio callback;
+- timer and scope tap fully stop in tray mode.
 
-Musical Noise Clean still uses its own fixed 256/512 transform because spectral denoise requires it. That transform has a precomputed per-instance plan and no JUCE/shared FFT lock.
+The visual shape is intentionally different from the VST sphere, but the audio tap and audio engine remain shared.
 
 ## Windows build — Visual Studio Community 2026
 
@@ -75,7 +68,7 @@ powershell -ExecutionPolicy Bypass `
 ## Main workspace
 
 - **Left:** Before Enhancer rack, input fader and stereo meter.
-- **Centre:** Musical Noise Clean controls + liquid sphere, then the 40-preset Smart Enhancer and five macros.
+- **Centre:** Musical Noise Clean controls + rectangular aquarium visualizer, then the 40-preset Smart Enhancer and five macros.
 - **Right:** After Chain rack, output fader and stereo meter.
 - **Settings card:** sample rate, buffer size, channel mode and denoise quality.
 - **Footer:** average and callback-peak load, latency, dropouts, profile and tray state.
@@ -90,8 +83,13 @@ Read these first:
 - `docs/VISUALIZER_ARCHITECTURE_v0.8.0.md`
 - `docs/ASKP_SOURCE_SYNC.md`
 - `docs/REALTIME_SAFETY.md`
-- `qa/v080_source_audit.txt`
+- `docs/AUDIT_CONTROL_RESPONSE_v0.9.2.md`
+- `qa/v092_control_response_audit.txt`
 
 ## Current limitation
 
-v0.8.0 substantially reduces application-side deadline risk, but JUCE currently opens the physical input and VB-CABLE output through the Windows device backend. A future native dual-client `IAudioClient3` bridge with adaptive clock-drift correction remains the strongest route to a formal multi-hour anti-crackle guarantee.
+v0.9.2 removes the delayed background-engine rebuild and uses the VST real-time processor directly, but JUCE currently opens the physical input and VB-CABLE output through the Windows device backend. A future native dual-client `IAudioClient3` bridge with adaptive clock-drift correction remains the strongest route to a formal multi-hour anti-crackle guarantee.
+
+## Live knob response
+
+At configure time CMake creates a generated `PluginProcessor_Live.cpp` from the locked `askp-vst` processor and replaces only the 80 ms creative macro glide with 12 ms. The build fails if the audited source anchor is missing, preventing a silent patch against an unknown processor revision. See `docs/AUDIT_CONTROL_RESPONSE_v0.9.2.md`.

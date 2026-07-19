@@ -222,7 +222,7 @@ private:
 } // namespace
 
 LiveMainComponent::LiveMainComponent (LiveAudioEngine& engine, WindowActions actions)
-    : audioEngine (engine), windowActions (std::move (actions)), visualizer (engine)
+    : audioEngine (engine), windowActions (std::move (actions)), visualizer (engine.getAskpProcessor())
 {
     setLookAndFeel (&lookAndFeel);
     setWantsKeyboardFocus (true);
@@ -233,13 +233,13 @@ LiveMainComponent::LiveMainComponent (LiveAudioEngine& engine, WindowActions act
     // later visibilityChanged() notification is not reliable across all JUCE
     // window creation paths. The application calls setUiActive(true) after the
     // window is visible.
-    visualizer.setVisualEnabled (false);
+    audioEngine.setVisualTapEnabled (false);
 }
 
 LiveMainComponent::~LiveMainComponent()
 {
     stopTimer();
-    visualizer.setVisualEnabled (false);
+    audioEngine.setVisualTapEnabled (false);
     setLookAndFeel (nullptr);
 }
 
@@ -250,9 +250,9 @@ void LiveMainComponent::configureControls()
              &inputDevice, &outputDevice,
              &inputTrimRow, &noiseRow, &vstPreRow, &inputFader,
              &noiseReduction, &silenceAmount, &preserveAmount, &visualizer,
-             &profileStatus, &learnNoise,
+             &profileStatus, &learnNoise, &noiseBypass,
              &preset, &enhanceKnob, &bassKnob, &trebleKnob, &vocalKnob, &stereoKnob,
-             &gainReductionMeter,
+             &gainReductionMeter, &enhancerPower,
              &vstPostRow, &outputTrimRow, &limiterRow, &outputFader,
              &cpuStat, &latencyStat, &dropoutsStat, &profileStat, &trayStat })
         addAndMakeVisible (component);
@@ -268,6 +268,28 @@ void LiveMainComponent::configureControls()
     minimiseButton.onClick = [this] { if (windowActions.minimise) windowActions.minimise(); };
     maximiseButton.onClick = [this] { if (windowActions.toggleMaximise) windowActions.toggleMaximise(); };
     closeButton.onClick = [this] { if (windowActions.hideToTray) windowActions.hideToTray(); };
+
+    noiseBypass.setTooltip ("Bypass Musical Noise Clean and the smooth expander");
+    noiseBypass.setClickingTogglesState (true);
+    noiseBypass.setToggleState (! audioEngine.getNoiseClean().isEnabled() ? false : true, juce::dontSendNotification);
+    noiseBypass.onClick = [this]
+    {
+        const bool enabled = noiseBypass.getToggleState();
+        audioEngine.getNoiseClean().setEnabled (enabled);
+        audioEngine.getExpander().setEnabled (enabled);
+        noiseRow.setBypassed (! enabled);
+        repaint();
+    };
+
+    enhancerPower.setTooltip ("Bypass only the authoritative ArSonKuPik Smart Enhancer");
+    enhancerPower.setClickingTogglesState (true);
+    enhancerPower.setToggleState (! audioEngine.isBypassed(), juce::dontSendNotification);
+    enhancerPower.onClick = [this]
+    {
+        audioEngine.setBypassed (! enhancerPower.getToggleState());
+        updateStatus();
+        repaint();
+    };
 
     styleCombo (inputDevice, "Audio interface input device");
     styleCombo (outputDevice, "Audio output device; select CABLE Input for streaming");
@@ -357,10 +379,19 @@ void LiveMainComponent::configureControls()
         if (! updatingControls) audioEngine.setOutputTrimDb (valueDb);
     };
 
+    inputTrimRow.onBypassChanged = [this] (bool bypassed)
+    {
+        audioEngine.setInputTrimBypassed (bypassed);
+    };
     noiseRow.onBypassChanged = [this] (bool bypassed)
     {
         audioEngine.getNoiseClean().setEnabled (! bypassed);
         audioEngine.getExpander().setEnabled (! bypassed);
+        noiseBypass.setToggleState (! bypassed, juce::dontSendNotification);
+    };
+    outputTrimRow.onBypassChanged = [this] (bool bypassed)
+    {
+        audioEngine.setOutputTrimBypassed (bypassed);
     };
     vstPreRow.onOpen = vstPostRow.onOpen = [this] { showExternalVstRoadmap(); };
 }
@@ -384,7 +415,11 @@ void LiveMainComponent::refreshAllControls()
     stereoKnob.setValue (audioEngine.getStereoMagic());
     inputFader.setValue (audioEngine.getInputTrimDb());
     outputFader.setValue (audioEngine.getOutputTrimDb());
+    inputTrimRow.setBypassed (audioEngine.isInputTrimBypassed());
     noiseRow.setBypassed (! audioEngine.getNoiseClean().isEnabled());
+    noiseBypass.setToggleState (audioEngine.getNoiseClean().isEnabled(), juce::dontSendNotification);
+    outputTrimRow.setBypassed (audioEngine.isOutputTrimBypassed());
+    enhancerPower.setToggleState (! audioEngine.isBypassed(), juce::dontSendNotification);
     updatingControls = false;
 }
 
@@ -469,9 +504,9 @@ void LiveMainComponent::paint (juce::Graphics& g)
     drawFieldLabel (g, lf, outputLabelArea.removeFromLeft (60), "Output");
 
     drawSectionTitle (g, noiseArea.removeFromTop (42).reduced (16, 0).toFloat(),
-                      "MUSICAL NOISE CLEAN", "PROFILE-BASED / MUSIC SAFE");
+                      "MUSICAL NOISE CLEAN");
     drawSectionTitle (g, enhancerArea.removeFromTop (42).reduced (16, 0).toFloat(),
-                      "MAS ARI SIGNATURE", "SMART ENHANCER ENGINE");
+                      "SMART SOUND ENHANCER");
 
     g.setColour (colours::border);
     g.drawHorizontalLine (getHeight() - footerHeight, 12.0f, static_cast<float> (getWidth() - 12));
@@ -529,7 +564,8 @@ void LiveMainComponent::resized()
     centre.removeFromTop (10);
     auto enhancerArea = centre.reduced (14);
 
-    noiseArea.removeFromTop (42);
+    auto noiseHeader = noiseArea.removeFromTop (42);
+    noiseBypass.setBounds (noiseHeader.removeFromRight (34).withSizeKeepingCentre (34, 34));
     auto noiseControlColumn = noiseArea.removeFromLeft (320);
     noiseArea.removeFromLeft (14);
 
@@ -543,10 +579,10 @@ void LiveMainComponent::resized()
     noiseControlColumn.removeFromTop (7);
     learnNoise.setBounds (noiseControlColumn.removeFromTop (36));
 
-    const int orbSize = juce::jmin (noiseArea.getWidth(), noiseArea.getHeight());
-    visualizer.setBounds (juce::Rectangle<int> (orbSize, orbSize).withCentre (noiseArea.getCentre()));
+    visualizer.setBounds (noiseArea.reduced (2));
 
-    enhancerArea.removeFromTop (42);
+    auto enhancerHeader = enhancerArea.removeFromTop (42);
+    enhancerPower.setBounds (enhancerHeader.removeFromRight (34).withSizeKeepingCentre (34, 34));
     auto topStrip = enhancerArea.removeFromTop (38);
     preset.setBounds (topStrip.removeFromLeft (240));
     topStrip.removeFromLeft (14);
@@ -599,7 +635,7 @@ void LiveMainComponent::setUiActive (bool active)
     }
 
     uiActive = active;
-    visualizer.setVisualEnabled (active);
+    audioEngine.setVisualTapEnabled (active);
 
     if (active)
     {
@@ -646,6 +682,26 @@ void LiveMainComponent::updateStatus()
     }
 
     visualizer.refresh (audioEngine.isBypassed());
+
+    const bool noiseEnabled = audioEngine.getNoiseClean().isEnabled();
+    noiseReduction.setEnabled (noiseEnabled);
+    silenceAmount.setEnabled (noiseEnabled);
+    preserveAmount.setEnabled (noiseEnabled);
+    learnNoise.setEnabled (noiseEnabled);
+
+    const bool enhancerEnabled = ! audioEngine.isBypassed();
+    preset.setEnabled (enhancerEnabled);
+    enhanceKnob.setEnabled (enhancerEnabled);
+    bassKnob.setEnabled (enhancerEnabled);
+    trebleKnob.setEnabled (enhancerEnabled);
+    vocalKnob.setEnabled (enhancerEnabled);
+    stereoKnob.setEnabled (enhancerEnabled);
+    gainReductionMeter.setEnabled (enhancerEnabled);
+
+    if (enhancerPower.getToggleState() == audioEngine.isBypassed())
+        enhancerPower.setToggleState (! audioEngine.isBypassed(), juce::dontSendNotification);
+    if (noiseBypass.getToggleState() != audioEngine.getNoiseClean().isEnabled())
+        noiseBypass.setToggleState (audioEngine.getNoiseClean().isEnabled(), juce::dontSendNotification);
 
     cpuStat.setValue (juce::String (status.cpuPercent, 1) + "% / peak "
                       + juce::String (status.callbackPeakPercent, 0) + "%",

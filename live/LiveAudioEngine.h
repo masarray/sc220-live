@@ -1,14 +1,11 @@
 #pragma once
 
 #include "MusicalNoiseClean.h"
-#include "VisualScopeTap.h"
-#include "arsonkupik_dsp.hpp"
+#include "PluginProcessor.h"
 
 #include <juce_audio_devices/juce_audio_devices.h>
 
-#include <array>
 #include <atomic>
-#include <cstdint>
 #include <memory>
 
 namespace askp::live {
@@ -47,6 +44,8 @@ public:
     void shutdown();
 
     juce::AudioDeviceManager& getDeviceManager() noexcept { return deviceManager; }
+    askp::Processor& getAskpProcessor() noexcept { return enhancerProcessor; }
+    const askp::Processor& getAskpProcessor() const noexcept { return enhancerProcessor; }
 
     juce::StringArray getInputDeviceNames();
     juce::StringArray getOutputDeviceNames();
@@ -60,21 +59,26 @@ public:
     void setInputChannelMode (int channels) noexcept { inputChannelMode.store (channels <= 1 ? 1 : 2); }
     int getInputChannelMode() const noexcept { return inputChannelMode.load(); }
     double getCurrentSampleRate() const noexcept { return currentSampleRate.load(); }
-    void setInputTrimDb (float value) noexcept { inputTrimDb.store (juce::jlimit (-60.0f, 12.0f, value)); }
+
+    void setInputTrimDb (float value) noexcept;
     float getInputTrimDb() const noexcept { return inputTrimDb.load(); }
-    void setOutputTrimDb (float value) noexcept { outputTrimDb.store (juce::jlimit (-60.0f, 12.0f, value)); }
+    void setOutputTrimDb (float value) noexcept;
     float getOutputTrimDb() const noexcept { return outputTrimDb.load(); }
+    void setInputTrimBypassed (bool value) noexcept;
+    bool isInputTrimBypassed() const noexcept { return inputTrimBypassed.load(); }
+    void setOutputTrimBypassed (bool value) noexcept;
+    bool isOutputTrimBypassed() const noexcept { return outputTrimBypassed.load(); }
 
     void setEngineEnabled (bool value) noexcept { engineEnabled.store (value); }
     bool isEngineEnabled() const noexcept { return engineEnabled.load(); }
-    void setBypassed (bool value) noexcept { bypassed.store (value); }
-    bool isBypassed() const noexcept { return bypassed.load(); }
+    void setBypassed (bool value) noexcept;
+    bool isBypassed() const noexcept { return enhancerBypassed.load(); }
     void setOutputMuted (bool value) noexcept { outputMuted.store (value); }
     bool isOutputMuted() const noexcept { return outputMuted.load(); }
     void restartAudio();
 
     void setPresetIndex (int index);
-    int getPresetIndex() const noexcept { return presetIndex.load(); }
+    int getPresetIndex() const noexcept;
     juce::StringArray getPresetNames() const;
 
     void setEnhance (float value) noexcept;
@@ -83,11 +87,11 @@ public:
     void setVocalBody (float value) noexcept;
     void setStereoMagic (float value) noexcept;
 
-    float getEnhance() const noexcept { return enhance.load(); }
-    float getSmartBass() const noexcept { return smartBass.load(); }
-    float getSmartTreble() const noexcept { return smartTreble.load(); }
-    float getVocalBody() const noexcept { return vocalBody.load(); }
-    float getStereoMagic() const noexcept { return stereoMagic.load(); }
+    float getEnhance() const noexcept;
+    float getSmartBass() const noexcept;
+    float getSmartTreble() const noexcept;
+    float getVocalBody() const noexcept;
+    float getStereoMagic() const noexcept;
 
     MusicalNoiseClean& getNoiseClean() noexcept { return noiseClean; }
     SmoothDownwardExpander& getExpander() noexcept { return expander; }
@@ -95,10 +99,9 @@ public:
     Status getStatus() const;
     std::unique_ptr<juce::XmlElement> createDeviceState() const;
 
-    void setVisualTapEnabled (bool enabled) noexcept { visualTap.setEnabled (enabled); }
-    int copyLatestVisualSamples (float* left, float* right, int wanted) noexcept
+    void setVisualTapEnabled (bool enabled) noexcept
     {
-        return visualTap.popLatest (left, right, wanted);
+        enhancerProcessor.scopeTap.setEnabled (enabled);
     }
 
     // AudioIODeviceCallback
@@ -113,73 +116,36 @@ public:
     void audioDeviceError (const juce::String& errorMessage) override;
 
 private:
-    enum EngineSlotState : int
-    {
-        slotFree = 0,
-        slotBuilding,
-        slotPending,
-        slotActive,
-        slotTransition
-    };
-
-    static constexpr int engineSlotCount = 3;
-
-    class EngineBuilderThread final : public juce::Thread
-    {
-    public:
-        explicit EngineBuilderThread (LiveAudioEngine& ownerToUse)
-            : juce::Thread ("ArSonKuPik DSP Builder"), owner (ownerToUse) {}
-        void run() override;
-    private:
-        LiveAudioEngine& owner;
-    };
-
     void changeListenerCallback (juce::ChangeBroadcaster*) override;
-    void requestEngineRebuild() noexcept;
-    bool buildLatestEngineOffAudioThread();
-    arsonkupik::RuntimeParams makeRuntimeParamsSnapshot() const;
-    void activatePendingEngineIfReady (bool instant) noexcept;
-    void processEnhancerWithTransition (int channels, int numSamples) noexcept;
     void clearOutputs (float* const* outputChannelData, int channels, int samples) noexcept;
-    void updateMeters (const juce::AudioBuffer<float>& input,
-                       const juce::AudioBuffer<float>& output) noexcept;
+    void updateMeters (const juce::AudioBuffer<float>& finalOutput) noexcept;
     void refreshDeviceStatus();
+    void setAskpParameter (const char* parameterId, float plainValue) noexcept;
+    float getAskpParameter (const char* parameterId, float fallback = 0.0f) const noexcept;
+    void updateInputTrimRouting() noexcept;
+    void updateOutputTrimRouting() noexcept;
     static bool looksLikeVirtualCable (const juce::String& name);
 
     juce::AudioDeviceManager deviceManager;
     juce::AudioBuffer<float> processBuffer;
     juce::AudioBuffer<float> detectorBuffer;
-    juce::AudioBuffer<float> transitionBuffer;
+    juce::MidiBuffer emptyMidi;
 
     MusicalNoiseClean noiseClean;
     SmoothDownwardExpander expander;
-    LiveSafetyLimiter safetyLimiter;
-    VisualScopeTap visualTap;
+    askp::Processor enhancerProcessor;
 
-    std::array<std::unique_ptr<arsonkupik::ArSonKuPikEngine>, engineSlotCount> enhancerSlots;
-    std::array<std::atomic<int>, engineSlotCount> engineSlotStates {};
-    std::atomic<int> activeEngineSlot { 0 };
-    std::atomic<int> pendingEngineSlot { -1 };
-    int transitionOldSlot = -1;
-    int transitionSamplesRemaining = 0;
-    int transitionTotalSamples = 1;
-    std::atomic<uint64_t> parameterRevision { 1 };
-    std::atomic<uint64_t> builtRevision { 0 };
-    juce::CriticalSection engineBuildLock;
-    EngineBuilderThread engineBuilder { *this };
+    juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> inputGainLinear;
+    juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> outputGainLinear;
 
     std::atomic<bool> engineEnabled { true };
     std::atomic<float> inputTrimDb { 0.0f };
     std::atomic<float> outputTrimDb { 0.0f };
+    std::atomic<bool> inputTrimBypassed { false };
+    std::atomic<bool> outputTrimBypassed { false };
     std::atomic<int> inputChannelMode { 2 };
-    std::atomic<bool> bypassed { false };
+    std::atomic<bool> enhancerBypassed { false };
     std::atomic<bool> outputMuted { false };
-    std::atomic<int> presetIndex { 0 };
-    std::atomic<float> enhance { 65.0f };
-    std::atomic<float> smartBass { 55.0f };
-    std::atomic<float> smartTreble { 70.0f };
-    std::atomic<float> vocalBody { 65.0f };
-    std::atomic<float> stereoMagic { 85.0f };
 
     std::atomic<bool> callbackRegistered { false };
     std::atomic<bool> running { false };

@@ -2,7 +2,7 @@
 
 #include "LiveAudioEngine.h"
 #include "LiveWidgets.h"
-#include "LiveLiquidVisualizer.h"
+#include "AquariumVisualizer.h"
 
 #include <juce_gui_extra/juce_gui_extra.h>
 
@@ -56,15 +56,15 @@ private:
     juce::ComboBox inputDevice;
     juce::ComboBox outputDevice;
 
-    CompactRackRow inputTrimRow { 1, "sliders_horizontal_svg", "Input Trim", false };
+    CompactRackRow inputTrimRow { 1, "sliders_horizontal_svg", "Input Trim", true };
     CompactRackRow noiseRow { 2, "audio_waveform_svg", "Musical Noise Clean", true, true };
-    CompactRackRow vstPreRow { 3, "plug_zap_svg", "External VST Slot", false };
+    CompactRackRow vstPreRow { 3, "plug_zap_svg", "External VST Slot", false, false, false, true };
     VolumeFader inputFader { "Input Volume" };
 
     KnobControl noiseReduction { "Reduction", " dB", colours::cyan, 0.0, 12.0, 0.1 };
     KnobControl silenceAmount { "Silence", "%", colours::violet, 0.0, 100.0, 1.0 };
     KnobControl preserveAmount { "Preserve", "%", colours::cyan, 0.0, 100.0, 1.0 };
-    LiveLiquidVisualizer visualizer;
+    askp::live::AquariumVisualizer visualizer;
     StatusPill profileStatus;
     juce::TextButton learnNoise { "Learn Noise" };
 
@@ -75,9 +75,11 @@ private:
     KnobControl vocalKnob { "Vocal Body", "%", colours::violet, 0.0, 100.0, 0.1 };
     KnobControl stereoKnob { "Stereo Magic", "%", colours::cyan, 0.0, 100.0, 0.1 };
     GainReductionMeter gainReductionMeter;
+    LucideIconButton noiseBypass { "Noise Clean Bypass", "power_svg", colours::cyan };
+    LucideIconButton enhancerPower { "Smart Enhancer Bypass", "power_svg", colours::cyan };
 
-    CompactRackRow vstPostRow { 1, "plug_zap_svg", "External VST Slot", false };
-    CompactRackRow outputTrimRow { 2, "sliders_horizontal_svg", "Output Trim", false };
+    CompactRackRow vstPostRow { 1, "plug_zap_svg", "External VST Slot", false, false, false, true };
+    CompactRackRow outputTrimRow { 2, "sliders_horizontal_svg", "Output Trim", true };
     CompactRackRow limiterRow { 3, "shield_check_svg", "Safety Limiter", false, false, true };
     VolumeFader outputFader { "Output Volume" };
 

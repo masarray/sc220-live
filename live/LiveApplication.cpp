@@ -234,7 +234,7 @@ class SonkupikLiveApplication final : public juce::JUCEApplication
 {
 public:
     const juce::String getApplicationName() override { return "Sonkupik Live"; }
-    const juce::String getApplicationVersion() override { return "0.8.2"; }
+    const juce::String getApplicationVersion() override { return "0.9.2"; }
     bool moreThanOneInstanceAllowed() override { return false; }
 
     void initialise (const juce::String&) override
@@ -261,6 +261,8 @@ public:
             audioEngine->setInputChannelMode (file->getIntValue ("inputChannelMode", 2));
             audioEngine->setInputTrimDb (static_cast<float> (file->getDoubleValue ("inputTrimDb", 0.0)));
             audioEngine->setOutputTrimDb (static_cast<float> (file->getDoubleValue ("outputTrimDb", 0.0)));
+            audioEngine->setInputTrimBypassed (file->getBoolValue ("inputTrimBypassed", false));
+            audioEngine->setOutputTrimBypassed (file->getBoolValue ("outputTrimBypassed", false));
             audioEngine->setPresetIndex (file->getIntValue ("presetIndex", 0));
             audioEngine->setEnhance (static_cast<float> (file->getDoubleValue ("enhance", audioEngine->getEnhance())));
             audioEngine->setSmartBass (static_cast<float> (file->getDoubleValue ("smartBass", audioEngine->getSmartBass())));
@@ -273,6 +275,10 @@ public:
                 ? MusicalNoiseClean::Quality::clean512
                 : MusicalNoiseClean::Quality::live256);
             audioEngine->getExpander().setAmount (static_cast<float> (file->getDoubleValue ("expanderAmount", 0.55)));
+            const bool noiseEnabled = file->getBoolValue ("noiseCleanEnabled", true);
+            audioEngine->getNoiseClean().setEnabled (noiseEnabled);
+            audioEngine->getExpander().setEnabled (noiseEnabled);
+            audioEngine->setBypassed (file->getBoolValue ("enhancerBypassed", false));
             audioEngine->setEngineEnabled (file->getBoolValue ("engineEnabled", true));
         }
         audioEngine->initialise (deviceState.get());
@@ -384,6 +390,8 @@ private:
             file->setValue ("inputChannelMode", audioEngine->getInputChannelMode());
             file->setValue ("inputTrimDb", audioEngine->getInputTrimDb());
             file->setValue ("outputTrimDb", audioEngine->getOutputTrimDb());
+            file->setValue ("inputTrimBypassed", audioEngine->isInputTrimBypassed());
+            file->setValue ("outputTrimBypassed", audioEngine->isOutputTrimBypassed());
             file->setValue ("enhance", audioEngine->getEnhance());
             file->setValue ("smartBass", audioEngine->getSmartBass());
             file->setValue ("smartTreble", audioEngine->getSmartTreble());
@@ -393,6 +401,8 @@ private:
             file->setValue ("noisePreserve", audioEngine->getNoiseClean().getPreserve());
             file->setValue ("noiseQuality", audioEngine->getNoiseClean().getQuality() == MusicalNoiseClean::Quality::clean512 ? 1 : 0);
             file->setValue ("expanderAmount", audioEngine->getExpander().getAmount());
+            file->setValue ("noiseCleanEnabled", audioEngine->getNoiseClean().isEnabled());
+            file->setValue ("enhancerBypassed", audioEngine->isBypassed());
             file->setValue ("engineEnabled", audioEngine->isEngineEnabled());
             file->saveIfNeeded();
         }

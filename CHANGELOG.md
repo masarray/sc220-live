@@ -1,13 +1,26 @@
 # Changelog
 
-## v0.8.2 - 2026-07-19 - Live meter and liquid visualizer lifecycle fix
+## v0.9.2 - 2026-07-19 - P1 live knob response
 
-- Fixed the main UI timer being stopped during construction while `isShowing()` was false and not reliably restarted when the top-level window became visible.
-- Added explicit `setUiActive()` ownership from the application show/hide path instead of relying only on JUCE visibility notifications.
-- Restored 24 Hz status polling, footer values, input/output stereo meters, gain-reduction display and liquid visualizer refresh.
-- Explicitly enables/disables the lock-free visual tap with the main window lifecycle; hidden-to-tray mode remains lightweight.
-- Added immediate status refresh on window open so meters and footer no longer appear frozen until a later timer tick.
-- Reset liquid analysis when re-enabled so reopening from tray starts from fresh samples without stale motion.
+- Audited the complete UI-to-DSP parameter path for Enhance, Smart Bass, Smart Treble, Vocal Body, and Stereo Magic.
+- Identified the authoritative VST's 80 ms `SmoothedValue` glide as the remaining source of the detached live-control feel during continuous dragging.
+- Added a configure-time generated `PluginProcessor_Live.cpp` overlay that changes only creative-control smoothing from 80 ms to 12 ms.
+- Kept the authoritative DSP engine, 40 presets, 400 Hz coefficient-retune ceiling, preset transition, WOW calibration, bypass, lookahead limiter, output ceiling, and settled parameter values unchanged.
+- Added a hard CMake anchor check: build stops instead of applying the overlay to an unaudited `askp-vst` processor revision.
+- Added static and mathematical response audits for common 48 kHz buffer sizes.
+
+## v0.9.0 - 2026-07-19 - Full VST parity and functional rack controls
+
+- Replaced the custom Live enhancer wrapper with the authoritative `askp::Processor` from `askp-vst`.
+- Restored exact VST macro smoothing, 400 Hz in-place retune, dual-engine preset handover, WOW calibration, one-millisecond lookahead safety, meters, and latency-aligned bypass.
+- Removed the delayed 35 Hz background full-engine rebuild responsible for sluggish knob response.
+- Replaced the shortened Live liquid implementation with the exact VST `OrbVisualizer` and scope tap.
+- Added a visible Smart Enhancer bypass button.
+- Wired Input Trim, Noise Clean, and Output Trim rack power controls.
+- Replaced misleading disabled external-slot power icons with functional ADD actions.
+- Preserved the locked final VST safety limiter.
+- Added a parity and interaction root-cause audit.
+
 
 ## v0.8.1 - 2026-07-19 - Windows compile fix and leaner JUCE linkage
 

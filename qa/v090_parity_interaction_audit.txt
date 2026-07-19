@@ -1,0 +1,22 @@
+SONKUPIK LIVE v0.9.0 PARITY / INTERACTION SOURCE AUDIT
+
+Checks : 16
+Passed : 16
+Failed : 0
+
+[PASS] Version 0.9.0
+[PASS] Authoritative PluginProcessor compiled
+[PASS] Exact OrbVisualizer compiled
+[PASS] Exact processor member
+[PASS] No custom engine builder
+[PASS] No custom Live visualizer source
+[PASS] Main uses exact OrbVisualizer
+[PASS] Direct VST processBlock
+[PASS] Main enhancer bypass control
+[PASS] Input trim bypass wired
+[PASS] Output trim bypass wired
+[PASS] Noise bypass wired
+[PASS] External ADD action
+[PASS] Locked safety limiter
+[PASS] No delayed 28ms builder coalescing
+[PASS] VST visual tap toggled

@@ -84,28 +84,31 @@ void LiveLookAndFeel::drawLinearSlider (juce::Graphics& g, int x, int y, int wid
                                          const juce::Slider::SliderStyle style, juce::Slider&)
 {
     if (style != juce::Slider::LinearVertical && style != juce::Slider::LinearBarVertical)
-    {
         return;
-    }
 
     auto area = juce::Rectangle<float> ((float) x, (float) y, (float) width, (float) height).reduced (2.0f);
-    auto track = area.withWidth (8.0f).withCentre (area.getCentre());
-    g.setColour (colours::black.withAlpha (0.72f));
-    g.fillRoundedRectangle (track, 4.0f);
-    g.setColour (colours::borderSoft);
-    g.drawRoundedRectangle (track, 4.0f, 1.0f);
+    auto track = juce::Rectangle<float> (0.0f, area.getY(), 12.0f, area.getHeight()).withCentre (area.getCentre());
+    g.setColour (colours::black.withAlpha (0.55f));
+    g.fillRoundedRectangle (track, 6.0f);
+    g.setColour (colours::borderSoft.withAlpha (0.9f));
+    g.drawRoundedRectangle (track, 6.0f, 1.0f);
 
     auto fill = track.withTop (sliderPos);
     juce::ColourGradient grad (colours::cyan, fill.getCentreX(), fill.getBottom(),
                                colours::blue, fill.getCentreX(), fill.getY(), false);
     g.setGradientFill (grad);
-    g.fillRoundedRectangle (fill, 4.0f);
+    g.fillRoundedRectangle (fill, 6.0f);
 
-    auto thumb = juce::Rectangle<float> (track.getX() - 7.0f, sliderPos - 9.0f, track.getWidth() + 14.0f, 18.0f);
-    g.setColour (juce::Colour (0xffbcc7d4));
-    g.fillRoundedRectangle (thumb, 4.0f);
-    g.setColour (juce::Colours::white.withAlpha (0.6f));
-    g.drawRoundedRectangle (thumb, 4.0f, 1.0f);
+    auto thumb = juce::Rectangle<float> (track.getX() - 11.0f, sliderPos - 11.0f, track.getWidth() + 22.0f, 22.0f);
+    juce::ColourGradient thumbGrad (juce::Colour (0xffe9eef4), thumb.getCentreX(), thumb.getY(),
+                                    juce::Colour (0xffaab5c2), thumb.getCentreX(), thumb.getBottom(), false);
+    thumbGrad.addColour (0.45, juce::Colour (0xffcfd7e2));
+    g.setGradientFill (thumbGrad);
+    g.fillRoundedRectangle (thumb, 6.0f);
+    g.setColour (juce::Colours::white.withAlpha (0.78f));
+    g.drawRoundedRectangle (thumb, 6.0f, 1.0f);
+    g.setColour (juce::Colours::black.withAlpha (0.16f));
+    g.drawLine (thumb.getX() + 8.0f, thumb.getCentreY(), thumb.getRight() - 8.0f, thumb.getCentreY(), 1.2f);
 }
 
 void LiveLookAndFeel::drawButtonBackground (juce::Graphics& g, juce::Button& button,
@@ -246,17 +249,29 @@ void LiveLookAndFeel::drawToggleButton (juce::Graphics& g, juce::ToggleButton& b
 void LiveLookAndFeel::drawTooltip (juce::Graphics& g, const juce::String& text,
                                    int width, int height)
 {
-    g.setColour (colours::panelHi);
-    g.fillRoundedRectangle (juce::Rectangle<float> (0.0f, 0.0f,
-                                                     static_cast<float> (width),
-                                                     static_cast<float> (height)), 6.0f);
+    auto bubble = juce::Rectangle<float> (6.0f, 0.0f, static_cast<float> (width - 12), static_cast<float> (height - 8));
+    juce::Path callout;
+    callout.addRoundedRectangle (bubble, 9.0f);
+    callout.startNewSubPath (22.0f, bubble.getBottom());
+    callout.lineTo (30.0f, bubble.getBottom() + 8.0f);
+    callout.lineTo (38.0f, bubble.getBottom());
+
+    g.setColour (juce::Colours::black.withAlpha (0.26f));
+    g.fillPath (callout, juce::AffineTransform::translation (0.0f, 2.0f));
+
+    juce::ColourGradient bg (colours::panelHi.brighter (0.03f), bubble.getX(), bubble.getY(),
+                             colours::panelLo, bubble.getRight(), bubble.getBottom(), false);
+    g.setGradientFill (bg);
+    g.fillPath (callout);
+
+    g.setColour (colours::cyan.withAlpha (0.16f));
+    g.fillRoundedRectangle (bubble.reduced (1.5f).withHeight (12.0f), 8.0f);
     g.setColour (colours::border);
-    g.drawRoundedRectangle (juce::Rectangle<float> (0.5f, 0.5f,
-                                                     static_cast<float> (width - 1),
-                                                     static_cast<float> (height - 1)), 6.0f, 1.0f);
+    g.strokePath (callout, juce::PathStrokeType (1.0f));
+
     g.setColour (colours::text);
     g.setFont (jakarta (12.0f));
-    g.drawFittedText (text, 9, 4, width - 18, height - 8,
+    g.drawFittedText (text, 16, 7, width - 28, height - 20,
                       juce::Justification::centredLeft, 2);
 }
 

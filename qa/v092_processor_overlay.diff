@@ -1,0 +1,11 @@
+--- askp-vst/src/PluginProcessor.cpp
++++ generated/PluginProcessor_Live.cpp
+@@ -416,7 +416,7 @@
+     resetLookaheadGain();
+     setLatencySamples(lookaheadSamples_);
+ 
+-    const double ramp = 0.08; // 80 ms knob glide
++    const double ramp = 0.012; // Sonkupik Live low-latency macro glide
+     auto init = [&](Smooth& s, const char* id) {
+         s.reset(sampleRate, ramp);
+         s.setCurrentAndTargetValue(apvts.getRawParameterValue(id)->load());

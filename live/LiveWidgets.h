@@ -94,7 +94,8 @@ class CompactRackRow final : public juce::Component
 public:
     CompactRackRow (int index, const juce::String& iconResource,
                     const juce::String& name, bool canBypass,
-                    bool selected = false, bool locked = false);
+                    bool selected = false, bool locked = false,
+                    bool openOnly = false);
 
     std::function<void(bool)> onBypassChanged;
     std::function<void()> onOpen;
@@ -106,6 +107,7 @@ public:
 
     void resized() override;
     void paint (juce::Graphics&) override;
+    void mouseUp (const juce::MouseEvent&) override;
     void mouseDoubleClick (const juce::MouseEvent&) override;
 
 private:
@@ -114,9 +116,10 @@ private:
     bool bypassAllowed = false;
     bool selectedState = false;
     bool lockedState = false;
+    bool openOnlyState = false;
     bool bypassed = false;
     std::unique_ptr<juce::Drawable> moduleIcon;
-    LucideIconButton power { "Power", "power_svg", colours::cyan };
+    std::unique_ptr<LucideIconButton> actionButton;
 };
 
 class MiniStat final : public juce::Component

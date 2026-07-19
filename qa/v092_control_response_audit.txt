@@ -1,0 +1,26 @@
+SONKUPIK LIVE v0.9.2 P1 CONTROL RESPONSE AUDIT
+=======================================================
+[PASS] Version 0.9.2
+[PASS] 12 ms live control overlay
+[PASS] Audited 80 ms anchor
+[PASS] Unknown authority revision fails
+[PASS] Generated processor compiled
+[PASS] Original processor not compiled in target
+[PASS] Direct askp processor block
+[PASS] Direct UI macro setters
+[PASS] No legacy live engine builder
+[PASS] P1 audit documentation
+[PASS] Authority Processor source exists
+[PASS] Authority retains 80 ms VST glide
+[PASS] Authority retains 400 Hz retune ceiling
+[PASS] Authority APVTS target path present
+
+48 kHz RESPONSE ESTIMATE
+buffer  block_ms  old_complete_ms  live_complete_ms  first_live_move
+    64      1.33            80.00             12.00            11.1%
+   128      2.67            80.00             13.33            22.2%
+   256      5.33            80.00             16.00            44.4%
+   480     10.00            80.00             20.00            83.3%
+   512     10.67            85.33             21.33            88.9%
+
+Checks: 14 | Passed: 14 | Failed: 0

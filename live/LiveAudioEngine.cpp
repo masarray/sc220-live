@@ -198,6 +198,24 @@ void LiveAudioEngine::restartAudio()
     refreshDeviceStatus();
 }
 
+void LiveAudioEngine::applyVstReferenceConditions() noexcept
+{
+    // Manual A/B reference: remove every Live-only tonal/dynamics stage while
+    // leaving the authoritative askp::Processor active at unity I/O gain.
+    // MusicalNoiseClean still maintains its fixed latency line when disabled,
+    // so comparisons must align by the latency value reported in the footer.
+    noiseClean.setEnabled (false);
+    expander.setEnabled (false);
+    setInputChannelMode (2);
+    setInputTrimDb (0.0f);
+    setOutputTrimDb (0.0f);
+    setInputTrimBypassed (false);
+    setOutputTrimBypassed (false);
+    setEngineEnabled (true);
+    setBypassed (false);
+    setOutputMuted (false);
+}
+
 void LiveAudioEngine::setPresetIndex (int index)
 {
     const auto count = enhancerProcessor.presetNames().size();

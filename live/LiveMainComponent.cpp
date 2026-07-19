@@ -46,11 +46,11 @@ public:
         : engine (engineToUse), refresh (std::move (refreshCallback))
     {
         setLookAndFeel (&cardLookAndFeel);
-        setSize (338, 410);
+        setSize (338, 456);
 
         for (juce::Component* component : std::initializer_list<juce::Component*> {
                  &sampleRate, &bufferSize, &channelMode, &noiseQuality,
-                 &hearRemoved, &restartButton, &refreshButton, &learnButton, &message })
+                 &hearRemoved, &restartButton, &refreshButton, &referenceButton, &learnButton, &message })
             addAndMakeVisible (component);
 
         styleCombo (sampleRate, "Audio engine sample rate");
@@ -75,6 +75,8 @@ public:
 
         restartButton.setButtonText ("Restart Audio Engine");
         refreshButton.setButtonText ("Refresh Device Lists");
+        referenceButton.setButtonText ("Match VST Reference");
+        referenceButton.setTooltip ("Bypass Live-only Noise Clean and Expander, set I/O trims to 0 dB, and keep the authoritative enhancer active for A/B comparison");
         learnButton.setButtonText ("Learn Noise Again");
 
         message.setJustificationType (juce::Justification::centredLeft);
@@ -122,6 +124,14 @@ public:
         refreshButton.onClick = [this]
         {
             populateAudioChoices();
+            if (refresh) refresh();
+        };
+        referenceButton.onClick = [this]
+        {
+            engine.applyVstReferenceConditions();
+            message.setText ("VST reference conditions applied. Align recorded files by reported latency.",
+                             juce::dontSendNotification);
+            message.setColour (juce::Label::textColourId, colours::green);
             if (refresh) refresh();
         };
         learnButton.onClick = [this]
@@ -173,8 +183,9 @@ public:
 
         restartButton.setBounds (18, 284, 146, 36);
         refreshButton.setBounds (174, 284, 146, 36);
-        learnButton.setBounds (18, 330, 302, 36);
-        message.setBounds (18, 370, 302, 26);
+        referenceButton.setBounds (18, 330, 302, 36);
+        learnButton.setBounds (18, 376, 302, 36);
+        message.setBounds (18, 416, 302, 30);
     }
 
 private:
@@ -216,6 +227,7 @@ private:
     juce::ToggleButton hearRemoved;
     juce::TextButton restartButton;
     juce::TextButton refreshButton;
+    juce::TextButton referenceButton;
     juce::TextButton learnButton;
     juce::Label message;
 };

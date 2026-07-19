@@ -1,14 +1,28 @@
-# Implementation Status — v0.9.2
+# Implementation Status — v0.9.3
 
 ## Implemented
 
-- Authoritative askp-vst DSP, presets, wrapper policies, WOW calibration, lookahead safety, and bypass.
-- Live-only 12 ms creative macro glide generated from the audited processor source.
-- Direct APVTS knob path with no background engine builder.
-- Musical Noise Clean, smooth expander, input/output trim, tray lifecycle, meters, and aquarium visualizer.
+- Native Windows JUCE live audio application.
+- Authoritative `askp::Processor` Smart Sound Enhancer path.
+- 40 factory presets from locked `askp-vst` v0.5.14.
+- P1 12 ms Live creative-control glide.
+- P2 optional reference/live offline renderers.
+- P2 exact preset output comparison infrastructure.
+- Musical Noise Clean and smooth expander.
+- Input/output device routing, tray lifecycle, meters and aquarium visualizer.
+- Functional built-in rack bypass controls.
+- Manual **Match VST Reference** conditions.
 
-## Pending
+## Requires Windows validation
 
-- Native dual-device clock-drift bridge for a formal long-duration anti-crackle guarantee.
-- Crash-isolated external VST3 scanner and host.
-- Windows hardware A/B and multi-hour soak tests.
+- Compile both P2 parity renderer targets under MSVC.
+- Run all 40 deterministic renders.
+- Confirm 40/40 exact fingerprints.
+- Perform listening A/B using aligned recordings.
+- Eight-hour live soak test with zero dropouts.
+
+## Roadmap
+
+- Crash-isolated VST3 scanner and hosting.
+- Native dual-client WASAPI/ASIO drift-corrected bridge.
+- Signed installer strategy with VB-CABLE redistribution compliance.

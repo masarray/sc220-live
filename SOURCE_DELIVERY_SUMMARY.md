@@ -1,28 +1,56 @@
-# Sonkupik Live v0.9.2 — Source Delivery Summary
+# Sonkupik Live v0.9.3 — Source Delivery Summary
 
-## P1 result
+This milestone completes **P2: Smart Sound Enhancer preset and engine parity verification**.
 
-The slow knob feel was traced to the authoritative VST processor's 80 ms creative macro glide. That value is appropriate for DAW automation but trails continuous mouse movement in a live rack.
+## Runtime architecture
 
-Sonkupik Live now generates `PluginProcessor_Live.cpp` during CMake configuration and changes only that glide to **12 ms**. The build uses the same askp-vst engine, 40 presets, macro mapping, 400 Hz coefficient update ceiling, preset crossfade, WOW calibration, lookahead safety, bypass path, meters, and final ceiling.
+Sonkupik Live continues to process the enhancer through the authoritative `askp::Processor::processBlock()` implementation. DSP, all 40 presets, WOW calibration, preset handover, lookahead safety, bypass, metering and scope publication come directly from the locked `askp-vst` checkout.
 
-## Expected control response at 48 kHz
-
-- 128 samples: audible movement in the next 2.67 ms block; full 12 ms glide in about 13.3 ms.
-- 256 samples: audible movement in the next 5.33 ms block; full glide in about 16 ms.
-- 480 samples: first block reaches about 83% of the requested move; full glide by the second block, about 20 ms.
-- 512 samples: full glide by the second block, about 21.3 ms.
-
-Static sound at the final knob position remains identical to the authoritative processor because only transition time changed.
-
-## Build
-
-```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\build-live-windows.ps1 -Clean
-```
-
-CMake must print:
+The only intentional processor-source delta remains the P1 control glide:
 
 ```text
-Sonkupik Live creative-control glide: 0.012 s (authoritative VST default: 0.080 s)
+askp-vst       : 80 ms
+Sonkupik Live  : 12 ms
+```
+
+This changes control travel time, not settled preset output.
+
+## P2 additions
+
+- Optional `SonkupikParityReference` renderer using original `PluginProcessor.cpp`.
+- Optional `SonkupikParityLive` renderer using generated `PluginProcessor_Live.cpp`.
+- Deterministic five-second stereo input for all 40 presets.
+- Three-second warm-up before output analysis.
+- Exact FNV-1a 64-bit float-output fingerprint.
+- RMS, peak, latency and analysed-sample validation.
+- `scripts/run-p2-parity.ps1` for one-command build/render/compare.
+- **Match VST Reference** action in Settings for manual A/B conditions.
+
+## Source-level audit performed in this environment
+
+```text
+Checks : 24
+Passed : 24
+Failed : 0
+Result : PASS
+```
+
+The actual 40-preset binary render comparison must be run on the Windows/MSVC machine because this environment does not contain the Windows JUCE/MSVC toolchain.
+
+## Windows command
+
+```powershell
+powershell -ExecutionPolicy Bypass `
+  -File .\scripts\run-p2-parity.ps1 `
+  -AskpSourceDir D:\Git\askp-vst `
+  -Clean
+```
+
+Expected final result:
+
+```text
+Presets checked: 40
+Passed: 40
+Failed: 0
+Result: PASS
 ```

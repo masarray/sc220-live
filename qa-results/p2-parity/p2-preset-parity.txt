@@ -1,0 +1,49 @@
+﻿Sonkupik Live P2 preset-by-preset audio parity
+Reference: D:\Git\Sonkupik-Live\qa-results\p2-parity\askp-vst-reference.json
+Live: D:\Git\Sonkupik-Live\qa-results\p2-parity\sonkupik-live.json
+
+PASS  00 default / Mas Ari Signature  f6dd7307bd74800e
+PASS  01 master-clean / Master Clean  ccec8bc690b878b9
+PASS  02 mastering / Master Modern  e5cc5c19cd969e69
+PASS  03 master-warm / Master Warm  5f0d7bef20b4fe08
+PASS  04 master-open-3d / Master Open 3D  58bcf9b26745920b
+PASS  05 master-low-end / Master Low-End Control  a85070f27aaab27c
+PASS  06 master-vocal-focus / Master Vocal Focus  901706ed6b42ff97
+PASS  07 master-streaming / Master Streaming Safe  b6a7b85e8cd18bf2
+PASS  08 master-dynamic / Master Dynamic  0d2d207f84629618
+PASS  09 mix-glue / Mix Glue  1c99d919b7cf1386
+PASS  10 pro-music / Mix Punch  6eb5f72d5cbcf488
+PASS  11 mix-depth / Mix Depth  49838530aeff819b
+PASS  12 mix-air / Mix Air  b8830246a67efe13
+PASS  13 mix-warmth / Mix Warmth  e5a87cad1ae4b627
+PASS  14 mix-cleanup / Mix Clean-Up  9a8b649f0c2b8b6f
+PASS  15 vocal-polish / Vocal Polish  e2754da74bd929bc
+PASS  16 drum-punch / Drum Punch  5af5f3c826c892c1
+PASS  17 bass-tight / Bass Tight  b4f8060795c3455c
+PASS  18 guitar-synth-width / Guitar / Synth Width  77bba7a1de1a0a0b
+PASS  19 acoustic-natural / Acoustic Natural  9564fa7b0c76ebfe
+PASS  20 podcast / Podcast  b8733e36ab7ad75d
+PASS  21 max-enhancer / Max Enhancer  80bc20e8da39e862
+PASS  22 sonku-deep-chest / SonKu Deep Chest  f57cb270c3e0566f
+PASS  23 movie-dolby / Movie Sub  aa9f1d8a7ef5097f
+PASS  24 night-listening / Night Listening  af2f2bc0cddb9f0a
+PASS  25 open-air-field / Open Air  da45e58529aee329
+PASS  26 dangdut-koplo / Dangdut Koplo  bbe89a85be9106a4
+PASS  27 edm-festival / EDM Festival  66417d1a4ce65437
+PASS  28 reggae-dub / Reggae Dub  3fbda7f4ac32d9e0
+PASS  29 rock-arena / Rock Arena  798cf3cbff5268e9
+PASS  30 pop-radio / Pop Radio  8bfde1efb2b50c84
+PASS  31 jazz-club / Jazz Club  d3c224f6ade767dd
+PASS  32 hiphop-punch / Hip-Hop Punch  42d37d34d24b44ae
+PASS  33 rnb-silk / R&B Silk  c7543ecbdc138290
+PASS  34 metal-impact / Metal Impact  393331e09731ed6b
+PASS  35 acoustic-live / Acoustic Live  e2a27a3b4c9d927f
+PASS  36 lofi-warm / Lo-Fi Warm  7ae5f7c1d7b93b23
+PASS  37 kpop-gloss / K-Pop Gloss  7321e1dd59a062e5
+PASS  38 campursari / Campursari  a3d0189b630f1e70
+PASS  39 radio-mas-ari / Radio Mas Ari  3d73103fb6026d82
+
+Presets checked: 40
+Passed: 40
+Failed: 0
+Result: PASS

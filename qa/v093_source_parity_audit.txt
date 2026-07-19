@@ -1,0 +1,31 @@
+SONKUPIK LIVE v0.9.3 P2 SOURCE PARITY AUDIT
+
+[PASS] Version 0.9.3
+[PASS] Authoritative DSP source direct
+[PASS] Authoritative presets source direct
+[PASS] Original processor retained for reference renderer
+[PASS] Live overlay processor retained for live renderer
+[PASS] P1 overlay remains 12 ms
+[PASS] P2 targets are optional
+[PASS] Renderer checks all factory presets
+[PASS] Renderer uses direct askp Processor
+[PASS] Renderer fixes unity I/O and wet enhancer
+[PASS] Renderer warm-up exists
+[PASS] Renderer exact output fingerprint
+[PASS] Comparator rejects hash mismatch
+[PASS] PowerShell runner builds parity targets
+[PASS] Build helper exposes ParityQa
+[PASS] Live audio calls authoritative Processor directly
+[PASS] No legacy custom enhancer engine in Live callback
+[PASS] Manual reference conditions implemented
+[PASS] Settings exposes Match VST Reference
+[PASS] P2 documentation exists
+[PASS] Uploaded authority has audited P1 anchor
+[PASS] Generated overlay changes one line only
+[PASS] Authority lock declares 40 presets
+[PASS] Uploaded preset bank contains final appended contexts
+
+Checks: 24
+Passed: 24
+Failed: 0
+Result: PASS

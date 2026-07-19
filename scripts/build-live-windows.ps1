@@ -9,6 +9,7 @@ param(
     [ValidateSet('Auto','VisualStudio','Ninja')]
     [string]$Generator = 'Auto',
 
+    [switch]$ParityQa,
     [switch]$Clean
 )
 
@@ -306,6 +307,11 @@ $cmakeArgs = @(
     "-DSONKUPIK_ASKP_SOURCE_DIR=$askpAuthority"
 )
 
+if ($ParityQa) {
+    $cmakeArgs += '-DSONKUPIK_BUILD_PARITY_QA=ON'
+    Write-Host '==> P2 parity QA renderers enabled'
+}
+
 if ($useMultiConfig) {
     $cmakeArgs += @('-A', 'x64', "-DCMAKE_GENERATOR_INSTANCE=$($vs.Path)")
 } else {
@@ -336,7 +342,9 @@ Write-Host '==> Configuring Sonkupik Live'
 if ($LASTEXITCODE -ne 0) { throw "CMake configure failed with exit code $LASTEXITCODE" }
 
 Write-Host "==> Building Sonkupik Live ($Configuration)"
-$buildArgs = @('--build', $build, '--target', 'SonkupikLive', '--parallel')
+$buildTargets = @('SonkupikLive')
+if ($ParityQa) { $buildTargets += @('SonkupikParityReference', 'SonkupikParityLive') }
+$buildArgs = @('--build', $build, '--target') + $buildTargets + @('--parallel')
 if ($useMultiConfig) { $buildArgs += @('--config', $Configuration) }
 & $cmake.Path @buildArgs
 if ($LASTEXITCODE -ne 0) { throw "Build failed with exit code $LASTEXITCODE" }
@@ -350,7 +358,7 @@ $candidates = @(
 $exe = $candidates | Where-Object { Test-Path $_ } | Select-Object -First 1
 if (-not $exe) {
     $exe = Get-ChildItem $build -Recurse -Filter '*.exe' |
-        Where-Object { $_.Name -match '(Sonkupik.*Live)' } |
+        Where-Object { $_.Name -match '(Sonkupik.*Live)' -and $_.Name -notmatch '(Parity|Renderer)' } |
         Select-Object -First 1 -ExpandProperty FullName
 }
 if (-not $exe) { throw 'Build completed but Sonkupik Live executable was not found.' }

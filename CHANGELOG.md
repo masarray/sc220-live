@@ -1,5 +1,13 @@
 # Changelog
 
+## v0.9.3 - 2026-07-19 - P2 preset-by-preset audio parity
+
+- Added separate authoritative and Live offline renderers for all 40 factory presets.
+- Added bit-exact FNV-1a output fingerprints plus RMS, peak, latency and sample-count comparison.
+- Added `scripts/run-p2-parity.ps1` and optional CMake parity targets.
+- Added a Settings action that applies clear VST reference conditions for manual A/B tests.
+- Preserved the P1 12 ms control-response overlay as the only processor-source delta.
+
 ## v0.9.2 - 2026-07-19 - P1 live knob response
 
 - Audited the complete UI-to-DSP parameter path for Enhance, Smart Bass, Smart Treble, Vocal Body, and Stereo Magic.

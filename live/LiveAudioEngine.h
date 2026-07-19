@@ -76,6 +76,7 @@ public:
     void setOutputMuted (bool value) noexcept { outputMuted.store (value); }
     bool isOutputMuted() const noexcept { return outputMuted.load(); }
     void restartAudio();
+    void applyVstReferenceConditions() noexcept;
 
     void setPresetIndex (int index);
     int getPresetIndex() const noexcept;

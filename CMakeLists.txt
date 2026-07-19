@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.22)
 
-project(SonkupikLive VERSION 0.9.2 LANGUAGES C CXX)
+project(SonkupikLive VERSION 0.9.3 LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -20,7 +20,7 @@ set(SONKUPIK_ASKP_SOURCE_DIR "" CACHE PATH
     "Path to the authoritative masarray/askp-vst source checkout")
 set(SONKUPIK_AUDITED_ASKP_COMMIT
     "655874dee6ee69df7212b8073ab941f9607d8faa" CACHE STRING
-    "askp-vst commit audited for Sonkupik Live v0.9.2")
+    "askp-vst commit audited for Sonkupik Live v0.9.3")
 
 set(_askp_engine_dir "")
 set(_askp_asset_dir "")
@@ -52,7 +52,7 @@ if(SONKUPIK_ASKP_SOURCE_DIR)
                 set(_askp_source_identity "${_askp_root} @ ${_askp_commit}")
                 if(NOT _askp_commit STREQUAL SONKUPIK_AUDITED_ASKP_COMMIT)
                     message(WARNING
-                        "askp-vst commit ${_askp_commit} differs from the audited v0.9.2 lock "
+                        "askp-vst commit ${_askp_commit} differs from the audited v0.9.3 lock "
                         "${SONKUPIK_AUDITED_ASKP_COMMIT}. The newer source will be used, but rerun QA.")
                 endif()
             endif()
@@ -274,6 +274,85 @@ target_link_libraries(SonkupikLive PRIVATE
     juce::juce_recommended_warning_flags
 )
 
-# The authoritative ArSonKuPik processor/editor sources are linked only to guarantee
-# exact audio and visual parity. Sonkupik Live does not instantiate the VST editor;
-# external third-party VST hosting remains disabled until crash isolation is ready.
+# The authoritative ArSonKuPik processor/editor support sources are linked to guarantee
+# exact Smart Sound Enhancer audio parity. Sonkupik Live uses its own rectangular
+# aquarium presentation but consumes the same authoritative ScopeTap. External
+# third-party VST hosting remains disabled until crash isolation is ready.
+
+# ---------------------------------------------------------------------------
+# Optional P2 preset-by-preset parity renderers
+# ---------------------------------------------------------------------------
+# These targets are OFF by default because each intentionally compiles a full
+# independent Processor image. Keeping reference/live in separate executables
+# avoids ODR collisions and permits bit-exact comparison of all factory presets.
+option(SONKUPIK_BUILD_PARITY_QA
+    "Build authoritative VST and Sonkupik Live offline parity renderers" OFF)
+
+if(SONKUPIK_BUILD_PARITY_QA)
+    function(sonkupik_add_parity_renderer target_name product_name processor_source variant_name)
+        juce_add_console_app(${target_name} PRODUCT_NAME "${product_name}")
+
+        target_sources(${target_name} PRIVATE
+            qa/ParityRendererMain.cpp
+            "${ASKP_DSP_SOURCE}"
+            "${ASKP_PRESET_SOURCE}"
+            "${processor_source}"
+            "${ASKP_EDITOR_SOURCE}"
+            "${ASKP_LICENSE_SOURCE}"
+            "${ASKP_LOOK_AND_FEEL_SOURCE}"
+            "${ASKP_ORB_SOURCE}"
+            "${ASKP_UPDATE_SOURCE}"
+        )
+
+        target_include_directories(${target_name} PRIVATE
+            "${_askp_engine_dir}"
+            "${_askp_src_dir}"
+        )
+
+        target_compile_definitions(${target_name} PRIVATE
+            JUCE_WEB_BROWSER=0
+            JUCE_USE_CURL=0
+            JUCE_MODAL_LOOPS_PERMITTED=1
+            JUCE_STANDALONE_APPLICATION=0
+            JucePlugin_Build_Standalone=0
+            JucePlugin_Name="ArSonKuPik"
+            JucePlugin_ManufacturerCode=0x4d734172
+            JucePlugin_PluginCode=0x416b5673
+            JucePlugin_IsSynth=0
+            JucePlugin_WantsMidiInput=0
+            JucePlugin_ProducesMidiOutput=0
+            JucePlugin_IsMidiEffect=0
+            JucePlugin_EditorRequiresKeyboardFocus=0
+            JucePlugin_Version=0.5.14
+            JucePlugin_VersionCode=0x50E
+            JucePlugin_VersionString="0.5.14"
+            ASKP_BUILD_CHANNEL="Sonkupik Live P2 Parity"
+            SONKUPIK_PARITY_VARIANT="${variant_name}"
+        )
+
+        target_link_libraries(${target_name} PRIVATE
+            SonkupikLiveAssets
+            juce::juce_audio_utils
+            juce::juce_audio_processors
+            juce::juce_cryptography
+            juce::juce_dsp
+            juce::juce_gui_extra
+            PUBLIC
+            juce::juce_recommended_config_flags
+            juce::juce_recommended_lto_flags
+            juce::juce_recommended_warning_flags
+        )
+    endfunction()
+
+    sonkupik_add_parity_renderer(
+        SonkupikParityReference
+        "Sonkupik P2 Reference Renderer"
+        "${ASKP_PROCESSOR_SOURCE}"
+        "askp-vst-authority")
+
+    sonkupik_add_parity_renderer(
+        SonkupikParityLive
+        "Sonkupik P2 Live Renderer"
+        "${ASKP_LIVE_PROCESSOR_SOURCE}"
+        "sonkupik-live")
+endif()

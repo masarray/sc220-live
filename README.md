@@ -1,4 +1,4 @@
-# Sonkupik Live v0.9.2
+# Sonkupik Live v0.9.3
 
 **Sonkupik Live** is a lightweight native Windows live-audio rack for streamers who need professional enhancement without opening a full DAW.
 
@@ -14,7 +14,7 @@ Audio Interface
   -> OBS or TikTok Studio captures CABLE Output
 ```
 
-## v0.9.2 authoritative engine with Live control response
+## v0.9.3 authoritative engine with preset parity QA
 
 Sonkupik Live compiles the authoritative DSP, 40 presets, WOW calibration, preset handover, lookahead safety, bypass path, meters, and scope tap from `askp-vst`. The only intentional processing-wrapper delta is a configure-time **12 ms creative-control glide** for live mouse control; the VST's 80 ms glide remains unchanged in the VST repository. Settled sound, preset values, coefficient recipes, limiter behaviour, and output policy remain authoritative.
 
@@ -65,6 +65,21 @@ powershell -ExecutionPolicy Bypass `
   -Clean
 ```
 
+## P2 preset audio parity test
+
+Run the deterministic reference/live comparison on Windows:
+
+```powershell
+powershell -ExecutionPolicy Bypass `
+  -File .\scripts\run-p2-parity.ps1 `
+  -AskpSourceDir D:\Git\askp-vst `
+  -Clean
+```
+
+The test independently renders the original `askp-vst` processor and Sonkupik Live processor for all 40 presets. It requires identical latency, output fingerprint, RMS and peak after warm-up. See `docs/AUDIT_PRESET_PARITY_v0.9.3.md`.
+
+The Settings card also provides **Match VST Reference**, which bypasses Noise Clean and Expander, resets both outer faders to 0 dB, selects stereo input mode and keeps Smart Sound Enhancer active for a manual latency-aligned A/B test.
+
 ## Main workspace
 
 - **Left:** Before Enhancer rack, input fader and stereo meter.
@@ -84,11 +99,13 @@ Read these first:
 - `docs/ASKP_SOURCE_SYNC.md`
 - `docs/REALTIME_SAFETY.md`
 - `docs/AUDIT_CONTROL_RESPONSE_v0.9.2.md`
+- `docs/AUDIT_PRESET_PARITY_v0.9.3.md`
 - `qa/v092_control_response_audit.txt`
+- `qa/v093_source_parity_audit.txt`
 
 ## Current limitation
 
-v0.9.2 removes the delayed background-engine rebuild and uses the VST real-time processor directly, but JUCE currently opens the physical input and VB-CABLE output through the Windows device backend. A future native dual-client `IAudioClient3` bridge with adaptive clock-drift correction remains the strongest route to a formal multi-hour anti-crackle guarantee.
+v0.9.3 retains the v0.9.2 direct processor path and adds deterministic preset parity QA; v0.9.2 removed the delayed background-engine rebuild and uses the VST real-time processor directly, but JUCE currently opens the physical input and VB-CABLE output through the Windows device backend. A future native dual-client `IAudioClient3` bridge with adaptive clock-drift correction remains the strongest route to a formal multi-hour anti-crackle guarantee.
 
 ## Live knob response
 

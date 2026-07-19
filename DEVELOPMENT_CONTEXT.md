@@ -1,30 +1,34 @@
 # Sonkupik Live Development Context
 
-Current milestone: **v0.9.2 — authoritative engine/preset parity with 12 ms Live control response**.
+Current milestone: **v0.9.3 — P2 deterministic preset-by-preset enhancer parity verification**.
 
-The application is intentionally not a DAW. It is a compact live signal rack for audio-interface input to VB-CABLE/OBS/TikTok Studio.
+## Product intent
 
-## Non-negotiable architecture
+A lightweight live audio rack for streamers who currently open a full DAW only to clean, enhance and route their audio interface signal into VB-CABLE for OBS or TikTok Studio.
 
-- Product name: **Sonkupik Live**.
-- C++17 + JUCE shell.
-- Smart Enhancer DSP and all factory presets come from the locked private `masarray/askp-vst` source; do not fork or hand-copy recipe values.
-- Built-in Live Safe chain remains usable without external VST hosting.
-- No lock, allocation, file I/O, UI call or device enumeration in the audio callback.
-- Visual output is disposable: it may drop data but may never delay audio.
-- Safety limiter remains the final non-bypassable stage.
-- Main window may hide to tray without stopping audio.
+## Current engine authority
 
-## Read before modifying
+- Repository: `masarray/askp-vst`
+- Version: `0.5.14`
+- Commit: `655874dee6ee69df7212b8073ab941f9607d8faa`
+- Factory presets: 40
+- Full wrapper authority: `askp::Processor`
+- Live-only processor delta: creative-control smoothing 80 ms → 12 ms
 
-- `ASKP_AUTHORITY.lock`
-- `docs/AUDIT_VST_AUTHORITY_v0.8.0.md`
-- `docs/VISUALIZER_ARCHITECTURE_v0.8.0.md`
-- `docs/MUSICAL_NOISE_CLEAN_DESIGN.md`
-- `docs/REALTIME_SAFETY.md`
-- `docs/UX_SPEC.md`
-- `qa/v080_source_audit.txt`
+## P2 parity boundary
 
-## Live-only processor delta
+Enhancer parity means:
 
-The app may generate a local `PluginProcessor_Live.cpp` from the audited askp-vst source. The only permitted processing delta is the creative macro smoothing constant: 80 ms in the VST, 12 ms in Sonkupik Live. Do not fork preset values, DSP recipes, WOW policy, limiter, or preset-transition code.
+```text
+Stereo input
+-> askp::Processor
+-> same settled output as askp-vst
+```
+
+Whole-rack audio can intentionally differ when Musical Noise Clean, Expander, non-unity outer trims, mono duplication, device resampling or VB-CABLE format conversion are active.
+
+Use `scripts/run-p2-parity.ps1` for binary preset verification and the Settings action **Match VST Reference** for manual A/B conditions.
+
+## Next logical milestone
+
+P3 remains functional third-party VST3 hosting with crash-isolated scanning, latency reporting, state recall and safe bypass. It must not compromise the Live Safe built-in chain.

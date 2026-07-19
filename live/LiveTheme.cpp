@@ -147,12 +147,30 @@ void LiveLookAndFeel::drawButtonBackground (juce::Graphics& g, juce::Button& but
                                             const juce::Colour&, bool highlighted, bool down)
 {
     auto bounds = button.getLocalBounds().toFloat().reduced (0.5f);
-    const auto base = button.getToggleState() ? colours::cyan.withAlpha (0.13f)
-                                              : colours::panelLo;
-    g.setColour (down ? base.brighter (0.08f) : highlighted ? base.brighter (0.04f) : base);
-    g.fillRoundedRectangle (bounds, 7.0f);
-    g.setColour ((button.getToggleState() ? colours::cyan : colours::border).withAlpha (0.95f));
-    g.drawRoundedRectangle (bounds, 7.0f, 1.0f);
+    const bool toggled = button.getToggleState();
+    const float hover = highlighted ? 1.0f : 0.0f;
+    const float press = down ? 1.0f : 0.0f;
+
+    g.setColour (juce::Colours::black.withAlpha (0.12f + press * 0.04f));
+    g.fillRoundedRectangle (bounds.translated (0.0f, 1.5f), 8.0f);
+
+    juce::ColourGradient surface ((toggled ? colours::panelHi.brighter (0.03f) : colours::panelHi.brighter (0.016f)),
+                                  bounds.getX(), bounds.getY(),
+                                  colours::panelLo, bounds.getRight(), bounds.getBottom(), false);
+    g.setGradientFill (surface);
+    g.fillRoundedRectangle (bounds, 8.0f);
+
+    const auto accent = toggled ? colours::cyan : colours::textMuted;
+    g.setColour (accent.withAlpha (0.05f + hover * 0.06f + press * 0.04f));
+    g.fillRoundedRectangle (bounds.reduced (0.5f), 8.0f);
+
+    g.setColour (juce::Colours::white.withAlpha (0.020f + hover * 0.018f));
+    g.fillRoundedRectangle (juce::Rectangle<float> (bounds.getX() + 10.0f, bounds.getY() + 1.5f,
+                                                    juce::jmax (0.0f, bounds.getWidth() - 20.0f), 1.4f), 1.0f);
+    g.setColour (juce::Colours::black.withAlpha (0.12f));
+    g.drawRoundedRectangle (bounds.reduced (1.0f), 7.0f, 1.0f);
+    g.setColour ((toggled ? colours::cyan : colours::border).withAlpha (0.18f + hover * 0.16f + press * 0.06f));
+    g.drawRoundedRectangle (bounds, 8.0f, 1.0f);
 }
 
 void LiveLookAndFeel::drawButtonText (juce::Graphics& g, juce::TextButton& button,
@@ -169,9 +187,20 @@ void LiveLookAndFeel::drawComboBox (juce::Graphics& g, int width, int height, bo
 {
     auto bounds = juce::Rectangle<float> (0.5f, 0.5f, static_cast<float> (width - 1),
                                           static_cast<float> (height - 1));
-    g.setColour (isDown ? colours::panelHi.brighter (0.05f) : colours::panelLo);
+    const bool hover = box.isMouseOverOrDragging();
+    juce::ColourGradient surface (colours::panelHi.brighter (hover ? 0.022f : 0.010f),
+                                  bounds.getX(), bounds.getY(),
+                                  colours::panelLo, bounds.getRight(), bounds.getBottom(), false);
+    g.setGradientFill (surface);
     g.fillRoundedRectangle (bounds, 7.0f);
-    g.setColour (box.hasKeyboardFocus (true) ? colours::cyan.withAlpha (0.8f) : colours::border);
+    g.setColour (colours::cyan.withAlpha (hover ? 0.045f : 0.02f));
+    g.fillRoundedRectangle (bounds.reduced (0.5f), 7.0f);
+    g.setColour (juce::Colours::white.withAlpha (0.018f + (hover ? 0.016f : 0.0f)));
+    g.fillRoundedRectangle (juce::Rectangle<float> (bounds.getX() + 10.0f, bounds.getY() + 1.5f,
+                                                    juce::jmax (0.0f, bounds.getWidth() - 22.0f), 1.4f), 1.0f);
+    g.setColour (box.hasKeyboardFocus (true) ? colours::cyan.withAlpha (0.72f)
+                                             : hover ? colours::border.withAlpha (0.96f)
+                                                     : colours::borderSoft.withAlpha (0.88f));
     g.drawRoundedRectangle (bounds, 7.0f, 1.0f);
 
     const auto cx = static_cast<float> (width - 18);
@@ -180,8 +209,8 @@ void LiveLookAndFeel::drawComboBox (juce::Graphics& g, int width, int height, bo
     chevron.startNewSubPath (cx - 4.0f, cy - 2.0f);
     chevron.lineTo (cx, cy + 2.0f);
     chevron.lineTo (cx + 4.0f, cy - 2.0f);
-    g.setColour (colours::textMuted);
-    g.strokePath (chevron, juce::PathStrokeType (1.6f, juce::PathStrokeType::curved,
+    g.setColour ((hover ? colours::text : colours::textMuted).withAlpha (hover ? 0.86f : 0.72f));
+    g.strokePath (chevron, juce::PathStrokeType (1.7f, juce::PathStrokeType::curved,
                                                  juce::PathStrokeType::rounded));
 }
 
@@ -265,15 +294,28 @@ void LiveLookAndFeel::drawToggleButton (juce::Graphics& g, juce::ToggleButton& b
     auto area = button.getLocalBounds().toFloat();
     auto toggle = area.removeFromRight (38.0f).withSizeKeepingCentre (34.0f, 18.0f);
     const bool on = button.getToggleState();
-    g.setColour (on ? colours::cyan.withAlpha (0.32f) : colours::border);
+
+    juce::ColourGradient track (on ? colours::cyan.withAlpha (0.34f) : colours::panelLo,
+                                toggle.getX(), toggle.getY(),
+                                on ? colours::cyan.withAlpha (0.18f) : colours::panelHi,
+                                toggle.getRight(), toggle.getBottom(), false);
+    g.setGradientFill (track);
     g.fillRoundedRectangle (toggle, 9.0f);
-    g.setColour (on ? colours::cyan : colours::textMuted);
+    g.setColour ((on ? colours::cyan : colours::border).withAlpha (0.85f + (highlighted ? 0.08f : 0.0f)));
+    g.drawRoundedRectangle (toggle, 9.0f, 1.0f);
+
     const float diameter = 14.0f;
     const float x = on ? toggle.getRight() - diameter - 2.0f : toggle.getX() + 2.0f;
-    g.fillEllipse (x, toggle.getY() + 2.0f, diameter, diameter);
+    auto thumb = juce::Rectangle<float> (x, toggle.getY() + 2.0f, diameter, diameter);
+    juce::ColourGradient thumbFill (juce::Colour (0xffeef3f9), thumb.getX(), thumb.getY(),
+                                    juce::Colour (0xffaeb9c5), thumb.getRight(), thumb.getBottom(), false);
+    g.setGradientFill (thumbFill);
+    g.fillEllipse (thumb);
+    g.setColour (juce::Colours::black.withAlpha (0.22f));
+    g.drawEllipse (thumb, 1.0f);
 
     g.setFont (jakarta (12.5f, true));
-    g.setColour (highlighted ? colours::text : colours::textMuted);
+    g.setColour ((highlighted ? colours::text : colours::textMuted).withAlpha (highlighted ? 1.0f : 0.90f));
     g.drawText (button.getButtonText(), area.reduced (2.0f, 0.0f),
                 juce::Justification::centredLeft, false);
 }
@@ -281,58 +323,82 @@ void LiveLookAndFeel::drawToggleButton (juce::Graphics& g, juce::ToggleButton& b
 void LiveLookAndFeel::drawTooltip (juce::Graphics& g, const juce::String& text,
                                    int width, int height)
 {
-    auto bubble = juce::Rectangle<float> (8.0f, 10.0f,
-                                          static_cast<float> (width - 16),
-                                          static_cast<float> (height - 18));
+    const bool hasTitle = text.containsChar ('|');
+    const auto title = hasTitle ? text.upToFirstOccurrenceOf ("|", false, false).trim() : juce::String();
+    const auto body = hasTitle ? text.fromFirstOccurrenceOf ("|", false, false).trim()
+                               : text.trim();
+
+    auto bubble = juce::Rectangle<float> (10.0f, 12.0f,
+                                          static_cast<float> (width - 20),
+                                          static_cast<float> (height - 22));
     juce::Path callout;
-    callout.startNewSubPath (bubble.getCentreX() - 10.0f, bubble.getY());
-    callout.lineTo (bubble.getCentreX(), bubble.getY() - 10.0f);
-    callout.lineTo (bubble.getCentreX() + 10.0f, bubble.getY());
+    const float anchorX = bubble.getX() + juce::jmin (36.0f, bubble.getWidth() * 0.22f);
+    callout.startNewSubPath (anchorX - 10.0f, bubble.getY());
+    callout.lineTo (anchorX, bubble.getY() - 10.0f);
+    callout.lineTo (anchorX + 10.0f, bubble.getY());
     callout.addRoundedRectangle (bubble, 12.0f);
 
-    g.setColour (juce::Colours::black.withAlpha (0.24f));
+    g.setColour (juce::Colours::black.withAlpha (0.22f));
     g.fillPath (callout, juce::AffineTransform::translation (0.0f, 2.0f));
 
-    juce::ColourGradient bg (colours::panelHi.brighter (0.02f), bubble.getX(), bubble.getY(),
+    juce::ColourGradient bg (colours::panelHi.brighter (0.03f), bubble.getX(), bubble.getY(),
                              colours::panelLo, bubble.getRight(), bubble.getBottom(), false);
+    bg.addColour (0.58, colours::panel.withAlpha (0.98f));
     g.setGradientFill (bg);
     g.fillPath (callout);
 
-    g.setColour (colours::cyan.withAlpha (0.10f));
-    g.fillRoundedRectangle (bubble.removeFromTop (18.0f).reduced (2.0f), 10.0f);
+    auto highlight = bubble.removeFromTop (24.0f);
+    g.setColour (colours::cyan.withAlpha (0.055f));
+    g.fillRoundedRectangle (highlight.reduced (2.0f, 1.0f), 9.0f);
 
-    g.setColour (juce::Colours::white.withAlpha (0.09f));
+    g.setColour (juce::Colours::white.withAlpha (0.05f));
     g.strokePath (callout, juce::PathStrokeType (2.0f));
-    g.setColour (colours::border);
+    g.setColour (colours::borderSoft.withAlpha (0.96f));
     g.strokePath (callout, juce::PathStrokeType (1.0f));
 
-    g.setColour (colours::text);
+    auto titleArea = juce::Rectangle<int> ((int) bubble.getX() + 14, (int) highlight.getY() + 3,
+                                           (int) bubble.getWidth() - 28, 18);
+    auto bodyArea = juce::Rectangle<int> ((int) bubble.getX() + 14, (int) bubble.getY() + 30,
+                                          (int) bubble.getWidth() - 28, (int) bubble.getHeight() - 40);
+
+    g.setColour (colours::cyan.withAlpha (0.92f));
+    g.setFont (jakarta (11.2f, true));
+    g.drawFittedText (title.isEmpty() ? "TIP" : title.toUpperCase(), titleArea,
+                      juce::Justification::centredLeft, 1);
+
+    g.setColour (colours::text.withAlpha (0.96f));
     g.setFont (jakarta (12.0f));
-    g.drawFittedText (text, 18, 18, width - 36, height - 26,
-                      juce::Justification::centredLeft, 2);
+    g.drawFittedText (body, bodyArea,
+                      juce::Justification::topLeft, 4);
 }
 
 void fillPremiumPanel (juce::Graphics& g, juce::Rectangle<float> bounds,
                        float radius, bool selected)
 {
-    juce::ColourGradient gradient (selected ? colours::panelHi.brighter (0.035f) : colours::panelHi,
+    g.setColour (juce::Colours::black.withAlpha (0.14f));
+    g.fillRoundedRectangle (bounds.translated (0.0f, 1.6f), radius + 0.5f);
+
+    juce::ColourGradient gradient (selected ? colours::panelHi.brighter (0.03f) : colours::panelHi,
                                    bounds.getX(), bounds.getY(),
                                    colours::panelLo, bounds.getRight(), bounds.getBottom(), false);
-    gradient.addColour (0.58, colours::panel.withAlpha (0.98f));
+    gradient.addColour (0.58, colours::panel.withAlpha (0.985f));
     g.setGradientFill (gradient);
     g.fillRoundedRectangle (bounds, radius);
 
-    g.setColour (juce::Colours::white.withAlpha (selected ? 0.045f : 0.028f));
+    g.setColour ((selected ? colours::cyan : colours::panelHi).withAlpha (selected ? 0.05f : 0.025f));
+    g.fillRoundedRectangle (bounds.reduced (0.8f), radius - 0.8f);
+
+    g.setColour (juce::Colours::white.withAlpha (selected ? 0.040f : 0.024f));
     g.drawRoundedRectangle (bounds.reduced (1.5f), juce::jmax (2.0f, radius - 1.5f), 1.0f);
 
-    g.setColour ((selected ? colours::cyan.withAlpha (0.52f) : colours::border).withAlpha (0.92f));
+    g.setColour ((selected ? colours::cyan : colours::borderSoft).withAlpha (selected ? 0.82f : 0.94f));
     g.drawRoundedRectangle (bounds.reduced (0.5f), radius, 1.0f);
 
     const auto topHighlight = juce::Rectangle<float> (bounds.getX() + radius,
                                                        bounds.getY() + 1.0f,
                                                        juce::jmax (0.0f, bounds.getWidth() - radius * 2.0f),
-                                                       1.0f);
-    g.setColour (juce::Colours::white.withAlpha (selected ? 0.055f : 0.025f));
+                                                       1.1f);
+    g.setColour (juce::Colours::white.withAlpha (selected ? 0.050f : 0.020f));
     g.fillRect (topHighlight);
 }
 

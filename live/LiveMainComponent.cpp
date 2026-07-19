@@ -265,10 +265,10 @@ public:
                  &hearRemoved, &restartButton, &refreshButton, &referenceButton, &learnButton, &message })
             addAndMakeVisible (component);
 
-        styleCombo (sampleRate, "Audio engine sample rate");
-        styleCombo (bufferSize, "Audio engine buffer size");
-        styleCombo (channelMode, "Input channel mode");
-        styleCombo (noiseQuality, "Musical Noise Clean FFT quality");
+        styleCombo (sampleRate, "Sample Rate|Set the live engine sample rate. Higher rates may use more CPU.");
+        styleCombo (bufferSize, "Buffer Size|Lower values reduce latency but require a more stable system.");
+        styleCombo (channelMode, "Channel Mode|Choose stereo or duplicate mono input processing.");
+        styleCombo (noiseQuality, "Noise Quality|Select the fast live FFT mode or the cleaner reference mode.");
 
         channelMode.addItem ("Mono to Dual Mono", 1);
         channelMode.addItem ("Stereo", 2);
@@ -288,7 +288,7 @@ public:
         restartButton.setButtonText ("Restart Audio Engine");
         refreshButton.setButtonText ("Refresh Device Lists");
         referenceButton.setButtonText ("Match VST Reference");
-        referenceButton.setTooltip ("Bypass Live-only Noise Clean and Expander, set I/O trims to 0 dB, and keep the authoritative enhancer active for A/B comparison");
+        referenceButton.setTooltip ("Match VST Reference|Bypass the live-only denoise and expander stages, reset trims to 0 dB, and keep the main enhancer active for direct A/B comparison.");
         learnButton.setButtonText ("Learn Noise Again");
 
         message.setJustificationType (juce::Justification::centredLeft);
@@ -492,11 +492,11 @@ void LiveMainComponent::configureControls()
     gainReductionMeter.setVertical (true);
     gainReductionMeter.setTitle ("EXPANDER");
 
-    settingsButton.setTooltip ("Audio engine and Musical Noise Clean settings");
-    trayButton.setTooltip ("Open compact tray controller");
-    minimiseButton.setTooltip ("Minimise");
-    maximiseButton.setTooltip ("Maximise or restore");
-    closeButton.setTooltip ("Hide to tray; audio keeps running");
+    settingsButton.setTooltip ("Settings|Open audio engine, device and noise-clean options.");
+    trayButton.setTooltip ("Mini Controller|Open the compact tray controller view.");
+    minimiseButton.setTooltip ("Minimise|Send the main window to the taskbar.");
+    maximiseButton.setTooltip ("Window Size|Toggle maximise or restore.");
+    closeButton.setTooltip ("Close to Tray|Hide the window while the audio engine keeps running.");
 
     settingsButton.onClick = [this] { showSettingsCard(); };
     trayButton.onClick = [this] { if (windowActions.showMiniController) windowActions.showMiniController(); };
@@ -504,7 +504,7 @@ void LiveMainComponent::configureControls()
     maximiseButton.onClick = [this] { if (windowActions.toggleMaximise) windowActions.toggleMaximise(); };
     closeButton.onClick = [this] { if (windowActions.hideToTray) windowActions.hideToTray(); };
 
-    noiseBypass.setTooltip ("Noise Clean bypass: disables spectral denoise and smooth expander");
+    noiseBypass.setTooltip ("Noise Clean Bypass|Disable spectral denoise and the smooth expander while keeping routing alive.");
     noiseBypass.setClickingTogglesState (true);
     noiseBypass.setToggleState (! audioEngine.getNoiseClean().isEnabled() ? false : true, juce::dontSendNotification);
     noiseBypass.onClick = [this]
@@ -516,7 +516,7 @@ void LiveMainComponent::configureControls()
         repaint();
     };
 
-    enhancerPower.setTooltip ("Smart Sound Enhancer bypass: keeps the live engine running while muting enhancer processing");
+    enhancerPower.setTooltip ("Enhancer Bypass|Mute Smart Sound Enhancer processing while the live engine continues running.");
     enhancerPower.setClickingTogglesState (true);
     enhancerPower.setToggleState (! audioEngine.isBypassed(), juce::dontSendNotification);
     enhancerPower.onClick = [this]
@@ -526,9 +526,9 @@ void LiveMainComponent::configureControls()
         repaint();
     };
 
-    styleCombo (inputDevice, "Audio interface input device");
-    styleCombo (outputDevice, "Audio output device; select CABLE Input for streaming");
-    styleCombo (preset, "Smart Enhancer factory preset");
+    styleCombo (inputDevice, "Input Device|Choose the capture source that feeds Sonkupik Live.");
+    styleCombo (outputDevice, "Output Device|Choose the playback or virtual cable destination for processed audio.");
+    styleCombo (preset, "Preset|Load a Smart Sound Enhancer macro preset as your starting point.");
 
     inputDevice.onChange = [this]
     {
@@ -547,7 +547,7 @@ void LiveMainComponent::configureControls()
         }
     };
 
-    learnNoise.setTooltip ("Play only the static noise, then press Learn Noise for two seconds");
+    learnNoise.setTooltip ("Learn Noise|Play only the noise you want removed, then capture it for about two seconds.");
     learnNoise.onClick = [this] { audioEngine.getNoiseClean().startLearning (2.0); };
 
     noiseReduction.setFormatter ([] (double value) { return juce::String (value, 1) + " dB"; });

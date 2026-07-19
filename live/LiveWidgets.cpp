@@ -426,8 +426,13 @@ CompactRackRow::CompactRackRow (int index, const juce::String& iconResource,
           openOnly ? "plus_svg" : "power_svg", colours::cyan))
 {
     setMouseCursor (juce::MouseCursor::PointingHandCursor);
-    setTooltip (openOnlyState ? "Open this rack slot" : lockedState ? "This protection stage is locked" : "Click the row or power icon to toggle bypass");
+    setTooltip (openOnlyState ? "External VST Slot|Open this rack slot to insert or plan an external VST stage."
+                              : lockedState ? "Safety Limiter|This protection stage stays active and cannot be bypassed from here."
+                                            : "Rack Module|Click anywhere on the row or the power icon to toggle bypass.");
     actionButton->setOffColour (colours::textMuted.withAlpha (0.75f));
+    actionButton->setTooltip (openOnlyState ? "Add Slot|Open this external VST slot."
+                                            : lockedState ? "Safety Limiter|This stage stays protected and cannot be bypassed."
+                                                          : "Bypass|Toggle this stage on or off.");
     addAndMakeVisible (*actionButton);
     actionButton->setClickingTogglesState (! openOnlyState);
     actionButton->setToggleState (! bypassed, juce::dontSendNotification);
@@ -449,6 +454,34 @@ CompactRackRow::CompactRackRow (int index, const juce::String& iconResource,
         if (onBypassChanged)
             onBypassChanged (bypassed);
     };
+}
+
+void CompactRackRow::startAnimation()
+{
+    if (! isTimerRunning())
+        startTimerHz (60);
+}
+
+void CompactRackRow::timerCallback()
+{
+    const auto stepTowards = [] (float current, float target)
+    {
+        return current + (target - current) * 0.18f;
+    };
+
+    const float hoverTarget = isMouseOver (true) ? 1.0f : 0.0f;
+    const float pressTarget = isMouseButtonDown() ? 1.0f : 0.0f;
+    hoverMix = stepTowards (hoverMix, hoverTarget);
+    pressMix = stepTowards (pressMix, pressTarget);
+    repaint();
+
+    if (std::abs (hoverMix - hoverTarget) < 0.015f && std::abs (pressMix - pressTarget) < 0.015f)
+    {
+        hoverMix = hoverTarget;
+        pressMix = pressTarget;
+        stopTimer();
+        repaint();
+    }
 }
 
 void CompactRackRow::setBypassed (bool value)
@@ -484,24 +517,29 @@ void CompactRackRow::paint (juce::Graphics& g)
     auto bounds = getLocalBounds().toFloat().reduced (0.5f);
     const bool hovered = isMouseOver (true);
     const bool active = ! bypassed && ! openOnlyState;
+    const float hover = juce::jlimit (0.0f, 1.0f, hoverMix + (hovered ? 0.08f : 0.0f));
+    const float press = juce::jlimit (0.0f, 1.0f, pressMix);
 
-    juce::ColourGradient surface (selectedState ? colours::panelHi.brighter (0.045f)
-                                                : hovered ? colours::panelHi.brighter (0.025f)
-                                                          : colours::panelLo,
+    juce::ColourGradient surface (selectedState ? colours::panelHi.brighter (0.035f + hover * 0.012f)
+                                                : colours::panelLo.brighter (hover * 0.025f),
                                   bounds.getX(), bounds.getY(),
-                                  colours::panelLo.darker (0.04f), bounds.getRight(), bounds.getBottom(), false);
+                                  colours::panelLo.darker (0.045f - hover * 0.01f), bounds.getRight(), bounds.getBottom(), false);
     g.setGradientFill (surface);
     g.fillRoundedRectangle (bounds, 8.0f);
 
-    g.setColour (selectedState ? colours::cyan.withAlpha (0.44f)
-                               : hovered ? colours::border.withAlpha (0.92f)
-                                         : colours::borderSoft.withAlpha (0.90f));
+    g.setColour (juce::Colours::black.withAlpha (0.10f + press * 0.05f));
+    g.drawRoundedRectangle (bounds.reduced (1.5f), 7.0f, 1.0f);
+    g.setColour (selectedState ? colours::cyan.withAlpha (0.34f + hover * 0.16f)
+                               : colours::borderSoft.withAlpha (0.78f + hover * 0.16f));
     g.drawRoundedRectangle (bounds, 8.0f, 1.0f);
+    g.setColour (juce::Colours::white.withAlpha (0.016f + hover * 0.018f));
+    g.fillRoundedRectangle (juce::Rectangle<float> (bounds.getX() + 12.0f, bounds.getY() + 1.5f,
+                                                    juce::jmax (0.0f, bounds.getWidth() - 24.0f), 1.3f), 1.0f);
 
     const auto railColour = openOnlyState ? colours::violet
                            : lockedState ? colours::green
                            : active ? colours::cyan : colours::textMuted;
-    g.setColour (railColour.withAlpha (selectedState || hovered ? 0.88f : 0.52f));
+    g.setColour (railColour.withAlpha (0.48f + hover * 0.34f));
     g.fillRoundedRectangle (juce::Rectangle<float> (bounds.getX() + 1.0f, bounds.getY() + 8.0f,
                                                     2.0f, bounds.getHeight() - 16.0f), 1.0f);
 
@@ -555,8 +593,24 @@ void CompactRackRow::toggleBypassFromUi()
         onBypassChanged (bypassed);
 }
 
+void CompactRackRow::mouseEnter (const juce::MouseEvent&)
+{
+    startAnimation();
+}
+
+void CompactRackRow::mouseExit (const juce::MouseEvent&)
+{
+    startAnimation();
+}
+
+void CompactRackRow::mouseDown (const juce::MouseEvent&)
+{
+    startAnimation();
+}
+
 void CompactRackRow::mouseUp (const juce::MouseEvent& event)
 {
+    startAnimation();
     if (actionButton != nullptr && actionButton->getBounds().contains (event.getPosition()))
         return;
 

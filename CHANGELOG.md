@@ -1,12 +1,20 @@
-# Sonkupik Live v0.10.1
+# Sonkupik Live v0.10.2
 
-- Build script now closes a running `Sonkupik Live.exe` before linking.
-- Removes stale linker output with bounded retry for antivirus/Explorer locks.
-- Automatically retries the build once after releasing executable locks.
-- Single-click BAT performs the same running-process preflight.
-- Portable staging and ZIP cleanup now use bounded retry.
+- Premium P2 visual refinement focused on hover states, border precision, subtle shadows and tooltip readability.
+- Added smarter structured tooltips with elegant callout rendering and clearer microcopy.
+- Added lightweight animated hover/press transitions for icon buttons and rack rows.
 
 # Changelog
+
+## v0.10.2 - 2026-07-19 - P2 premium interaction polish
+
+- Refined header and utility button hover states with smoother animated surface feedback.
+- Rebalanced button, combo-box and card shadows to be more subtle and premium.
+- Tightened border contrast so controls read clearly without looking harsh.
+- Rebuilt tooltip/callout rendering with cleaner title/body hierarchy and better readability.
+- Converted key tooltips to smart two-part microcopy using concise titles and helpful descriptions.
+- Added lightweight hover/press interpolation to rack rows and icon buttons without touching the audio thread.
+
 
 ## v0.10.1 - 2026-07-19 - P1 premium polish and single-click build
 

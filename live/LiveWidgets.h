@@ -100,7 +100,8 @@ private:
 };
 
 class CompactRackRow final : public juce::Component,
-                             public juce::SettableTooltipClient
+                             public juce::SettableTooltipClient,
+                             private juce::Timer
 {
 public:
     CompactRackRow (int index, const juce::String& iconResource,
@@ -118,12 +119,15 @@ public:
 
     void resized() override;
     void paint (juce::Graphics&) override;
-    void mouseEnter (const juce::MouseEvent&) override { repaint(); }
-    void mouseExit (const juce::MouseEvent&) override { repaint(); }
+    void mouseEnter (const juce::MouseEvent&) override;
+    void mouseExit (const juce::MouseEvent&) override;
+    void mouseDown (const juce::MouseEvent&) override;
     void mouseUp (const juce::MouseEvent&) override;
     void mouseDoubleClick (const juce::MouseEvent&) override;
 
 private:
+    void timerCallback() override;
+    void startAnimation();
     void toggleBypassFromUi();
     int rowIndex = 0;
     juce::String moduleName;
@@ -134,6 +138,8 @@ private:
     bool bypassed = false;
     std::unique_ptr<juce::Drawable> moduleIcon;
     std::unique_ptr<LucideIconButton> actionButton;
+    float hoverMix = 0.0f;
+    float pressMix = 0.0f;
 };
 
 class MiniStat final : public juce::Component

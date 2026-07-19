@@ -10,6 +10,8 @@ echo ============================================================
 echo   Source : %CD%
 echo   Mode   : Release x64 + portable ZIP
 echo.
+echo Closing any running Sonkupik Live preview...
+taskkill /F /IM "Sonkupik Live.exe" >nul 2>nul
 
 where powershell.exe >nul 2>nul
 if errorlevel 1 (
@@ -22,13 +24,13 @@ if /I "%~1"=="clean" (
     powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass ^
       -File "%~dp0scripts\package-live-windows.ps1" ^
       -Configuration Release ^
-      -Version 0.10.0 ^
+      -Version 0.10.1 ^
       -Clean
 ) else (
     powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass ^
       -File "%~dp0scripts\package-live-windows.ps1" ^
       -Configuration Release ^
-      -Version 0.10.0
+      -Version 0.10.1
 )
 
 set "BUILD_RC=%ERRORLEVEL%"

@@ -2,7 +2,7 @@ param(
     [ValidateSet('Release','Debug')]
     [string]$Configuration = 'Release',
     [string]$BuildDir = 'build-live',
-    [string]$Version = '0.10.0',
+    [string]$Version = '0.10.1',
     [string]$JuceSourceDir = '',
     [string]$AskpSourceDir = '',
     [switch]$Clean
@@ -10,6 +10,19 @@ param(
 
 $ErrorActionPreference = 'Stop'
 $root = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
+
+function Remove-PathWithRetry([string]$path) {
+    if (-not (Test-Path $path)) { return }
+    for ($attempt = 1; $attempt -le 6; $attempt++) {
+        try {
+            Remove-Item -LiteralPath $path -Recurse -Force -ErrorAction Stop
+            return
+        } catch {
+            if ($attempt -eq 6) { throw }
+            Start-Sleep -Milliseconds (300 * $attempt)
+        }
+    }
+}
 
 $buildScriptArgs = @{
     Configuration = $Configuration
@@ -32,8 +45,8 @@ $packageName = "Sonkupik-Live-v$Version-win-x64-portable"
 $stage = Join-Path $distRoot $packageName
 $zip = Join-Path $distRoot "$packageName.zip"
 
-if (Test-Path $stage) { Remove-Item -Recurse -Force $stage }
-if (Test-Path $zip) { Remove-Item -Force $zip }
+Remove-PathWithRetry $stage
+Remove-PathWithRetry $zip
 New-Item -ItemType Directory -Force -Path $stage | Out-Null
 
 Copy-Item $exe.FullName (Join-Path $stage 'Sonkupik Live.exe')

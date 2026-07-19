@@ -1,0 +1,15 @@
+Sonkupik Live v0.10.1 Linker Lock Audit
+
+[PASS] CMake version 0.10.1
+[PASS] Application version 0.10.1
+[PASS] Build closes running preview
+[PASS] Build removes stale output
+[PASS] Build retries once
+[PASS] BAT preflight taskkill
+[PASS] BAT packages v0.10.1
+[PASS] Package cleanup has retry
+[PASS] Package default version 0.10.1
+
+Checks : 9
+Passed : 9
+Failed : 0

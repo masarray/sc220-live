@@ -15,7 +15,7 @@ Double-click the root file:
 build-live-windows.bat
 ```
 
-The BAT runs the Release build, creates `dist\Sonkupik-Live-v0.10.0-win-x64-portable.zip`, and opens the `dist` folder after success. The console remains open on failure so the complete compiler/linker message is visible.
+The BAT runs the Release build, creates `dist\Sonkupik-Live-v0.10.1-win-x64-portable.zip`, and opens the `dist` folder after success. The console remains open on failure so the complete compiler/linker message is visible.
 
 For a forced clean build:
 
@@ -83,3 +83,15 @@ Install/repair:
 - C++ CMake tools for Windows.
 
 The automatic Ninja fallback still uses MSVC and is a valid build path.
+
+## Linker output locked (LNK1104)
+
+The build script closes any running `Sonkupik Live.exe`, removes stale output with bounded retry, and retries the linker once. This prevents the common case where a preview instance, Windows Security, or Explorer temporarily locks the Release executable.
+
+If Windows still holds the file, close Sonkupik Live and run:
+
+```bat
+build-live-windows.bat clean
+```
+
+Avoid browsing the build artefact folder with Explorer Preview enabled during linking.

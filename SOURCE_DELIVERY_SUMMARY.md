@@ -1,8 +1,8 @@
-# Sonkupik Live v0.10.0 — Source Delivery Summary
+# Sonkupik Live v0.10.1 — Source Delivery Summary
 
 ## P1 premium polish and repository/build hygiene
 
-Implemented in v0.10.0:
+Implemented in v0.10.1:
 
 - integrated side-fader chassis and realistic premium fader thumb;
 - lightweight 24 Hz peak-hold meter display;
@@ -16,7 +16,7 @@ Implemented in v0.10.0:
 Documentation and audit:
 
 ```text
-docs/P1_PREMIUM_POLISH_v0.10.0.md
+docs/P1_PREMIUM_POLISH_v0.10.1.md
 qa/v0100_p1_audit.txt
 ```
 

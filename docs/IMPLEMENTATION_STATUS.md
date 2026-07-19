@@ -1,4 +1,14 @@
-# Implementation Status — v0.10.0
+# Implementation Status — v0.10.1
+
+## v0.10.1 build reliability completed
+
+- Automatically closes a running Sonkupik Live preview before linking.
+- Removes stale Release executable with bounded retry.
+- Retries the linker once after releasing output locks.
+- Single-click BAT and portable packaging use the same lock-safe workflow.
+- DSP and P1 workspace source remain unchanged from v0.10.0.
+
+## Previous milestone — v0.10.0
 
 ## v0.10.0 P1 completed
 

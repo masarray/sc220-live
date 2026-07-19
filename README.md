@@ -1,4 +1,4 @@
-# Sonkupik Live v0.10.0
+# Sonkupik Live v0.10.1
 
 **Sonkupik Live** is a lightweight native Windows live-audio rack for streamers who need professional enhancement without opening a full DAW.
 
@@ -14,11 +14,11 @@ Audio Interface
   -> OBS or TikTok Studio captures CABLE Output
 ```
 
-## v0.10.0 P1 premium polish
+## v0.10.1 P1 premium polish
 
 P1 refines the P0 structure without changing the audio path. Side faders now use an integrated mixer chassis, realistic metallic thumbs and lightweight peak hold. Rack rows expose clear ON/BYPASS/ADD/SAFE states and can be toggled across the full row. Noise Clean and Smart Sound Enhancer now use inset workstation-style control bays, reducing empty space and making the centre workspace feel like one professional audio surface.
 
-The UI still refreshes at 24 Hz and P1 adds no work to the real-time audio callback. See `docs/P1_PREMIUM_POLISH_v0.10.0.md`.
+The UI still refreshes at 24 Hz and P1 adds no work to the real-time audio callback. See `docs/P1_PREMIUM_POLISH_v0.10.1.md`.
 
 ## v0.9.9 P0 premium workspace redesign
 
@@ -128,12 +128,12 @@ Read these first:
 - `docs/AUDIT_PRESET_PARITY_v0.9.3.md`
 - `qa/v092_control_response_audit.txt`
 - `qa/v093_source_parity_audit.txt`
-- `docs/P1_PREMIUM_POLISH_v0.10.0.md`
+- `docs/P1_PREMIUM_POLISH_v0.10.1.md`
 - `qa/v0100_p1_audit.txt`
 
 ## Current limitation
 
-v0.10.0 retains the v0.9.2 direct processor path and adds deterministic preset parity QA; v0.9.2 removed the delayed background-engine rebuild and uses the VST real-time processor directly, but JUCE currently opens the physical input and VB-CABLE output through the Windows device backend. A future native dual-client `IAudioClient3` bridge with adaptive clock-drift correction remains the strongest route to a formal multi-hour anti-crackle guarantee.
+v0.10.1 retains the v0.9.2 direct processor path and adds deterministic preset parity QA; v0.9.2 removed the delayed background-engine rebuild and uses the VST real-time processor directly, but JUCE currently opens the physical input and VB-CABLE output through the Windows device backend. A future native dual-client `IAudioClient3` bridge with adaptive clock-drift correction remains the strongest route to a formal multi-hour anti-crackle guarantee.
 
 ## Live knob response
 

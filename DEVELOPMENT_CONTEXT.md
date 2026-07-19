@@ -1,6 +1,6 @@
 # Sonkupik Live Development Context
 
-Current milestone: **v0.10.0 — P1 premium workspace polish and single-click Windows build**.
+Current milestone: **v0.10.1 — P1 premium workspace polish and single-click Windows build**.
 
 ## Product intent
 
@@ -33,7 +33,7 @@ Use `scripts/run-p2-parity.ps1` for binary preset verification and the Settings 
 
 P3 remains functional third-party VST3 hosting with crash-isolated scanning, latency reporting, state recall and safe bypass. It must not compromise the Live Safe built-in chain.
 
-## v0.10.0 P1 UI and build rule
+## v0.10.1 P1 UI and build rule
 
 - Keep fader peak hold and interaction rendering on the message thread only.
 - Do not add a second UI timer; the application remains at 24 Hz.

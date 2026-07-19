@@ -1,6 +1,14 @@
+# Sonkupik Live v0.10.1
+
+- Build script now closes a running `Sonkupik Live.exe` before linking.
+- Removes stale linker output with bounded retry for antivirus/Explorer locks.
+- Automatically retries the build once after releasing executable locks.
+- Single-click BAT performs the same running-process preflight.
+- Portable staging and ZIP cleanup now use bounded retry.
+
 # Changelog
 
-## v0.10.0 - 2026-07-19 - P1 premium polish and single-click build
+## v0.10.1 - 2026-07-19 - P1 premium polish and single-click build
 
 - Added an integrated premium chassis for both side faders and stereo meters.
 - Added lightweight UI-only peak-hold lines without adding a timer or audio-thread work.
@@ -11,7 +19,7 @@
 - Added lightweight knob/fader hover emphasis without changing the 24 Hz UI cadence.
 - Strengthened `.gitignore` for build trees, generated projects, dependencies, packages, diagnostics, recordings, certificates and private keys.
 - Added root-level `build-live-windows.bat` for single-click Release build and portable packaging.
-- Updated the package script to support `-Clean` and version 0.10.0.
+- Updated the package script to support `-Clean` and version 0.10.1.
 
 ## v0.9.9 - 2026-07-19 - P0 premium workspace redesign
 

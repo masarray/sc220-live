@@ -158,6 +158,82 @@ function Find-Ninja([string]$vsInstallPath) {
     return $null
 }
 
+function Stop-SonkupikLiveProcesses {
+    $stopped = 0
+    try {
+        $processes = Get-CimInstance Win32_Process -Filter "Name='Sonkupik Live.exe'" -ErrorAction SilentlyContinue
+        foreach ($process in $processes) {
+            try {
+                Write-Host "==> Closing running Sonkupik Live process (PID $($process.ProcessId))" -ForegroundColor Yellow
+                Stop-Process -Id ([int]$process.ProcessId) -Force -ErrorAction Stop
+                $stopped++
+            } catch {
+                Write-Warning "Unable to close Sonkupik Live PID $($process.ProcessId): $($_.Exception.Message)"
+            }
+        }
+    } catch {
+        # CIM can be unavailable on stripped-down Windows environments. Fall
+        # back to Get-Process, whose ProcessName omits the .exe suffix.
+        Get-Process -Name 'Sonkupik Live' -ErrorAction SilentlyContinue | ForEach-Object {
+            try {
+                Write-Host "==> Closing running Sonkupik Live process (PID $($_.Id))" -ForegroundColor Yellow
+                Stop-Process -Id $_.Id -Force -ErrorAction Stop
+                $stopped++
+            } catch {
+                Write-Warning "Unable to close Sonkupik Live PID $($_.Id): $($_.Exception.Message)"
+            }
+        }
+    }
+
+    if ($stopped -gt 0) {
+        Start-Sleep -Milliseconds 700
+    }
+    return $stopped
+}
+
+function Get-SonkupikOutputCandidates([string]$buildPath, [string]$configuration) {
+    return @(
+        (Join-Path $buildPath "SonkupikLive_artefacts\$configuration\Sonkupik Live.exe"),
+        (Join-Path $buildPath "SonkupikLive_artefacts\$configuration\SonkupikLive.exe"),
+        (Join-Path $buildPath 'SonkupikLive_artefacts\Sonkupik Live.exe'),
+        (Join-Path $buildPath 'SonkupikLive_artefacts\SonkupikLive.exe')
+    )
+}
+
+function Remove-StaleSonkupikOutputs([string]$buildPath, [string]$configuration) {
+    foreach ($candidate in (Get-SonkupikOutputCandidates $buildPath $configuration)) {
+        if (-not (Test-Path $candidate)) { continue }
+
+        $removed = $false
+        for ($attempt = 1; $attempt -le 6; $attempt++) {
+            try {
+                Remove-Item -LiteralPath $candidate -Force -ErrorAction Stop
+                $removed = $true
+                break
+            } catch {
+                if ($attempt -lt 6) {
+                    Write-Host "==> Output file is busy; waiting before linker retry ($attempt/6)" -ForegroundColor Yellow
+                    Start-Sleep -Milliseconds (350 * $attempt)
+                } else {
+                    throw @"
+The previous Sonkupik Live executable is still locked:
+  $candidate
+
+Close Sonkupik Live, disable any Explorer preview for this file, and allow the
+build folder in antivirus/Windows Security if it is being scanned continuously.
+Then run:
+  build-live-windows.bat clean
+"@
+                }
+            }
+        }
+
+        if ($removed) {
+            Write-Host "==> Removed stale executable: $candidate"
+        }
+    }
+}
+
 function Remove-IncompatibleBuildTree([string]$buildPath, [string]$wantedGenerator) {
     $cache = Join-Path $buildPath 'CMakeCache.txt'
     if (-not (Test-Path $cache)) { return }
@@ -341,20 +417,30 @@ Write-Host '==> Configuring Sonkupik Live'
 & $cmake.Path @cmakeArgs
 if ($LASTEXITCODE -ne 0) { throw "CMake configure failed with exit code $LASTEXITCODE" }
 
+# The linker cannot replace an executable that is still running. Close any
+# previous preview instance and remove the stale output before invoking MSBuild.
+Stop-SonkupikLiveProcesses | Out-Null
+Remove-StaleSonkupikOutputs $build $Configuration
+
 Write-Host "==> Building Sonkupik Live ($Configuration)"
 $buildTargets = @('SonkupikLive')
 if ($ParityQa) { $buildTargets += @('SonkupikParityReference', 'SonkupikParityLive') }
 $buildArgs = @('--build', $build, '--target') + $buildTargets + @('--parallel')
 if ($useMultiConfig) { $buildArgs += @('--config', $Configuration) }
 & $cmake.Path @buildArgs
-if ($LASTEXITCODE -ne 0) { throw "Build failed with exit code $LASTEXITCODE" }
+$firstBuildExitCode = $LASTEXITCODE
+if ($firstBuildExitCode -ne 0) {
+    Write-Host '==> First build attempt failed. Releasing possible executable locks and retrying once.' -ForegroundColor Yellow
+    Stop-SonkupikLiveProcesses | Out-Null
+    Remove-StaleSonkupikOutputs $build $Configuration
+    Start-Sleep -Milliseconds 900
+    & $cmake.Path @buildArgs
+}
+if ($LASTEXITCODE -ne 0) {
+    throw "Build failed with exit code $LASTEXITCODE after automatic linker-lock retry"
+}
 
-$candidates = @(
-    (Join-Path $build "SonkupikLive_artefacts\$Configuration\Sonkupik Live.exe"),
-    (Join-Path $build "SonkupikLive_artefacts\$Configuration\SonkupikLive.exe"),
-    (Join-Path $build 'SonkupikLive_artefacts\Sonkupik Live.exe'),
-    (Join-Path $build 'SonkupikLive_artefacts\SonkupikLive.exe')
-)
+$candidates = Get-SonkupikOutputCandidates $build $Configuration
 $exe = $candidates | Where-Object { Test-Path $_ } | Select-Object -First 1
 if (-not $exe) {
     $exe = Get-ChildItem $build -Recurse -Filter '*.exe' |

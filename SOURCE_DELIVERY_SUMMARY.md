@@ -1,6 +1,27 @@
-# Sonkupik Live v0.9.3 — Source Delivery Summary
+# Sonkupik Live v0.9.9 — Source Delivery Summary
 
-This milestone completes **P2: Smart Sound Enhancer preset and engine parity verification**.
+## P0 premium layout milestone
+
+This milestone implements Option A (component-level audit/checklist) and Option B (workspace redesign blueprint), then applies the P0 changes to the actual JUCE application.
+
+Implemented:
+
+- one authoritative `WorkspaceLayout` for paint and placement;
+- shared spacing/radius metrics;
+- premium brand/status header and quiet cached utility icons;
+- unified Input/Output routing strip;
+- rebalanced Noise Clean controls, expander reduction monitor and sphere;
+- explicit PRESET hierarchy and equal macro-knob grid;
+- refined card depth, header separators and border precision;
+- no increase to visual refresh rate or audio-thread workload.
+
+Documentation:
+
+```text
+docs/P0_PREMIUM_LAYOUT_AUDIT_v0.9.9.md
+docs/P0_LAYOUT_REDESIGN_BLUEPRINT_v0.9.9.md
+qa/v099_layout_p0_audit.txt
+```
 
 ## Runtime architecture
 
@@ -54,3 +75,13 @@ Passed: 40
 Failed: 0
 Result: PASS
 ```
+
+## P0 source audit
+
+```text
+Checks : 23
+Passed : 23
+Failed : 0
+```
+
+This audit verifies the shared layout model, spacing tokens, status capsule, I/O strip, Noise Clean zoning, vertical expander reduction meter, preset hierarchy, cached icon rendering and unchanged 24 Hz refresh policy.

@@ -1,4 +1,4 @@
-# Implementation Status — v0.9.3
+# Implementation Status — v0.9.9
 
 ## Implemented
 
@@ -9,9 +9,11 @@
 - P2 optional reference/live offline renderers.
 - P2 exact preset output comparison infrastructure.
 - Musical Noise Clean and smooth expander.
-- Input/output device routing, tray lifecycle, meters and aquarium visualizer.
+- Input/output device routing, tray lifecycle, meters and authoritative sphere visualizer.
 - Functional built-in rack bypass controls.
 - Manual **Match VST Reference** conditions.
+- P0 premium workspace layout with one authoritative geometry model.
+- Premium header status capsule, I/O strip, refined expander meter and preset hierarchy.
 
 ## Requires Windows validation
 
@@ -26,3 +28,5 @@
 - Crash-isolated VST3 scanner and hosting.
 - Native dual-client WASAPI/ASIO drift-corrected bridge.
 - Signed installer strategy with VB-CABLE redistribution compliance.
+
+- Headless askp processor integration: implemented in v0.9.7; VST editor/QRIS/update UI excluded from Live target.

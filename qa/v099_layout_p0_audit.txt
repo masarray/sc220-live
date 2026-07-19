@@ -1,0 +1,29 @@
+Sonkupik Live v0.9.9 P0 Layout Audit
+==========================================
+Checks : 23
+Passed : 23
+Failed : 0
+
+[PASS] CMake project version is 0.9.9
+[PASS] Application version is 0.9.9
+[PASS] Shared metrics namespace exists
+[PASS] Header metric is centralised
+[PASS] Footer metric is centralised
+[PASS] Single WorkspaceLayout exists
+[PASS] paint uses WorkspaceLayout
+[PASS] resized uses WorkspaceLayout
+[PASS] Premium I/O strip surface exists
+[PASS] Engine status capsule exists
+[PASS] Noise control/visual divider exists
+[PASS] Preset caption hierarchy exists
+[PASS] Expander meter is vertical
+[PASS] Expander meter uses negative scale labels
+[PASS] Expander meter shows actual negative readout
+[PASS] Momentary icon buttons are quiet at idle
+[PASS] Lucide active icon is cached
+[PASS] Lucide inactive icon is cached
+[PASS] Header icon fallback is present
+[PASS] Panel inner highlight exists
+[PASS] UI refresh remains 24 Hz
+[PASS] Option A audit documentation exists
+[PASS] Option B blueprint documentation exists

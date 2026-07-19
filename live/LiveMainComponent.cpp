@@ -7,9 +7,25 @@
 
 namespace askp::live {
 namespace {
-constexpr int headerHeight = 58;
-constexpr int footerHeight = 54;
-constexpr int outerPad = 12;
+constexpr int headerHeight = metrics::headerHeight;
+constexpr int footerHeight = metrics::footerHeight;
+constexpr int outerPad = metrics::space12;
+
+const juce::Image& getBrandLogo()
+{
+    static juce::Image image = []
+    {
+        int bytes = 0;
+        if (const auto* data = BinaryData::getNamedResource ("askp_app_logo_png", bytes))
+            if (auto img = juce::ImageFileFormat::loadFrom (data, static_cast<size_t> (bytes)); img.isValid())
+                return img;
+        if (const auto* data = BinaryData::getNamedResource ("favicon_96x96_png", bytes))
+            if (auto img = juce::ImageFileFormat::loadFrom (data, static_cast<size_t> (bytes)); img.isValid())
+                return img;
+        return juce::Image();
+    }();
+    return image;
+}
 
 void styleCombo (juce::ComboBox& box, const juce::String& tooltip)
 {
@@ -36,6 +52,169 @@ void selectComboText (juce::ComboBox& combo, const juce::String& text)
         }
     }
     combo.setText (text, juce::dontSendNotification);
+}
+
+struct WorkspaceLayout
+{
+    juce::Rectangle<int> header;
+    juce::Rectangle<int> footer;
+    juce::Rectangle<int> leftPanel;
+    juce::Rectangle<int> rightPanel;
+    juce::Rectangle<int> ioStrip;
+    juce::Rectangle<int> noiseCard;
+    juce::Rectangle<int> enhancerCard;
+
+    juce::Rectangle<int> logo;
+    juce::Rectangle<int> statusPill;
+    juce::Rectangle<int> settings;
+    juce::Rectangle<int> tray;
+    juce::Rectangle<int> minimise;
+    juce::Rectangle<int> maximise;
+    juce::Rectangle<int> close;
+
+    juce::Rectangle<int> leftTitle;
+    juce::Rectangle<int> inputTrimRow;
+    juce::Rectangle<int> noiseRow;
+    juce::Rectangle<int> vstPreRow;
+    juce::Rectangle<int> inputFader;
+
+    juce::Rectangle<int> rightTitle;
+    juce::Rectangle<int> vstPostRow;
+    juce::Rectangle<int> outputTrimRow;
+    juce::Rectangle<int> limiterRow;
+    juce::Rectangle<int> outputFader;
+
+    juce::Rectangle<int> inputLabel;
+    juce::Rectangle<int> inputCombo;
+    juce::Rectangle<int> outputLabel;
+    juce::Rectangle<int> outputCombo;
+
+    juce::Rectangle<int> noiseHeader;
+    juce::Rectangle<int> noiseBypass;
+    juce::Rectangle<int> noiseKnobs[3];
+    juce::Rectangle<int> profile;
+    juce::Rectangle<int> learn;
+    juce::Rectangle<int> expanderMeter;
+    juce::Rectangle<int> visualizer;
+    juce::Rectangle<int> noiseDivider;
+
+    juce::Rectangle<int> enhancerHeader;
+    juce::Rectangle<int> enhancerBypass;
+    juce::Rectangle<int> presetCaption;
+    juce::Rectangle<int> presetCombo;
+    juce::Rectangle<int> enhancerKnobs[5];
+
+    juce::Rectangle<int> stats[5];
+};
+
+WorkspaceLayout makeWorkspaceLayout (juce::Rectangle<int> bounds)
+{
+    WorkspaceLayout l;
+    l.header = bounds.removeFromTop (headerHeight);
+    l.footer = bounds.removeFromBottom (footerHeight);
+
+    l.logo = { metrics::space16, metrics::space8, 42, 42 };
+    const int headerButton = 36;
+    int x = l.header.getRight() - metrics::space12;
+    l.close = { x - headerButton, metrics::space12, headerButton, headerButton };
+    x -= headerButton + metrics::space4;
+    l.maximise = { x - headerButton, metrics::space12, headerButton, headerButton };
+    x -= headerButton + metrics::space4;
+    l.minimise = { x - headerButton, metrics::space12, headerButton, headerButton };
+    x -= headerButton + metrics::space8;
+    l.tray = { x - headerButton, metrics::space12, headerButton, headerButton };
+    x -= headerButton + metrics::space4;
+    l.settings = { x - headerButton, metrics::space12, headerButton, headerButton };
+    l.statusPill = { 276, 15, juce::jlimit (250, 340, x - 294), 30 };
+
+    auto workspace = bounds.reduced (outerPad, metrics::space10);
+    const int sideWidth = juce::jlimit (224, metrics::sidePanelWidth,
+                                        static_cast<int> (workspace.getWidth() * 0.172f));
+    l.leftPanel = workspace.removeFromLeft (sideWidth);
+    workspace.removeFromLeft (metrics::space12);
+    l.rightPanel = workspace.removeFromRight (sideWidth);
+    workspace.removeFromRight (metrics::space12);
+
+    auto centre = workspace;
+    l.ioStrip = centre.removeFromTop (48);
+    centre.removeFromTop (metrics::space10);
+    const int noiseHeight = juce::jlimit (328, 356,
+                                          static_cast<int> (centre.getHeight() * 0.545f));
+    l.noiseCard = centre.removeFromTop (noiseHeight);
+    centre.removeFromTop (metrics::space10);
+    l.enhancerCard = centre;
+
+    auto left = l.leftPanel.reduced (metrics::space12);
+    l.leftTitle = left.removeFromTop (42);
+    l.inputTrimRow = left.removeFromTop (metrics::rackRowHeight);
+    left.removeFromTop (metrics::space6);
+    l.noiseRow = left.removeFromTop (metrics::rackRowHeight);
+    left.removeFromTop (metrics::space6);
+    l.vstPreRow = left.removeFromTop (metrics::rackRowHeight);
+    left.removeFromTop (metrics::space10);
+    l.inputFader = left;
+
+    auto right = l.rightPanel.reduced (metrics::space12);
+    l.rightTitle = right.removeFromTop (42);
+    l.vstPostRow = right.removeFromTop (metrics::rackRowHeight);
+    right.removeFromTop (metrics::space6);
+    l.outputTrimRow = right.removeFromTop (metrics::rackRowHeight);
+    right.removeFromTop (metrics::space6);
+    l.limiterRow = right.removeFromTop (metrics::rackRowHeight);
+    right.removeFromTop (metrics::space10);
+    l.outputFader = right;
+
+    auto io = l.ioStrip;
+    auto inputHalf = io.removeFromLeft (io.getWidth() / 2).reduced (metrics::space10, metrics::space4);
+    auto outputHalf = io.reduced (metrics::space10, metrics::space4);
+    l.inputLabel = inputHalf.removeFromLeft (52);
+    l.inputCombo = inputHalf;
+    l.outputLabel = outputHalf.removeFromLeft (58);
+    l.outputCombo = outputHalf;
+
+    auto noiseInner = l.noiseCard.reduced (metrics::space14, metrics::space12);
+    l.noiseHeader = noiseInner.removeFromTop (40);
+    l.noiseBypass = l.noiseHeader.removeFromRight (34).withSizeKeepingCentre (34, 34);
+    auto noiseBody = noiseInner;
+    const int controlWidth = juce::jlimit (350, 382,
+                                           static_cast<int> (noiseBody.getWidth() * 0.42f));
+    auto controls = noiseBody.removeFromLeft (controlWidth);
+    l.noiseDivider = noiseBody.removeFromLeft (metrics::space16)
+                            .withSizeKeepingCentre (1, juce::jmax (80, noiseBody.getHeight() - 24));
+    l.visualizer = noiseBody.reduced (metrics::space4, 0);
+
+    auto meter = controls.removeFromRight (72);
+    controls.removeFromRight (metrics::space12);
+    auto knobRow = controls.removeFromTop (140);
+    const int knobWidth = knobRow.getWidth() / 3;
+    for (int i = 0; i < 3; ++i)
+        l.noiseKnobs[i] = knobRow.removeFromLeft (i == 2 ? knobRow.getWidth() : knobWidth).reduced (metrics::space4);
+    controls.removeFromTop (metrics::space10);
+    l.profile = controls.removeFromTop (34);
+    controls.removeFromTop (metrics::space8);
+    l.learn = controls.removeFromTop (36);
+    l.expanderMeter = meter.withSizeKeepingCentre (68, juce::jmin (186, meter.getHeight() - 8));
+
+    auto enhancerInner = l.enhancerCard.reduced (metrics::space14, metrics::space12);
+    l.enhancerHeader = enhancerInner.removeFromTop (40);
+    l.enhancerBypass = l.enhancerHeader.removeFromRight (34).withSizeKeepingCentre (34, 34);
+    auto presetStrip = enhancerInner.removeFromTop (58);
+    auto captionRow = presetStrip.removeFromTop (15);
+    l.presetCaption = captionRow.removeFromLeft (350);
+    auto comboRow = presetStrip.removeFromTop (38);
+    l.presetCombo = comboRow.removeFromLeft (350);
+    enhancerInner.removeFromTop (metrics::space8);
+    const int enhancerKnobWidth = enhancerInner.getWidth() / 5;
+    for (int i = 0; i < 5; ++i)
+        l.enhancerKnobs[i] = enhancerInner.removeFromLeft (i == 4 ? enhancerInner.getWidth() : enhancerKnobWidth)
+                                                   .reduced (metrics::space6, metrics::space2);
+
+    auto footer = l.footer.reduced (metrics::space12, 0);
+    const int statWidth = footer.getWidth() / 5;
+    for (int i = 0; i < 5; ++i)
+        l.stats[i] = footer.removeFromLeft (i == 4 ? footer.getWidth() : statWidth);
+
+    return l;
 }
 
 class AudioSettingsCard final : public juce::Component
@@ -269,6 +448,17 @@ void LiveMainComponent::configureControls()
              &cpuStat, &latencyStat, &dropoutsStat, &profileStat, &trayStat })
         addAndMakeVisible (component);
 
+    settingsButton.setOffColour (colours::textMuted);
+    trayButton.setOffColour (colours::textMuted);
+    minimiseButton.setOffColour (colours::textMuted);
+    maximiseButton.setOffColour (colours::textMuted);
+    closeButton.setOffColour (colours::textMuted);
+    noiseBypass.setOffColour (colours::textMuted.withAlpha (0.78f));
+    enhancerPower.setOffColour (colours::textMuted.withAlpha (0.78f));
+
+    gainReductionMeter.setVertical (true);
+    gainReductionMeter.setTitle ("EXPANDER");
+
     settingsButton.setTooltip ("Audio engine and Musical Noise Clean settings");
     trayButton.setTooltip ("Open compact tray controller");
     minimiseButton.setTooltip ("Minimise");
@@ -281,7 +471,7 @@ void LiveMainComponent::configureControls()
     maximiseButton.onClick = [this] { if (windowActions.toggleMaximise) windowActions.toggleMaximise(); };
     closeButton.onClick = [this] { if (windowActions.hideToTray) windowActions.hideToTray(); };
 
-    noiseBypass.setTooltip ("Bypass Musical Noise Clean and the smooth expander");
+    noiseBypass.setTooltip ("Noise Clean bypass: disables spectral denoise and smooth expander");
     noiseBypass.setClickingTogglesState (true);
     noiseBypass.setToggleState (! audioEngine.getNoiseClean().isEnabled() ? false : true, juce::dontSendNotification);
     noiseBypass.onClick = [this]
@@ -293,7 +483,7 @@ void LiveMainComponent::configureControls()
         repaint();
     };
 
-    enhancerPower.setTooltip ("Bypass only the authoritative ArSonKuPik Smart Enhancer");
+    enhancerPower.setTooltip ("Smart Sound Enhancer bypass: keeps the live engine running while muting enhancer processing");
     enhancerPower.setClickingTogglesState (true);
     enhancerPower.setToggleState (! audioEngine.isBypassed(), juce::dontSendNotification);
     enhancerPower.onClick = [this]
@@ -384,11 +574,27 @@ void LiveMainComponent::configureControls()
 
     inputFader.onValueChanged = [this] (float valueDb)
     {
-        if (! updatingControls) audioEngine.setInputTrimDb (valueDb);
+        if (! updatingControls)
+        {
+            if (audioEngine.isInputTrimBypassed())
+            {
+                audioEngine.setInputTrimBypassed (false);
+                inputTrimRow.setBypassed (false);
+            }
+            audioEngine.setInputTrimDb (valueDb);
+        }
     };
     outputFader.onValueChanged = [this] (float valueDb)
     {
-        if (! updatingControls) audioEngine.setOutputTrimDb (valueDb);
+        if (! updatingControls)
+        {
+            if (audioEngine.isOutputTrimBypassed())
+            {
+                audioEngine.setOutputTrimBypassed (false);
+                outputTrimRow.setBypassed (false);
+            }
+            audioEngine.setOutputTrimDb (valueDb);
+        }
     };
 
     inputTrimRow.onBypassChanged = [this] (bool bypassed)
@@ -450,28 +656,36 @@ void LiveMainComponent::updateDeviceLists()
 
 void LiveMainComponent::paint (juce::Graphics& g)
 {
+    const auto layout = makeWorkspaceLayout (getLocalBounds());
     g.fillAll (colours::appBg);
 
     juce::ColourGradient headerGradient (juce::Colour (0xff0d1725), 0.0f, 0.0f,
                                          colours::appBg, static_cast<float> (getWidth()), 0.0f, false);
+    headerGradient.addColour (0.58, colours::panelLo.withAlpha (0.98f));
     g.setGradientFill (headerGradient);
-    g.fillRect (0, 0, getWidth(), headerHeight);
+    g.fillRect (layout.header);
     g.setColour (colours::border);
-    g.drawHorizontalLine (headerHeight - 1, 0.0f, static_cast<float> (getWidth()));
+    g.drawHorizontalLine (layout.header.getBottom() - 1, 0.0f, static_cast<float> (getWidth()));
 
     auto& lf = lookAndFeel;
-    g.setColour (colours::cyan.withAlpha (0.15f));
-    g.fillRoundedRectangle (juce::Rectangle<float> (18.0f, 10.0f, 38.0f, 38.0f), 9.0f);
-    if (auto icon = createLucideIcon ("audio_waveform_svg", colours::cyan))
-        icon->drawWithin (g, juce::Rectangle<float> (27.0f, 19.0f, 20.0f, 20.0f),
-                          juce::RectanglePlacement::centred, 1.0f);
+    auto logoBox = layout.logo.toFloat();
+    juce::ColourGradient logoSurface (colours::panelHi.brighter (0.035f), logoBox.getX(), logoBox.getY(),
+                                      colours::panelLo, logoBox.getRight(), logoBox.getBottom(), false);
+    g.setGradientFill (logoSurface);
+    g.fillRoundedRectangle (logoBox, 10.0f);
+    g.setColour (colours::border.withAlpha (0.92f));
+    g.drawRoundedRectangle (logoBox.reduced (0.5f), 10.0f, 1.0f);
+    if (const auto& brandLogo = getBrandLogo(); brandLogo.isValid())
+        g.drawImageWithin (brandLogo, layout.logo.getX() + 5, layout.logo.getY() + 5,
+                           layout.logo.getWidth() - 10, layout.logo.getHeight() - 10,
+                           juce::RectanglePlacement::centred, false);
 
-    g.setFont (lf.jakarta (19.0f, true));
+    g.setFont (lf.jakarta (18.0f, true));
     g.setColour (colours::text);
-    g.drawText ("Sonkupik Live", 68, 0, 190, headerHeight,
+    g.drawText ("Sonkupik Live", layout.logo.getRight() + 12, 0, 188, headerHeight,
                 juce::Justification::centredLeft, false);
     g.setColour (colours::border);
-    g.drawVerticalLine (260, 14.0f, 44.0f);
+    g.drawVerticalLine (260, 15.0f, 45.0f);
 
     const auto headerStatus = audioEngine.getStatus();
     const auto statusColour = ! headerStatus.deviceOpen ? colours::red
@@ -479,142 +693,99 @@ void LiveMainComponent::paint (juce::Graphics& g)
                             : headerStatus.outputIsVirtualCable ? colours::green : colours::amber;
     const juce::String statusText = ! headerStatus.deviceOpen ? "AUDIO DISCONNECTED"
                                   : ! audioEngine.isEngineEnabled() ? "ENGINE STOPPED"
-                                  : headerStatus.outputIsVirtualCable ? "ENGINE RUNNING / VB-CABLE READY"
-                                  : "ENGINE RUNNING / SELECT VB-CABLE";
+                                  : headerStatus.outputIsVirtualCable ? "LIVE ENGINE  /  VB-CABLE READY"
+                                  : "LIVE ENGINE  /  SELECT VB-CABLE";
+    const auto pill = layout.statusPill.toFloat();
+    g.setColour (statusColour.withAlpha (0.075f));
+    g.fillRoundedRectangle (pill, pill.getHeight() * 0.5f);
+    g.setColour (statusColour.withAlpha (0.26f));
+    g.drawRoundedRectangle (pill.reduced (0.5f), pill.getHeight() * 0.5f, 1.0f);
     g.setColour (statusColour);
-    g.fillEllipse (278.0f, 26.0f, 6.0f, 6.0f);
-    g.setFont (lf.jakarta (10.5f, true));
-    g.drawText (statusText, 293, 0, 330, headerHeight,
-                juce::Justification::centredLeft, false);
+    g.fillEllipse (pill.getX() + 11.0f, pill.getCentreY() - 3.5f, 7.0f, 7.0f);
+    g.setFont (lf.jakarta (10.0f, true));
+    g.drawText (statusText, layout.statusPill.reduced (25, 0), juce::Justification::centredLeft, false);
 
-    auto content = getLocalBounds().withTrimmedTop (headerHeight).withTrimmedBottom (footerHeight).reduced (outerPad);
-    const int sideWidth = juce::jlimit (210, 244, static_cast<int> (content.getWidth() * 0.17f));
-    auto left = content.removeFromLeft (sideWidth);
-    content.removeFromLeft (10);
-    auto right = content.removeFromRight (sideWidth);
-    content.removeFromRight (10);
-    auto centre = content;
+    fillPremiumPanel (g, layout.leftPanel.toFloat(), metrics::cardRadius);
+    fillPremiumPanel (g, layout.rightPanel.toFloat(), metrics::cardRadius);
+    fillPremiumPanel (g, layout.ioStrip.toFloat(), metrics::controlRadius);
+    fillPremiumPanel (g, layout.noiseCard.toFloat(), metrics::cardRadius);
+    fillPremiumPanel (g, layout.enhancerCard.toFloat(), metrics::cardRadius);
 
-    fillPremiumPanel (g, left.toFloat());
-    fillPremiumPanel (g, right.toFloat());
+    drawSectionTitle (g, layout.leftTitle.reduced (2, 0).toFloat(), "BEFORE ENHANCER");
+    drawSectionTitle (g, layout.rightTitle.reduced (2, 0).toFloat(), "AFTER CHAIN");
+    drawFieldLabel (g, lf, layout.inputLabel, "Input");
+    drawFieldLabel (g, lf, layout.outputLabel, "Output");
+    drawSectionTitle (g, layout.noiseHeader.toFloat(), "MUSICAL NOISE CLEAN");
+    drawSectionTitle (g, layout.enhancerHeader.toFloat(), "SMART SOUND ENHANCER");
 
-    auto ioStrip = centre.removeFromTop (48);
-    centre.removeFromTop (8);
-    const int noiseHeight = juce::jlimit (300, 360, static_cast<int> (centre.getHeight() * 0.54f));
-    auto noiseArea = centre.removeFromTop (noiseHeight);
-    centre.removeFromTop (10);
-    auto enhancerArea = centre;
-    fillPremiumPanel (g, noiseArea.toFloat());
-    fillPremiumPanel (g, enhancerArea.toFloat());
+    g.setColour (colours::borderSoft.withAlpha (0.48f));
+    g.drawHorizontalLine (layout.noiseHeader.getBottom() + 1,
+                          (float) layout.noiseCard.getX() + metrics::space14,
+                          (float) layout.noiseCard.getRight() - metrics::space14);
+    g.drawHorizontalLine (layout.enhancerHeader.getBottom() + 1,
+                          (float) layout.enhancerCard.getX() + metrics::space14,
+                          (float) layout.enhancerCard.getRight() - metrics::space14);
 
-    drawSectionTitle (g, left.removeFromTop (44).reduced (14, 0).toFloat(), "BEFORE ENHANCER");
-    drawSectionTitle (g, right.removeFromTop (44).reduced (14, 0).toFloat(), "AFTER CHAIN");
+    g.setColour (colours::borderSoft.withAlpha (0.78f));
+    g.fillRect (layout.noiseDivider.toFloat());
 
-    auto inputLabelArea = ioStrip.removeFromLeft (ioStrip.getWidth() / 2).reduced (10, 0);
-    auto outputLabelArea = ioStrip.reduced (10, 0);
-    drawFieldLabel (g, lf, inputLabelArea.removeFromLeft (54), "Input");
-    drawFieldLabel (g, lf, outputLabelArea.removeFromLeft (60), "Output");
-
-    drawSectionTitle (g, noiseArea.removeFromTop (42).reduced (16, 0).toFloat(),
-                      "MUSICAL NOISE CLEAN");
-    drawSectionTitle (g, enhancerArea.removeFromTop (42).reduced (16, 0).toFloat(),
-                      "SMART SOUND ENHANCER");
+    g.setColour (colours::cyan.withAlpha (0.70f));
+    g.fillRoundedRectangle (juce::Rectangle<float> ((float) layout.presetCaption.getX(),
+                                                     (float) layout.presetCaption.getBottom() - 2.0f,
+                                                     18.0f, 2.0f), 1.0f);
+    g.setColour (colours::textMuted);
+    g.setFont (lf.jakarta (9.0f, true));
+    g.drawText ("PRESET", layout.presetCaption, juce::Justification::centredLeft, false);
 
     g.setColour (colours::border);
-    g.drawHorizontalLine (getHeight() - footerHeight, 12.0f, static_cast<float> (getWidth() - 12));
+    g.drawHorizontalLine (layout.footer.getY(), 12.0f, static_cast<float> (getWidth() - 12));
 }
 
 void LiveMainComponent::resized()
 {
-    const int titleButtonSize = 42;
-    int x = getWidth() - 10;
-    closeButton.setBounds (x -= titleButtonSize, 8, titleButtonSize, titleButtonSize);
-    maximiseButton.setBounds (x -= titleButtonSize, 8, titleButtonSize, titleButtonSize);
-    minimiseButton.setBounds (x -= titleButtonSize, 8, titleButtonSize, titleButtonSize);
-    x -= 10;
-    trayButton.setBounds (x -= titleButtonSize, 8, titleButtonSize, titleButtonSize);
-    settingsButton.setBounds (x -= titleButtonSize, 8, titleButtonSize, titleButtonSize);
+    const auto layout = makeWorkspaceLayout (getLocalBounds());
 
-    auto content = getLocalBounds().withTrimmedTop (headerHeight).withTrimmedBottom (footerHeight).reduced (outerPad);
-    const int sideWidth = juce::jlimit (210, 244, static_cast<int> (content.getWidth() * 0.17f));
-    auto left = content.removeFromLeft (sideWidth).reduced (12);
-    content.removeFromLeft (10);
-    auto right = content.removeFromRight (sideWidth).reduced (12);
-    content.removeFromRight (10);
-    auto centre = content;
+    settingsButton.setBounds (layout.settings);
+    trayButton.setBounds (layout.tray);
+    minimiseButton.setBounds (layout.minimise);
+    maximiseButton.setBounds (layout.maximise);
+    closeButton.setBounds (layout.close);
 
-    left.removeFromTop (44);
-    const int compactRowHeight = 48;
-    inputTrimRow.setBounds (left.removeFromTop (compactRowHeight));
-    left.removeFromTop (6);
-    noiseRow.setBounds (left.removeFromTop (compactRowHeight));
-    left.removeFromTop (6);
-    vstPreRow.setBounds (left.removeFromTop (compactRowHeight));
-    left.removeFromTop (10);
-    inputFader.setBounds (left);
+    inputTrimRow.setBounds (layout.inputTrimRow);
+    noiseRow.setBounds (layout.noiseRow);
+    vstPreRow.setBounds (layout.vstPreRow);
+    inputFader.setBounds (layout.inputFader);
 
-    right.removeFromTop (44);
-    vstPostRow.setBounds (right.removeFromTop (compactRowHeight));
-    right.removeFromTop (6);
-    outputTrimRow.setBounds (right.removeFromTop (compactRowHeight));
-    right.removeFromTop (6);
-    limiterRow.setBounds (right.removeFromTop (compactRowHeight));
-    right.removeFromTop (10);
-    outputFader.setBounds (right);
+    vstPostRow.setBounds (layout.vstPostRow);
+    outputTrimRow.setBounds (layout.outputTrimRow);
+    limiterRow.setBounds (layout.limiterRow);
+    outputFader.setBounds (layout.outputFader);
 
-    auto ioStrip = centre.removeFromTop (48);
-    centre.removeFromTop (8);
-    auto inputArea = ioStrip.removeFromLeft (ioStrip.getWidth() / 2).reduced (10, 5);
-    auto outputArea = ioStrip.reduced (10, 5);
-    inputArea.removeFromLeft (54);
-    outputArea.removeFromLeft (60);
-    inputDevice.setBounds (inputArea);
-    outputDevice.setBounds (outputArea);
+    inputDevice.setBounds (layout.inputCombo);
+    outputDevice.setBounds (layout.outputCombo);
 
-    const int noiseHeight = juce::jlimit (300, 360, static_cast<int> (centre.getHeight() * 0.54f));
-    auto noiseArea = centre.removeFromTop (noiseHeight).reduced (14);
-    centre.removeFromTop (10);
-    auto enhancerArea = centre.reduced (14);
+    noiseBypass.setBounds (layout.noiseBypass);
+    noiseReduction.setBounds (layout.noiseKnobs[0]);
+    silenceAmount.setBounds (layout.noiseKnobs[1]);
+    preserveAmount.setBounds (layout.noiseKnobs[2]);
+    profileStatus.setBounds (layout.profile);
+    learnNoise.setBounds (layout.learn);
+    gainReductionMeter.setBounds (layout.expanderMeter);
+    visualizer.setBounds (layout.visualizer);
 
-    auto noiseHeader = noiseArea.removeFromTop (42);
-    noiseBypass.setBounds (noiseHeader.removeFromRight (34).withSizeKeepingCentre (34, 34));
-    auto noiseControlColumn = noiseArea.removeFromLeft (320);
-    noiseArea.removeFromLeft (14);
+    enhancerPower.setBounds (layout.enhancerBypass);
+    preset.setBounds (layout.presetCombo);
+    enhanceKnob.setBounds (layout.enhancerKnobs[0]);
+    bassKnob.setBounds (layout.enhancerKnobs[1]);
+    trebleKnob.setBounds (layout.enhancerKnobs[2]);
+    vocalKnob.setBounds (layout.enhancerKnobs[3]);
+    stereoKnob.setBounds (layout.enhancerKnobs[4]);
 
-    auto knobBand = noiseControlColumn.removeFromTop (150);
-    const int noiseKnobWidth = knobBand.getWidth() / 3;
-    noiseReduction.setBounds (knobBand.removeFromLeft (noiseKnobWidth).reduced (4));
-    silenceAmount.setBounds (knobBand.removeFromLeft (noiseKnobWidth).reduced (4));
-    preserveAmount.setBounds (knobBand.reduced (4));
-    noiseControlColumn.removeFromTop (10);
-    profileStatus.setBounds (noiseControlColumn.removeFromTop (34));
-    noiseControlColumn.removeFromTop (7);
-    learnNoise.setBounds (noiseControlColumn.removeFromTop (36));
-
-    visualizer.setBounds (noiseArea.reduced (2));
-
-    auto enhancerHeader = enhancerArea.removeFromTop (42);
-    enhancerPower.setBounds (enhancerHeader.removeFromRight (34).withSizeKeepingCentre (34, 34));
-    auto topStrip = enhancerArea.removeFromTop (38);
-    preset.setBounds (topStrip.removeFromLeft (240));
-    topStrip.removeFromLeft (14);
-    gainReductionMeter.setBounds (topStrip.reduced (0, 5));
-    enhancerArea.removeFromTop (8);
-
-    const int enhancerKnobWidth = enhancerArea.getWidth() / 5;
-    enhanceKnob.setBounds (enhancerArea.removeFromLeft (enhancerKnobWidth).reduced (4));
-    bassKnob.setBounds (enhancerArea.removeFromLeft (enhancerKnobWidth).reduced (4));
-    trebleKnob.setBounds (enhancerArea.removeFromLeft (enhancerKnobWidth).reduced (4));
-    vocalKnob.setBounds (enhancerArea.removeFromLeft (enhancerKnobWidth).reduced (4));
-    stereoKnob.setBounds (enhancerArea.reduced (4));
-
-    auto footer = getLocalBounds().removeFromBottom (footerHeight).reduced (12, 0);
-    const int statWidth = footer.getWidth() / 5;
-    cpuStat.setBounds (footer.removeFromLeft (statWidth));
-    latencyStat.setBounds (footer.removeFromLeft (statWidth));
-    dropoutsStat.setBounds (footer.removeFromLeft (statWidth));
-    profileStat.setBounds (footer.removeFromLeft (statWidth));
-    trayStat.setBounds (footer);
+    cpuStat.setBounds (layout.stats[0]);
+    latencyStat.setBounds (layout.stats[1]);
+    dropoutsStat.setBounds (layout.stats[2]);
+    profileStat.setBounds (layout.stats[3]);
+    trayStat.setBounds (layout.stats[4]);
 }
 
 void LiveMainComponent::mouseDown (const juce::MouseEvent& event)
@@ -673,7 +844,7 @@ void LiveMainComponent::updateStatus()
     const auto status = audioEngine.getStatus();
     inputFader.setLevels (status.inputPeakDbL, status.inputPeakDbR);
     outputFader.setLevels (status.outputPeakDbL, status.outputPeakDbR);
-    gainReductionMeter.setReduction (status.gainReductionDb + status.expanderReductionDb);
+    gainReductionMeter.setReduction (status.expanderReductionDb);
 
     const auto& cleaner = audioEngine.getNoiseClean();
     if (cleaner.isLearning())
@@ -700,6 +871,7 @@ void LiveMainComponent::updateStatus()
     silenceAmount.setEnabled (noiseEnabled);
     preserveAmount.setEnabled (noiseEnabled);
     learnNoise.setEnabled (noiseEnabled);
+    gainReductionMeter.setEnabled (noiseEnabled);
 
     const bool enhancerEnabled = ! audioEngine.isBypassed();
     preset.setEnabled (enhancerEnabled);
@@ -708,7 +880,6 @@ void LiveMainComponent::updateStatus()
     trebleKnob.setEnabled (enhancerEnabled);
     vocalKnob.setEnabled (enhancerEnabled);
     stereoKnob.setEnabled (enhancerEnabled);
-    gainReductionMeter.setEnabled (enhancerEnabled);
 
     if (enhancerPower.getToggleState() == audioEngine.isBypassed())
         enhancerPower.setToggleState (! audioEngine.isBypassed(), juce::dontSendNotification);

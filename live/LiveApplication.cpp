@@ -234,7 +234,7 @@ class SonkupikLiveApplication final : public juce::JUCEApplication
 {
 public:
     const juce::String getApplicationName() override { return "Sonkupik Live"; }
-    const juce::String getApplicationVersion() override { return "0.9.3"; }
+    const juce::String getApplicationVersion() override { return "0.9.9"; }
     bool moreThanOneInstanceAllowed() override { return false; }
 
     void initialise (const juce::String&) override

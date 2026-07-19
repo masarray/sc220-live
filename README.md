@@ -1,4 +1,4 @@
-# Sonkupik Live v0.9.3
+# Sonkupik Live v0.9.9
 
 **Sonkupik Live** is a lightweight native Windows live-audio rack for streamers who need professional enhancement without opening a full DAW.
 
@@ -14,7 +14,13 @@ Audio Interface
   -> OBS or TikTok Studio captures CABLE Output
 ```
 
-## v0.9.3 authoritative engine with preset parity QA
+## v0.9.9 P0 premium workspace redesign
+
+The main workspace now uses one authoritative geometry model for both painting and child placement. Header, routing strip, side racks, Noise Clean, Smart Sound Enhancer and footer share a compact spacing system. The redesign adds a premium engine-status capsule, quiet cached titlebar icons, a balanced control/expander/sphere layout, a clear preset hierarchy and refined card depth without increasing the 24 Hz UI refresh rate.
+
+The headless processor architecture from v0.9.7 remains intact: `PluginEditor`, `QrisLicensePanel`, and `UpdateChecker` are not part of the Live executable, while DSP, presets, LicenseManager, ScopeTap, OrbVisualizer, gain staging, bypass, and final protection remain authoritative.
+
+## v0.9.6 authoritative engine with preset parity QA
 
 Sonkupik Live compiles the authoritative DSP, 40 presets, WOW calibration, preset handover, lookahead safety, bypass path, meters, and scope tap from `askp-vst`. The only intentional processing-wrapper delta is a configure-time **12 ms creative-control glide** for live mouse control; the VST's 80 ms glide remains unchanged in the VST repository. Settled sound, preset values, coefficient recipes, limiter behaviour, and output policy remain authoritative.
 
@@ -26,16 +32,16 @@ commit     : 655874dee6ee69df7212b8073ab941f9607d8faa
 
 The lock is recorded in `ASKP_AUTHORITY.lock`. The build script detects a sibling `askp-vst` checkout or automatically syncs the locked commit into `.deps/askp-vst` after Git authentication.
 
-## Lightweight aquarium visualizer
+## Lightweight sphere visualizer
 
-The centre visual is a rectangular aquarium that consumes the authoritative VST `ScopeTap`. Visual data remains disposable and never blocks the audio callback:
+The centre visual is a sphere visualizer that consumes the authoritative VST `ScopeTap`. Visual data remains disposable and never blocks the audio callback:
 
 - 24 Hz only while the window is visible;
 - fixed-size arrays and a lossy lock-free stereo scope queue;
 - no allocation, lock, FFT plan creation, or message-thread call in the audio callback;
 - timer and scope tap fully stop in tray mode.
 
-The visual shape is intentionally different from the VST sphere, but the audio tap and audio engine remain shared.
+The Live workspace uses the authoritative VST sphere behaviour with a dark UX-matched bezel overlay; the audio tap and processor remain shared.
 
 ## Windows build — Visual Studio Community 2026
 
@@ -83,7 +89,7 @@ The Settings card also provides **Match VST Reference**, which bypasses Noise Cl
 ## Main workspace
 
 - **Left:** Before Enhancer rack, input fader and stereo meter.
-- **Centre:** Musical Noise Clean controls + rectangular aquarium visualizer, then the 40-preset Smart Enhancer and five macros.
+- **Centre:** Musical Noise Clean controls + sphere visualizer visualizer, then the 40-preset Smart Enhancer and five macros.
 - **Right:** After Chain rack, output fader and stereo meter.
 - **Settings card:** sample rate, buffer size, channel mode and denoise quality.
 - **Footer:** average and callback-peak load, latency, dropouts, profile and tray state.
@@ -105,7 +111,7 @@ Read these first:
 
 ## Current limitation
 
-v0.9.3 retains the v0.9.2 direct processor path and adds deterministic preset parity QA; v0.9.2 removed the delayed background-engine rebuild and uses the VST real-time processor directly, but JUCE currently opens the physical input and VB-CABLE output through the Windows device backend. A future native dual-client `IAudioClient3` bridge with adaptive clock-drift correction remains the strongest route to a formal multi-hour anti-crackle guarantee.
+v0.9.9 retains the v0.9.2 direct processor path and adds deterministic preset parity QA; v0.9.2 removed the delayed background-engine rebuild and uses the VST real-time processor directly, but JUCE currently opens the physical input and VB-CABLE output through the Windows device backend. A future native dual-client `IAudioClient3` bridge with adaptive clock-drift correction remains the strongest route to a formal multi-hour anti-crackle guarantee.
 
 ## Live knob response
 

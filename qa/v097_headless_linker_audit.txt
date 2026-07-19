@@ -1,0 +1,20 @@
+Sonkupik Live v0.9.7 headless linker audit
+================================================
+
+PASS  CMake project version is 0.9.7
+PASS  PluginProcessor.h is generated with hasEditor() == false
+PASS  PluginProcessor_Live.cpp is generated with createEditor() == nullptr
+PASS  PluginProcessor_Reference.cpp is headless and preserves authority glide
+PASS  PluginEditor.cpp is excluded from SonkupikLive target
+PASS  UpdateChecker.cpp is excluded from SonkupikLive target
+PASS  QrisLicensePanel is not referenced by the Live target
+PASS  LicenseManager remains linked
+PASS  DSP and preset authority sources remain linked
+PASS  ScopeTap and OrbVisualizer remain linked
+PASS  generated include directory precedes askp-vst src include directory
+PASS  generated OrbVisualizer.h resolves the generated Processor header
+PASS  CMake reached JUCE dependency resolution in source-level configure test
+
+Configuration could not continue in the Linux audit container because outbound
+network access was unavailable for JUCE FetchContent. Final MSVC compile/link is
+performed on the Windows development machine.

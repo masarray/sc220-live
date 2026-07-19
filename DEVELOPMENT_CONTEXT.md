@@ -1,6 +1,6 @@
 # Sonkupik Live Development Context
 
-Current milestone: **v0.9.3 — P2 deterministic preset-by-preset enhancer parity verification**.
+Current milestone: **v0.9.9 — headless Smart Sound Enhancer processor and QrisLicensePanel linker fix**.
 
 ## Product intent
 
@@ -32,3 +32,7 @@ Use `scripts/run-p2-parity.ps1` for binary preset verification and the Settings 
 ## Next logical milestone
 
 P3 remains functional third-party VST3 hosting with crash-isolated scanning, latency reporting, state recall and safe bypass. It must not compromise the Live Safe built-in chain.
+
+## v0.9.9 P0 layout rule
+
+The main window now has one authoritative `WorkspaceLayout` used by both `paint()` and `resized()`. Do not reintroduce separate ad-hoc rectangle calculations. Premium spacing and radius tokens live in `live/LiveTheme.h`. See `docs/P0_PREMIUM_LAYOUT_AUDIT_v0.9.9.md` and `docs/P0_LAYOUT_REDESIGN_BLUEPRINT_v0.9.9.md`.

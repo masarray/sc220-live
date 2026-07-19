@@ -44,3 +44,12 @@ Sample rate, buffer size, channel mode, Musical Noise Clean quality, Hear Remove
 - The liquid stops repainting after it settles.
 - Status widgets repaint only after meaningful value changes.
 - No permanently animated decorative glow or particle field.
+
+## v0.9.9 P0 premium workspace baseline
+
+The authoritative P0 geometry and visual hierarchy are defined in:
+
+- `P0_PREMIUM_LAYOUT_AUDIT_v0.9.9.md`
+- `P0_LAYOUT_REDESIGN_BLUEPRINT_v0.9.9.md`
+
+Future UI work must preserve the shared `WorkspaceLayout` model rather than creating separate paint/layout calculations. New spacing values should use `metrics` from `LiveTheme.h`.

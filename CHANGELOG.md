@@ -1,6 +1,29 @@
 # Changelog
 
-## v0.9.3 - 2026-07-19 - P2 preset-by-preset audio parity
+## v0.9.9 - 2026-07-19 - P0 premium workspace redesign
+
+- Added one authoritative `WorkspaceLayout` shared by `paint()` and `resized()`.
+- Added a central spacing/radius metric system in `LiveTheme.h`.
+- Reworked the header into brand, title, engine-status capsule and quiet utility controls.
+- Cached Lucide active/inactive icons and added lightweight fallback glyphs.
+- Added a unified premium Input/Output routing strip.
+- Rebalanced Musical Noise Clean into controls, compact expander monitor and sphere zones.
+- Rebuilt the expander monitor with a professional 0 to -24 dB reduction convention.
+- Added a clear PRESET hierarchy and equal five-column macro grid in Smart Sound Enhancer.
+- Refined card depth, header separators, border precision and top highlights.
+- Added Option A P0 implementation audit and Option B layout blueprint documentation.
+
+## v0.9.7 - 2026-07-19 - Headless processor linker fix
+
+- Fixed `LNK2001` unresolved `askp::QrisLicensePanel` constructor/destructor.
+- Sonkupik Live no longer compiles the askp-vst `PluginEditor.cpp` or `UpdateChecker.cpp`.
+- Generates a headless `PluginProcessor.h` with `hasEditor() == false`.
+- Generates headless reference/live processor translation units with `createEditor() == nullptr`.
+- Keeps authoritative DSP, all factory presets, LicenseManager, ScopeTap, OrbVisualizer, limiter and gain policy.
+- P2 renderers now use headless processor variants; editor removal cannot affect rendered audio.
+- Removes VST-only QRIS/activation-editor dependency from the Live executable.
+
+## v0.9.6 - 2026-07-19 - P2 preset-by-preset audio parity
 
 - Added separate authoritative and Live offline renderers for all 40 factory presets.
 - Added bit-exact FNV-1a output fingerprints plus RMS, peak, latency and sample-count comparison.

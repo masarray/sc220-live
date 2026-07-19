@@ -4,6 +4,26 @@
 
 namespace askp::live {
 
+
+namespace metrics {
+inline constexpr int space2 = 2;
+inline constexpr int space4 = 4;
+inline constexpr int space6 = 6;
+inline constexpr int space8 = 8;
+inline constexpr int space10 = 10;
+inline constexpr int space12 = 12;
+inline constexpr int space14 = 14;
+inline constexpr int space16 = 16;
+inline constexpr int space20 = 20;
+inline constexpr int space24 = 24;
+inline constexpr int headerHeight = 60;
+inline constexpr int footerHeight = 48;
+inline constexpr int sidePanelWidth = 240;
+inline constexpr int rackRowHeight = 48;
+inline constexpr float cardRadius = 12.0f;
+inline constexpr float controlRadius = 8.0f;
+}
+
 namespace colours {
 inline const juce::Colour appBg      { 0xff080d14 };
 inline const juce::Colour panel      { 0xff0d141e };

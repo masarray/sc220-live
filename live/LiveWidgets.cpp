@@ -189,18 +189,21 @@ void VolumeFader::paint (juce::Graphics& g)
                 juce::Justification::centred, false);
 
     const auto faderBounds = fader.getBounds().toFloat();
-    const float trackX = faderBounds.getCentreX();
+    auto trackBounds = faderBounds.reduced (2.0f);
+    trackBounds = juce::Rectangle<float> (0.0f, trackBounds.getY(), 12.0f, trackBounds.getHeight())
+                    .withCentre (trackBounds.getCentre());
+    const float trackX = trackBounds.getCentreX();
     const int ticks[] = { 6, 0, -6, -12, -18, -24, -36, -48, -60 };
     g.setFont (lf.jakarta (8.5f));
     for (const int tick : ticks)
     {
-        const float norm = static_cast<float> (tick + 60) / 66.0f;
-        const float y = faderBounds.getBottom() - norm * faderBounds.getHeight();
-        g.setColour (colours::borderSoft);
-        g.drawHorizontalLine (static_cast<int> (y), trackX - 20.0f, trackX - 12.0f);
+        const float proportion = static_cast<float> (fader.valueToProportionOfLength ((double) tick));
+        const float y = trackBounds.getBottom() - proportion * trackBounds.getHeight();
+        g.setColour (colours::borderSoft.withAlpha (0.88f));
+        g.drawHorizontalLine (static_cast<int> (std::round (y)), trackBounds.getX() - 8.0f, trackBounds.getX() - 2.0f);
         g.setColour (colours::textMuted.withAlpha (0.78f));
         g.drawText (juce::String (tick), 0, static_cast<int> (y - 7.0f),
-                    juce::jmax (0, (int) faderBounds.getX() - 13), 14,
+                    juce::jmax (0, (int) trackBounds.getX() - 11), 14,
                     juce::Justification::centredRight, false);
     }
 }
@@ -215,15 +218,82 @@ void GainReductionMeter::setReduction (float db) noexcept
 
 void GainReductionMeter::paint (juce::Graphics& g)
 {
+    auto& lf = static_cast<LiveLookAndFeel&> (getLookAndFeel());
     const float alpha = isEnabled() ? 1.0f : 0.35f;
-    auto bounds = getLocalBounds().toFloat().reduced (2.0f, 7.0f);
+    auto bounds = getLocalBounds().toFloat();
+
+    g.setColour (colours::textMuted.withAlpha (0.90f * alpha));
+    g.setFont (lf.jakarta (8.8f, true));
+    g.drawText (title, bounds.removeFromTop (14.0f).toNearestInt(),
+                juce::Justification::centred, false);
+    bounds.removeFromTop (5.0f);
+
+    if (vertical)
+    {
+        auto readout = bounds.removeFromBottom (18.0f);
+        bounds.removeFromBottom (4.0f);
+        auto shell = bounds.reduced (3.0f, 0.0f);
+
+        juce::ColourGradient surface (colours::panelHi.brighter (0.015f), shell.getX(), shell.getY(),
+                                      colours::panelLo, shell.getRight(), shell.getBottom(), false);
+        g.setGradientFill (surface);
+        g.fillRoundedRectangle (shell, 9.0f);
+        g.setColour (colours::borderSoft.withAlpha (0.90f * alpha));
+        g.drawRoundedRectangle (shell.reduced (0.5f), 9.0f, 1.0f);
+
+        const float trackWidth = 12.0f;
+        auto track = juce::Rectangle<float> (trackWidth,
+                                             shell.getHeight() - 20.0f)
+                         .withPosition (shell.getX() + 10.0f, shell.getY() + 10.0f);
+        g.setColour (colours::black.withAlpha (0.54f * alpha));
+        g.fillRoundedRectangle (track, trackWidth * 0.5f);
+        g.setColour (colours::border.withAlpha (0.82f * alpha));
+        g.drawRoundedRectangle (track, trackWidth * 0.5f, 1.0f);
+
+        const float amount = juce::jlimit (0.0f, 1.0f, reductionDb / 24.0f);
+        const float markerY = track.getY() + track.getHeight() * amount;
+        auto fill = track.withBottom (markerY);
+        if (fill.getHeight() > 0.5f)
+        {
+            juce::ColourGradient gradient (colours::amber, fill.getCentreX(), fill.getY(),
+                                           colours::red, fill.getCentreX(), track.getBottom(), false);
+            gradient.multiplyOpacity (alpha);
+            g.setGradientFill (gradient);
+            g.fillRoundedRectangle (fill, trackWidth * 0.5f);
+        }
+
+        g.setColour ((amount > 0.72f ? colours::red : colours::amber).withAlpha (0.96f * alpha));
+        g.fillRoundedRectangle (juce::Rectangle<float> (track.getX() - 2.0f, markerY - 1.0f,
+                                                        track.getWidth() + 4.0f, 2.0f), 1.0f);
+
+        const int ticks[] = { 0, 6, 12, 18, 24 };
+        g.setFont (lf.jakarta (7.8f));
+        for (const int tick : ticks)
+        {
+            const float y = track.getY() + track.getHeight() * (static_cast<float> (tick) / 24.0f);
+            g.setColour (colours::borderSoft.withAlpha (0.84f * alpha));
+            g.drawHorizontalLine ((int) std::round (y), track.getRight() + 4.0f, track.getRight() + 8.0f);
+            g.setColour (colours::textMuted.withAlpha (0.72f * alpha));
+            g.drawText (tick == 0 ? juce::String ("0") : juce::String ("-") + juce::String (tick),
+                        juce::Rectangle<int> ((int) track.getRight() + 9, (int) y - 6, 25, 12),
+                        juce::Justification::centredLeft, false);
+        }
+
+        g.setColour (colours::text.withAlpha (0.95f * alpha));
+        g.setFont (lf.jakarta (9.3f, true));
+        g.drawText (juce::String (-reductionDb, 1) + " dB", readout.toNearestInt(),
+                    juce::Justification::centred, false);
+        return;
+    }
+
+    auto shell = bounds.reduced (2.0f, 7.0f);
     g.setColour (colours::black.withAlpha (0.60f * alpha));
-    g.fillRoundedRectangle (bounds, 3.0f);
+    g.fillRoundedRectangle (shell, 3.0f);
     g.setColour (colours::borderSoft.withAlpha (alpha));
-    g.drawRoundedRectangle (bounds, 3.0f, 1.0f);
+    g.drawRoundedRectangle (shell, 3.0f, 1.0f);
 
     const float amount = juce::jlimit (0.0f, 1.0f, reductionDb / 24.0f);
-    auto fill = bounds.withWidth (bounds.getWidth() * amount);
+    auto fill = shell.withWidth (shell.getWidth() * amount);
     juce::ColourGradient gradient (colours::amber, fill.getX(), fill.getCentreY(),
                                    colours::red, fill.getRight(), fill.getCentreY(), false);
     gradient.multiplyOpacity (alpha);
@@ -266,6 +336,7 @@ CompactRackRow::CompactRackRow (int index, const juce::String& iconResource,
           openOnly ? "Open module" : "Power",
           openOnly ? "plus_svg" : "power_svg", colours::cyan))
 {
+    actionButton->setOffColour (colours::textMuted.withAlpha (0.75f));
     addAndMakeVisible (*actionButton);
     actionButton->setClickingTogglesState (! openOnlyState);
     actionButton->setToggleState (! bypassed, juce::dontSendNotification);

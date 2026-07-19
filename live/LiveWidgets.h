@@ -73,9 +73,13 @@ class GainReductionMeter final : public juce::Component
 {
 public:
     void setReduction (float db) noexcept;
+    void setVertical (bool shouldBeVertical) noexcept { vertical = shouldBeVertical; repaint(); }
+    void setTitle (juce::String newTitle) { title = std::move (newTitle); repaint(); }
     void paint (juce::Graphics&) override;
 private:
     float reductionDb = 0.0f;
+    bool vertical = false;
+    juce::String title { "GAIN REDUCTION" };
 };
 
 class StatusPill final : public juce::Component

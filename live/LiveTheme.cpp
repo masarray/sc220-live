@@ -37,30 +37,31 @@ void LiveLookAndFeel::drawRotarySlider (juce::Graphics& g, int x, int y, int wid
     const float radius = size * 0.5f;
     const float angle = rotaryStartAngle + sliderPos * (rotaryEndAngle - rotaryStartAngle);
     const auto accent = slider.findColour (juce::Slider::rotarySliderFillColourId);
+    const bool enabled = slider.isEnabled();
+    const float alpha = enabled ? 1.0f : 0.34f;
 
-    juce::ColourGradient shadow (juce::Colours::black.withAlpha (0.60f), centre.x, bounds.getBottom(),
+    juce::ColourGradient shadow (juce::Colours::black.withAlpha (0.60f * alpha), centre.x, bounds.getBottom(),
                                  juce::Colours::transparentBlack, centre.x, bounds.getY(), false);
     g.setGradientFill (shadow);
     g.fillEllipse (bounds.translated (0.0f, 3.0f));
 
-    g.setColour (colours::borderSoft);
+    g.setColour (colours::borderSoft.withAlpha (alpha));
     g.drawEllipse (bounds.expanded (1.0f), 1.0f);
 
-    const auto arcBounds = bounds.expanded (2.0f);
     juce::Path track;
     track.addCentredArc (centre.x, centre.y, radius + 1.0f, radius + 1.0f, 0.0f,
                          rotaryStartAngle, rotaryEndAngle, true);
-    g.setColour (colours::border);
+    g.setColour (colours::border.withAlpha (enabled ? 1.0f : 0.6f));
     g.strokePath (track, juce::PathStrokeType (3.0f, juce::PathStrokeType::curved,
                                                juce::PathStrokeType::rounded));
 
     juce::Path active;
     active.addCentredArc (centre.x, centre.y, radius + 1.0f, radius + 1.0f, 0.0f,
                           rotaryStartAngle, angle, true);
-    g.setColour (accent.withAlpha (0.22f));
+    g.setColour (accent.withAlpha (enabled ? 0.22f : 0.06f));
     g.strokePath (active, juce::PathStrokeType (7.0f, juce::PathStrokeType::curved,
                                                 juce::PathStrokeType::rounded));
-    g.setColour (accent);
+    g.setColour ((enabled ? accent : colours::textMuted).withAlpha (enabled ? 1.0f : 0.55f));
     g.strokePath (active, juce::PathStrokeType (2.2f, juce::PathStrokeType::curved,
                                                 juce::PathStrokeType::rounded));
 
@@ -68,14 +69,16 @@ void LiveLookAndFeel::drawRotarySlider (juce::Graphics& g, int x, int y, int wid
     juce::ColourGradient metal (juce::Colour (0xff384554), knob.getX(), knob.getY(),
                                 juce::Colour (0xff0a1017), knob.getRight(), knob.getBottom(), false);
     metal.addColour (0.48, juce::Colour (0xff171f29));
+    if (! enabled)
+        metal.multiplyOpacity (0.62f);
     g.setGradientFill (metal);
     g.fillEllipse (knob);
-    g.setColour (juce::Colours::white.withAlpha (0.10f));
+    g.setColour (juce::Colours::white.withAlpha ((enabled ? 0.10f : 0.04f)));
     g.drawEllipse (knob.reduced (1.0f), 1.0f);
 
     juce::Path marker;
     marker.addRoundedRectangle (-1.1f, -radius * 0.48f, 2.2f, radius * 0.22f, 1.1f);
-    g.setColour (juce::Colours::white.withAlpha (0.82f));
+    g.setColour ((enabled ? juce::Colours::white : colours::textMuted).withAlpha (enabled ? 0.82f : 0.45f));
     g.fillPath (marker, juce::AffineTransform::rotation (angle).translated (centre.x, centre.y));
 }
 
@@ -249,42 +252,59 @@ void LiveLookAndFeel::drawToggleButton (juce::Graphics& g, juce::ToggleButton& b
 void LiveLookAndFeel::drawTooltip (juce::Graphics& g, const juce::String& text,
                                    int width, int height)
 {
-    auto bubble = juce::Rectangle<float> (6.0f, 0.0f, static_cast<float> (width - 12), static_cast<float> (height - 8));
+    auto bubble = juce::Rectangle<float> (8.0f, 10.0f,
+                                          static_cast<float> (width - 16),
+                                          static_cast<float> (height - 18));
     juce::Path callout;
-    callout.addRoundedRectangle (bubble, 9.0f);
-    callout.startNewSubPath (22.0f, bubble.getBottom());
-    callout.lineTo (30.0f, bubble.getBottom() + 8.0f);
-    callout.lineTo (38.0f, bubble.getBottom());
+    callout.startNewSubPath (bubble.getCentreX() - 10.0f, bubble.getY());
+    callout.lineTo (bubble.getCentreX(), bubble.getY() - 10.0f);
+    callout.lineTo (bubble.getCentreX() + 10.0f, bubble.getY());
+    callout.addRoundedRectangle (bubble, 12.0f);
 
-    g.setColour (juce::Colours::black.withAlpha (0.26f));
+    g.setColour (juce::Colours::black.withAlpha (0.24f));
     g.fillPath (callout, juce::AffineTransform::translation (0.0f, 2.0f));
 
-    juce::ColourGradient bg (colours::panelHi.brighter (0.03f), bubble.getX(), bubble.getY(),
+    juce::ColourGradient bg (colours::panelHi.brighter (0.02f), bubble.getX(), bubble.getY(),
                              colours::panelLo, bubble.getRight(), bubble.getBottom(), false);
     g.setGradientFill (bg);
     g.fillPath (callout);
 
-    g.setColour (colours::cyan.withAlpha (0.16f));
-    g.fillRoundedRectangle (bubble.reduced (1.5f).withHeight (12.0f), 8.0f);
+    g.setColour (colours::cyan.withAlpha (0.10f));
+    g.fillRoundedRectangle (bubble.removeFromTop (18.0f).reduced (2.0f), 10.0f);
+
+    g.setColour (juce::Colours::white.withAlpha (0.09f));
+    g.strokePath (callout, juce::PathStrokeType (2.0f));
     g.setColour (colours::border);
     g.strokePath (callout, juce::PathStrokeType (1.0f));
 
     g.setColour (colours::text);
     g.setFont (jakarta (12.0f));
-    g.drawFittedText (text, 16, 7, width - 28, height - 20,
+    g.drawFittedText (text, 18, 18, width - 36, height - 26,
                       juce::Justification::centredLeft, 2);
 }
 
 void fillPremiumPanel (juce::Graphics& g, juce::Rectangle<float> bounds,
                        float radius, bool selected)
 {
-    juce::ColourGradient gradient (selected ? colours::panelHi.brighter (0.025f) : colours::panelHi,
+    juce::ColourGradient gradient (selected ? colours::panelHi.brighter (0.035f) : colours::panelHi,
                                    bounds.getX(), bounds.getY(),
                                    colours::panelLo, bounds.getRight(), bounds.getBottom(), false);
+    gradient.addColour (0.58, colours::panel.withAlpha (0.98f));
     g.setGradientFill (gradient);
     g.fillRoundedRectangle (bounds, radius);
-    g.setColour ((selected ? colours::cyan.withAlpha (0.55f) : colours::border).withAlpha (0.9f));
+
+    g.setColour (juce::Colours::white.withAlpha (selected ? 0.045f : 0.028f));
+    g.drawRoundedRectangle (bounds.reduced (1.5f), juce::jmax (2.0f, radius - 1.5f), 1.0f);
+
+    g.setColour ((selected ? colours::cyan.withAlpha (0.52f) : colours::border).withAlpha (0.92f));
     g.drawRoundedRectangle (bounds.reduced (0.5f), radius, 1.0f);
+
+    const auto topHighlight = juce::Rectangle<float> (bounds.getX() + radius,
+                                                       bounds.getY() + 1.0f,
+                                                       juce::jmax (0.0f, bounds.getWidth() - radius * 2.0f),
+                                                       1.0f);
+    g.setColour (juce::Colours::white.withAlpha (selected ? 0.055f : 0.025f));
+    g.fillRect (topHighlight);
 }
 
 void drawSectionTitle (juce::Graphics& g, juce::Rectangle<float> area,

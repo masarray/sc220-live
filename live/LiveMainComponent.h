@@ -89,7 +89,7 @@ private:
     MiniStat profileStat { "Profile", "circle_check_svg" };
     MiniStat trayStat { "Tray Mode", "monitor_up_svg" };
 
-    juce::TooltipWindow tooltip { this, 600 };
+    juce::TooltipWindow tooltip { this, 850 };
     bool updatingControls = false;
     bool uiActive = false;
 

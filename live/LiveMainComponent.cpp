@@ -42,19 +42,17 @@ void drawFieldLabel (juce::Graphics& g, LiveLookAndFeel& lf,
 }
 
 void drawInsetBay (juce::Graphics& g, juce::Rectangle<float> bounds,
-                   juce::Colour accent = colours::cyan, bool stronger = false)
+                   juce::Colour accent = colours::cyan)
 {
-    juce::ColourGradient bay (colours::panelLo.darker (0.035f), bounds.getX(), bounds.getY(),
-                              colours::panelHi.withAlpha (0.74f), bounds.getRight(), bounds.getBottom(), false);
+    juce::ColourGradient bay (colours::panelLo.withAlpha (0.96f), bounds.getX(), bounds.getY(),
+                              colours::panel.withAlpha (0.72f), bounds.getRight(), bounds.getBottom(), false);
     g.setGradientFill (bay);
     g.fillRoundedRectangle (bounds, 10.0f);
-    g.setColour (juce::Colours::black.withAlpha (stronger ? 0.22f : 0.14f));
-    g.drawRoundedRectangle (bounds.reduced (1.5f), 8.5f, 1.0f);
-    g.setColour (colours::borderSoft.withAlpha (stronger ? 0.92f : 0.68f));
+    g.setColour (colours::borderSoft.withAlpha (0.72f));
     g.drawRoundedRectangle (bounds.reduced (0.5f), 10.0f, 1.0f);
-    g.setColour (accent.withAlpha (stronger ? 0.12f : 0.07f));
-    g.fillRoundedRectangle (juce::Rectangle<float> (bounds.getX() + 10.0f, bounds.getY() + 1.0f,
-                                                    juce::jmax (0.0f, bounds.getWidth() - 20.0f), 2.0f), 1.0f);
+    g.setColour (accent.withAlpha (0.055f));
+    g.fillRoundedRectangle (juce::Rectangle<float> (bounds.getX() + 14.0f, bounds.getY() + 1.0f,
+                                                    juce::jmax (0.0f, bounds.getWidth() - 28.0f), 1.0f), 0.5f);
 }
 
 void selectComboText (juce::ComboBox& combo, const juce::String& text)
@@ -226,17 +224,16 @@ WorkspaceLayout makeWorkspaceLayout (juce::Rectangle<int> bounds)
     auto enhancerInner = l.enhancerCard.reduced (metrics::space14, metrics::space12);
     l.enhancerHeader = enhancerInner.removeFromTop (40);
     l.enhancerBypass = l.enhancerHeader.removeFromRight (34).withSizeKeepingCentre (34, 34);
-    l.enhancerPresetSurface = enhancerInner.removeFromTop (64);
-    auto presetStrip = l.enhancerPresetSurface.reduced (metrics::space10, metrics::space6);
-    auto captionRow = presetStrip.removeFromTop (15);
+    l.enhancerPresetSurface = enhancerInner.removeFromTop (52);
+    auto presetStrip = l.enhancerPresetSurface.reduced (metrics::space8, metrics::space2);
+    auto captionRow = presetStrip.removeFromTop (12);
     l.presetCaption = captionRow.removeFromLeft (440);
-    auto comboRow = presetStrip.removeFromTop (38);
-    l.presetCombo = comboRow.removeFromLeft (440);
-    enhancerInner.removeFromTop (metrics::space8);
+    presetStrip.removeFromTop (2);
+    l.presetCombo = presetStrip.removeFromLeft (440);
+    enhancerInner.removeFromTop (metrics::space6);
     l.enhancerMacroSurface = enhancerInner;
-    auto macroContent = enhancerInner.reduced (metrics::space8, metrics::space6);
-    l.enhancerMacroCaption = macroContent.removeFromTop (18);
-    macroContent.removeFromTop (metrics::space2);
+    auto macroContent = enhancerInner.reduced (metrics::space4, metrics::space2);
+    l.enhancerMacroCaption = {};
     const int enhancerKnobWidth = macroContent.getWidth() / 5;
     for (int i = 0; i < 5; ++i)
         l.enhancerKnobs[i] = macroContent.removeFromLeft (i == 4 ? macroContent.getWidth() : enhancerKnobWidth)
@@ -529,6 +526,14 @@ void LiveMainComponent::configureControls()
     styleCombo (inputDevice, "Input Device|Choose the capture source that feeds Sonkupik Live.");
     styleCombo (outputDevice, "Output Device|Choose the playback or virtual cable destination for processed audio.");
     styleCombo (preset, "Preset|Load a Smart Sound Enhancer macro preset as your starting point.");
+    noiseReduction.slider().setTooltip ("Noise Reduction|Set how strongly the learned stationary noise profile is reduced.");
+    silenceAmount.slider().setTooltip ("Silence|Control how firmly the smooth expander suppresses noise during quiet passages.");
+    preserveAmount.slider().setTooltip ("Preserve|Protect musical detail and transients from excessive noise reduction.");
+    enhanceKnob.slider().setTooltip ("Enhance|Set the overall strength of the Smart Sound Enhancer.");
+    bassKnob.slider().setTooltip ("Smart Bass|Shape low-frequency weight while preserving headroom.");
+    trebleKnob.slider().setTooltip ("Smart Treble|Increase clarity and air without harsh static EQ behaviour.");
+    vocalKnob.slider().setTooltip ("Vocal Body|Add controlled body and presence to the vocal range.");
+    stereoKnob.slider().setTooltip ("Stereo Magic|Adjust perceived width while protecting mono compatibility.");
 
     inputDevice.onChange = [this]
     {
@@ -750,10 +755,7 @@ void LiveMainComponent::paint (juce::Graphics& g)
     fillPremiumPanel (g, layout.noiseCard.toFloat(), metrics::cardRadius);
     fillPremiumPanel (g, layout.enhancerCard.toFloat(), metrics::cardRadius);
 
-    drawInsetBay (g, layout.noiseControlSurface.toFloat(), colours::cyan, false);
-    drawInsetBay (g, layout.noiseVisualSurface.toFloat(), colours::violet, true);
-    drawInsetBay (g, layout.enhancerPresetSurface.toFloat(), colours::cyan, false);
-    drawInsetBay (g, layout.enhancerMacroSurface.toFloat(), colours::violet, false);
+    drawInsetBay (g, layout.noiseVisualSurface.toFloat(), colours::violet);
 
     drawSectionTitle (g, layout.leftTitle.reduced (2, 0).toFloat(), "BEFORE ENHANCER");
     drawSectionTitle (g, layout.rightTitle.reduced (2, 0).toFloat(), "AFTER CHAIN");
@@ -773,39 +775,17 @@ void LiveMainComponent::paint (juce::Graphics& g)
     g.setColour (colours::borderSoft.withAlpha (0.78f));
     g.fillRect (layout.noiseDivider.toFloat());
 
-    g.setColour (colours::cyan.withAlpha (0.74f));
-    g.fillRoundedRectangle (juce::Rectangle<float> ((float) layout.presetCaption.getX(),
-                                                     (float) layout.presetCaption.getBottom() - 2.0f,
-                                                     22.0f, 2.0f), 1.0f);
-    g.setColour (colours::textMuted);
-    g.setFont (lf.jakarta (9.0f, true));
-    g.drawText ("ACTIVE PRESET", layout.presetCaption, juce::Justification::centredLeft, false);
+    g.setColour (colours::textMuted.withAlpha (0.86f));
+    g.setFont (lf.jakarta (8.8f, true));
+    g.drawText ("PRESET", layout.presetCaption, juce::Justification::centredLeft, false);
 
-    g.setColour (colours::violet.withAlpha (0.74f));
+    g.setColour (colours::violet.withAlpha (0.72f));
     g.fillEllipse ((float) layout.visualizerCaption.getX(),
                    (float) layout.visualizerCaption.getCentreY() - 2.5f, 5.0f, 5.0f);
-    g.setColour (colours::textMuted);
-    g.setFont (lf.jakarta (8.8f, true));
+    g.setColour (colours::textMuted.withAlpha (0.84f));
+    g.setFont (lf.jakarta (8.6f, true));
     g.drawText ("LIVE RESPONSE", layout.visualizerCaption.withTrimmedLeft (12),
                 juce::Justification::centredLeft, false);
-
-    g.setColour (colours::violet.withAlpha (0.68f));
-    g.fillRoundedRectangle (juce::Rectangle<float> ((float) layout.enhancerMacroCaption.getX(),
-                                                     (float) layout.enhancerMacroCaption.getCentreY() - 1.0f,
-                                                     18.0f, 2.0f), 1.0f);
-    g.setColour (colours::textMuted);
-    g.setFont (lf.jakarta (8.8f, true));
-    g.drawText ("MACRO CONTROL BAY", layout.enhancerMacroCaption.withTrimmedLeft (26),
-                juce::Justification::centredLeft, false);
-
-    for (int i = 1; i < 5; ++i)
-    {
-        const int separatorX = layout.enhancerKnobs[i].getX() - metrics::space6;
-        g.setColour (colours::borderSoft.withAlpha (0.34f));
-        g.drawVerticalLine (separatorX,
-                            (float) layout.enhancerMacroSurface.getY() + 28.0f,
-                            (float) layout.enhancerMacroSurface.getBottom() - 12.0f);
-    }
 
     g.setColour (colours::border);
     g.drawHorizontalLine (layout.footer.getY(), 12.0f, static_cast<float> (getWidth() - 12));

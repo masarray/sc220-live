@@ -320,86 +320,95 @@ void LiveLookAndFeel::drawToggleButton (juce::Graphics& g, juce::ToggleButton& b
                 juce::Justification::centredLeft, false);
 }
 
+juce::Rectangle<int> LiveLookAndFeel::getTooltipBounds (const juce::String& tipText,
+                                                            juce::Point<int> screenPos,
+                                                            juce::Rectangle<int> parentArea)
+{
+    const bool structured = tipText.containsChar ('|');
+    const auto body = structured ? tipText.fromFirstOccurrenceOf ("|", false, false).trim()
+                                 : tipText.trim();
+    const int preferredWidth = juce::jlimit (260, 360, 276 + body.length() * 2);
+    const int lineCount = juce::jlimit (1, 4, 1 + body.length() / 46);
+    const int preferredHeight = structured ? 58 + lineCount * 17
+                                           : 34 + lineCount * 17;
+
+    int x = screenPos.x + 14;
+    int y = screenPos.y + 18;
+    if (x + preferredWidth > parentArea.getRight())
+        x = screenPos.x - preferredWidth - 14;
+    if (y + preferredHeight > parentArea.getBottom())
+        y = screenPos.y - preferredHeight - 16;
+
+    return juce::Rectangle<int> (x, y, preferredWidth, preferredHeight)
+        .constrainedWithin (parentArea.reduced (8));
+}
+
 void LiveLookAndFeel::drawTooltip (juce::Graphics& g, const juce::String& text,
                                    int width, int height)
 {
-    const bool hasTitle = text.containsChar ('|');
-    const auto title = hasTitle ? text.upToFirstOccurrenceOf ("|", false, false).trim() : juce::String();
-    const auto body = hasTitle ? text.fromFirstOccurrenceOf ("|", false, false).trim()
-                               : text.trim();
+    const bool structured = text.containsChar ('|');
+    const auto title = structured ? text.upToFirstOccurrenceOf ("|", false, false).trim()
+                                  : juce::String ("Info");
+    const auto body = structured ? text.fromFirstOccurrenceOf ("|", false, false).trim()
+                                 : text.trim();
 
-    auto bubble = juce::Rectangle<float> (10.0f, 12.0f,
-                                          static_cast<float> (width - 20),
-                                          static_cast<float> (height - 22));
-    juce::Path callout;
-    const float anchorX = bubble.getX() + juce::jmin (36.0f, bubble.getWidth() * 0.22f);
-    callout.startNewSubPath (anchorX - 10.0f, bubble.getY());
-    callout.lineTo (anchorX, bubble.getY() - 10.0f);
-    callout.lineTo (anchorX + 10.0f, bubble.getY());
-    callout.addRoundedRectangle (bubble, 12.0f);
+    auto shell = juce::Rectangle<float> (1.0f, 1.0f,
+                                         static_cast<float> (width - 2),
+                                         static_cast<float> (height - 2));
 
     g.setColour (juce::Colours::black.withAlpha (0.22f));
-    g.fillPath (callout, juce::AffineTransform::translation (0.0f, 2.0f));
+    g.fillRoundedRectangle (shell.translated (0.0f, 2.0f), 11.0f);
 
-    juce::ColourGradient bg (colours::panelHi.brighter (0.03f), bubble.getX(), bubble.getY(),
-                             colours::panelLo, bubble.getRight(), bubble.getBottom(), false);
-    bg.addColour (0.58, colours::panel.withAlpha (0.98f));
-    g.setGradientFill (bg);
-    g.fillPath (callout);
+    juce::ColourGradient background (colours::panelHi.brighter (0.025f), shell.getX(), shell.getY(),
+                                     colours::panelLo, shell.getRight(), shell.getBottom(), false);
+    background.addColour (0.55, colours::panel.withAlpha (0.99f));
+    g.setGradientFill (background);
+    g.fillRoundedRectangle (shell, 11.0f);
 
-    auto highlight = bubble.removeFromTop (24.0f);
-    g.setColour (colours::cyan.withAlpha (0.055f));
-    g.fillRoundedRectangle (highlight.reduced (2.0f, 1.0f), 9.0f);
-
-    g.setColour (juce::Colours::white.withAlpha (0.05f));
-    g.strokePath (callout, juce::PathStrokeType (2.0f));
+    g.setColour (juce::Colours::white.withAlpha (0.025f));
+    g.drawRoundedRectangle (shell.reduced (1.5f), 9.5f, 1.0f);
     g.setColour (colours::borderSoft.withAlpha (0.96f));
-    g.strokePath (callout, juce::PathStrokeType (1.0f));
+    g.drawRoundedRectangle (shell.reduced (0.5f), 11.0f, 1.0f);
 
-    auto titleArea = juce::Rectangle<int> ((int) bubble.getX() + 14, (int) highlight.getY() + 3,
-                                           (int) bubble.getWidth() - 28, 18);
-    auto bodyArea = juce::Rectangle<int> ((int) bubble.getX() + 14, (int) bubble.getY() + 30,
-                                          (int) bubble.getWidth() - 28, (int) bubble.getHeight() - 40);
+    auto content = shell.reduced (14.0f, 10.0f);
+    auto titleArea = content.removeFromTop (18.0f);
+    content.removeFromTop (5.0f);
 
     g.setColour (colours::cyan.withAlpha (0.92f));
-    g.setFont (jakarta (11.2f, true));
-    g.drawFittedText (title.isEmpty() ? "TIP" : title.toUpperCase(), titleArea,
+    g.fillRoundedRectangle (juce::Rectangle<float> (titleArea.getX(), titleArea.getBottom() - 2.0f,
+                                                    juce::jmin (28.0f, titleArea.getWidth()), 2.0f), 1.0f);
+    g.setFont (jakarta (10.5f, true));
+    g.drawFittedText (title.toUpperCase(), titleArea.toNearestInt(),
                       juce::Justification::centredLeft, 1);
 
     g.setColour (colours::text.withAlpha (0.96f));
     g.setFont (jakarta (12.0f));
-    g.drawFittedText (body, bodyArea,
+    g.drawFittedText (body, content.toNearestInt(),
                       juce::Justification::topLeft, 4);
 }
 
 void fillPremiumPanel (juce::Graphics& g, juce::Rectangle<float> bounds,
                        float radius, bool selected)
 {
-    g.setColour (juce::Colours::black.withAlpha (0.14f));
-    g.fillRoundedRectangle (bounds.translated (0.0f, 1.6f), radius + 0.5f);
+    g.setColour (juce::Colours::black.withAlpha (0.10f));
+    g.fillRoundedRectangle (bounds.translated (0.0f, 1.0f), radius);
 
-    juce::ColourGradient gradient (selected ? colours::panelHi.brighter (0.03f) : colours::panelHi,
-                                   bounds.getX(), bounds.getY(),
-                                   colours::panelLo, bounds.getRight(), bounds.getBottom(), false);
-    gradient.addColour (0.58, colours::panel.withAlpha (0.985f));
-    g.setGradientFill (gradient);
+    juce::ColourGradient surface (selected ? colours::panelHi.brighter (0.018f) : colours::panelHi,
+                                  bounds.getX(), bounds.getY(),
+                                  colours::panelLo, bounds.getRight(), bounds.getBottom(), false);
+    surface.addColour (0.62, colours::panel.withAlpha (0.99f));
+    g.setGradientFill (surface);
     g.fillRoundedRectangle (bounds, radius);
 
-    g.setColour ((selected ? colours::cyan : colours::panelHi).withAlpha (selected ? 0.05f : 0.025f));
-    g.fillRoundedRectangle (bounds.reduced (0.8f), radius - 0.8f);
-
-    g.setColour (juce::Colours::white.withAlpha (selected ? 0.040f : 0.024f));
-    g.drawRoundedRectangle (bounds.reduced (1.5f), juce::jmax (2.0f, radius - 1.5f), 1.0f);
-
-    g.setColour ((selected ? colours::cyan : colours::borderSoft).withAlpha (selected ? 0.82f : 0.94f));
+    g.setColour ((selected ? colours::cyan : colours::borderSoft)
+                     .withAlpha (selected ? 0.62f : 0.92f));
     g.drawRoundedRectangle (bounds.reduced (0.5f), radius, 1.0f);
 
-    const auto topHighlight = juce::Rectangle<float> (bounds.getX() + radius,
-                                                       bounds.getY() + 1.0f,
-                                                       juce::jmax (0.0f, bounds.getWidth() - radius * 2.0f),
-                                                       1.1f);
-    g.setColour (juce::Colours::white.withAlpha (selected ? 0.050f : 0.020f));
-    g.fillRect (topHighlight);
+    g.setColour (juce::Colours::white.withAlpha (0.018f));
+    g.fillRoundedRectangle (juce::Rectangle<float> (bounds.getX() + radius,
+                                                    bounds.getY() + 1.0f,
+                                                    juce::jmax (0.0f, bounds.getWidth() - radius * 2.0f),
+                                                    1.0f), 0.5f);
 }
 
 void drawSectionTitle (juce::Graphics& g, juce::Rectangle<float> area,

@@ -543,25 +543,20 @@ void CompactRackRow::paint (juce::Graphics& g)
     g.fillRoundedRectangle (juce::Rectangle<float> (bounds.getX() + 1.0f, bounds.getY() + 8.0f,
                                                     2.0f, bounds.getHeight() - 16.0f), 1.0f);
 
-    auto iconBay = juce::Rectangle<float> (30.0f, 7.0f, 28.0f, bounds.getHeight() - 14.0f);
-    g.setColour (railColour.withAlpha (active || openOnlyState ? 0.075f : 0.035f));
-    g.fillRoundedRectangle (iconBay, 7.0f);
-    g.setColour (colours::borderSoft.withAlpha (0.72f));
-    g.drawRoundedRectangle (iconBay, 7.0f, 1.0f);
-
     auto& lf = static_cast<LiveLookAndFeel&> (getLookAndFeel());
-    g.setFont (lf.jakarta (9.4f, true));
-    g.setColour ((selectedState ? colours::cyan : colours::textMuted).withAlpha (bypassed ? 0.48f : 0.88f));
-    g.drawText (juce::String (rowIndex).paddedLeft ('0', 2), 5, 0, 25, getHeight(),
+    g.setFont (lf.jakarta (8.8f, true));
+    g.setColour ((selectedState ? colours::cyan : colours::textMuted).withAlpha (bypassed ? 0.42f : 0.72f));
+    g.drawText (juce::String (rowIndex).paddedLeft ('0', 2), 8, 0, 22, getHeight(),
                 juce::Justification::centred, false);
 
+    auto iconArea = juce::Rectangle<float> (34.0f, 12.0f, 20.0f, bounds.getHeight() - 24.0f);
     if (moduleIcon != nullptr)
-        moduleIcon->drawWithin (g, iconBay.reduced (6.0f), juce::RectanglePlacement::centred,
-                                bypassed ? 0.38f : 0.90f);
+        moduleIcon->drawWithin (g, iconArea, juce::RectanglePlacement::centred,
+                                bypassed ? 0.34f : 0.82f + hover * 0.10f);
 
-    g.setColour ((selectedState ? colours::cyan : colours::text).withAlpha (bypassed ? 0.46f : 0.96f));
-    g.setFont (lf.jakarta (11.2f, true));
-    g.drawFittedText (moduleName, 67, 0, juce::jmax (0, getWidth() - 143), getHeight(),
+    g.setColour ((selectedState ? colours::cyan : colours::text).withAlpha (bypassed ? 0.44f : 0.94f));
+    g.setFont (lf.jakarta (10.8f, true));
+    g.drawFittedText (moduleName, 64, 0, juce::jmax (0, getWidth() - 136), getHeight(),
                       juce::Justification::centredLeft, 1);
 
     const juce::String status = openOnlyState ? "ADD"
@@ -570,13 +565,13 @@ void CompactRackRow::paint (juce::Graphics& g)
     const auto statusColour = openOnlyState ? colours::violet
                             : lockedState ? colours::green
                             : bypassed ? colours::textMuted : colours::cyan;
-    auto statusArea = juce::Rectangle<float> ((float) getWidth() - 91.0f, 13.0f, 43.0f, 22.0f);
-    g.setColour (statusColour.withAlpha (0.08f));
-    g.fillRoundedRectangle (statusArea, 8.0f);
-    g.setColour (statusColour.withAlpha (0.24f));
-    g.drawRoundedRectangle (statusArea, 8.0f, 1.0f);
-    g.setColour (statusColour.withAlpha (bypassed ? 0.65f : 0.90f));
-    g.setFont (lf.jakarta (7.7f, true));
+    auto statusArea = juce::Rectangle<float> ((float) getWidth() - 86.0f, 15.0f, 38.0f, 18.0f);
+    g.setColour (statusColour.withAlpha (0.055f));
+    g.fillRoundedRectangle (statusArea, 7.0f);
+    g.setColour (statusColour.withAlpha (0.18f + hover * 0.06f));
+    g.drawRoundedRectangle (statusArea, 7.0f, 1.0f);
+    g.setColour (statusColour.withAlpha (bypassed ? 0.58f : 0.84f));
+    g.setFont (lf.jakarta (7.2f, true));
     g.drawText (status, statusArea.toNearestInt(), juce::Justification::centred, false);
 }
 

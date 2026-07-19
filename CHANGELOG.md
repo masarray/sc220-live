@@ -1,10 +1,21 @@
-# Sonkupik Live v0.10.2
+# Sonkupik Live v0.10.3
 
-- Premium P2 visual refinement focused on hover states, border precision, subtle shadows and tooltip readability.
-- Added smarter structured tooltips with elegant callout rendering and clearer microcopy.
-- Added lightweight animated hover/press transitions for icon buttons and rack rows.
+- P3 final visual consolidation: simpler hierarchy, corrected tooltip sizing and quieter controls.
+- Removed unnecessary nested visual bays and reduced decorative borders.
+- Header utility controls now remain quiet until hover or interaction.
 
 # Changelog
+
+## v0.10.3 - 2026-07-19 - P3 final interface consolidation
+
+- Fixed broken/clipped tooltip rendering by giving tooltip windows explicit smart bounds.
+- Rebuilt tooltip visuals as a compact premium title/body card without oversized callout geometry.
+- Simplified Musical Noise Clean and Smart Sound Enhancer hierarchy by removing redundant nested bays.
+- Reduced card shadows and border layers for a more finished studio-product appearance.
+- Quieted momentary header controls so they only surface on hover or press.
+- Simplified rack rows by removing boxed icon bays and reducing status-pill visual weight.
+- Removed unnecessary macro-grid separators and renamed the preset hierarchy to a simpler PRESET label.
+- Added concise tooltips for all primary knobs and routing controls.
 
 ## v0.10.2 - 2026-07-19 - P2 premium interaction polish
 

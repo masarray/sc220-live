@@ -1,4 +1,4 @@
-# Sonkupik Live v0.10.1 — Source Delivery Summary
+# Sonkupik Live v0.10.3 — Source Delivery Summary
 
 ## P1 premium polish and repository/build hygiene
 

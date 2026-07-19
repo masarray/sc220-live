@@ -72,6 +72,9 @@ public:
                             const juce::Colour* textColour) override;
     void drawToggleButton (juce::Graphics&, juce::ToggleButton&, bool highlighted,
                            bool down) override;
+    juce::Rectangle<int> getTooltipBounds (const juce::String& tipText,
+                                             juce::Point<int> screenPos,
+                                             juce::Rectangle<int> parentArea) override;
     void drawTooltip (juce::Graphics&, const juce::String&, int width, int height) override;
 };
 

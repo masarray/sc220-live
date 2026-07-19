@@ -1,4 +1,4 @@
-# Sonkupik Live v0.10.1
+# Sonkupik Live v0.10.3
 
 **Sonkupik Live** is a lightweight native Windows live-audio rack for streamers who need professional enhancement without opening a full DAW.
 

@@ -1,6 +1,6 @@
 # Sonkupik Live Development Context
 
-Current milestone: **v0.10.1 — P1 premium workspace polish and single-click Windows build**.
+Current milestone: **v0.10.3 — P3 final visual consolidation and tooltip repair**.
 
 ## Product intent
 

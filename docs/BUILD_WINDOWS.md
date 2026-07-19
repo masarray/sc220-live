@@ -15,7 +15,7 @@ Double-click the root file:
 build-live-windows.bat
 ```
 
-The BAT runs the Release build, creates `dist\Sonkupik-Live-v0.10.1-win-x64-portable.zip`, and opens the `dist` folder after success. The console remains open on failure so the complete compiler/linker message is visible.
+The BAT runs the Release build, creates `dist\Sonkupik-Live-v0.10.3-win-x64-portable.zip`, and opens the `dist` folder after success. The console remains open on failure so the complete compiler/linker message is visible.
 
 For a forced clean build:
 

@@ -161,7 +161,7 @@ void LucideIconButton::paintButton (juce::Graphics& g, bool highlighted, bool do
 
     const float hover = juce::jlimit (0.0f, 1.0f, hoverMix + (highlighted ? 0.12f : 0.0f));
     const float press = juce::jlimit (0.0f, 1.0f, pressMix + (down ? 0.18f : 0.0f));
-    const bool showSurface = active || hover > 0.02f || press > 0.02f;
+    const bool showSurface = (toggleButton && active) || hover > 0.02f || press > 0.02f;
 
     if (showSurface)
     {

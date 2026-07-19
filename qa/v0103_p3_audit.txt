@@ -1,0 +1,24 @@
+P3 source audit v0.10.3
+Checks : 19
+Passed : 19
+Failed : 0
+
+[ PASS ] Version 0.10.3
+[ PASS ] Tooltip bounds override
+[ PASS ] Structured tooltip microcopy
+[ PASS ] Tooltip uses constrained bounds
+[ PASS ] No oversized callout path
+[ PASS ] Quiet momentary icon buttons
+[ PASS ] Animated icon hover
+[ PASS ] Animated rack hover
+[ PASS ] Rack icon bay removed
+[ PASS ] Nested control bay removed
+[ PASS ] Only response visual bay remains
+[ PASS ] Macro control bay label removed
+[ PASS ] Active preset simplified
+[ PASS ] Primary knob tooltips
+[ PASS ] Tooltip delay increased
+[ PASS ] Package version updated
+[ PASS ] Single click build version updated
+[ PASS ] Audio source unchanged: live/LiveAudioEngine.cpp
+[ PASS ] Audio source unchanged: live/MusicalNoiseClean.cpp

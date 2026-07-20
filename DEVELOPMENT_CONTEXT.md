@@ -1,6 +1,6 @@
 # Sonkupik Live Development Context
 
-Current milestone: **v0.10.3 — P3 final visual consolidation and tooltip repair**.
+Current milestone: **v0.11.0 — P0 real-time Stability Guard and visual hierarchy consolidation**.
 
 ## Product intent
 
@@ -31,7 +31,9 @@ Use `scripts/run-p2-parity.ps1` for binary preset verification and the Settings 
 
 ## Next logical milestone
 
-P3 remains functional third-party VST3 hosting with crash-isolated scanning, latency reporting, state recall and safe bypass. It must not compromise the Live Safe built-in chain.
+Run an 8–12 hour hardware soak test with the real audio interface, VB-CABLE and OBS/TikTok Studio. Record native xruns, callback deadline misses, automatic recovery count and final buffer size. A future native dual-WASAPI elastic bridge remains separate work; v0.11.0 does not pretend the transport layer has already been replaced.
+
+After stability acceptance, continue third-party VST3 hosting with crash-isolated scanning, latency reporting, state recall and safe bypass.
 
 ## v0.10.1 P1 UI and build rule
 

@@ -1,10 +1,36 @@
-# Sonkupik Live v0.10.3
+# Sonkupik Live v0.11.0
 
-- P3 final visual consolidation: simpler hierarchy, corrected tooltip sizing and quieter controls.
-- Removed unnecessary nested visual bays and reduced decorative borders.
-- Header utility controls now remain quiet until hover or interaction.
+- P0 visual hierarchy consolidation and real-time Stability Guard.
+- Added native/estimated xrun telemetry through JUCE AudioDeviceManager.
+- Added deadline and callback-gap monitoring plus bounded automatic buffer fallback.
+- Added a 128-sample safe floor for separate input/output endpoints when Stability Guard is enabled.
+- Reduced side-panel width, repaired rack-row name/status hierarchy, expanded the centre workspace and compacted Smart Sound Enhancer.
+- Optimised expander coefficient preparation and pointer-based sample access without changing its transfer behaviour.
 
 # Changelog
+
+## v0.11.0 - 2026-07-20 - P0 stability and visual hierarchy
+
+- Added callback deadline telemetry, scheduling-gap telemetry and OS/native xrun reporting.
+- Added a conservative 128-block instability window to avoid reacting to one isolated Windows scheduling spike.
+- Added automatic buffer fallback with a 30-second recovery cooldown.
+- Added an Auto Stability Guard switch in Settings.
+- Added cross-device routing state and a Stability footer indicator.
+- Added a 128-sample minimum when separate input/output endpoints are selected under Stability Guard.
+- Reduced side panels to give the core processors more visual authority.
+- Rebuilt rack rows into a two-line name/state hierarchy so long module names no longer collide.
+- Rebalanced Noise Clean and made Smart Sound Enhancer more compact.
+- Increased small-label contrast and expanded the vertical expander meter.
+
+
+## v0.10.4 - 2026-07-19 - Tooltip, titlebar and smart CPU display fix
+
+- Made the tooltip surface opaque and filled every pixel before custom drawing, eliminating stale/default white backing areas.
+- Kept structured tooltip sizing and premium title/body presentation.
+- Fixed double-padding of missing Lucide fallback glyphs that made tray/minimise/maximise icons much smaller than Close.
+- CPU footer text now updates at 1 Hz using smoothing and a decaying peak hold; audio meters and visualizer remain at their normal refresh cadence.
+- No DSP, device, denoise, preset, limiter or callback changes.
+
 
 ## v0.10.3 - 2026-07-19 - P3 final interface consolidation
 

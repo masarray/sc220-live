@@ -105,7 +105,7 @@ void LucideIconButton::setOffColour (juce::Colour colour)
 void LucideIconButton::drawFallbackIcon (juce::Graphics& g, juce::Rectangle<float> area,
                                           juce::Colour colour, float alpha) const
 {
-    area = area.reduced (juce::jmax (5.0f, area.getWidth() * 0.29f));
+    area = area.reduced (juce::jmax (5.0f, area.getWidth() * 0.25f));
     g.setColour (colour.withAlpha (alpha));
     const juce::PathStrokeType stroke (1.7f, juce::PathStrokeType::curved,
                                       juce::PathStrokeType::rounded);
@@ -193,7 +193,9 @@ void LucideIconButton::paintButton (juce::Graphics& g, bool highlighted, bool do
     if (drawable != nullptr)
         drawable->drawWithin (g, iconBounds, juce::RectanglePlacement::centred, alpha);
     else
-        drawFallbackIcon (g, iconBounds.transformedBy (iconShift), drawColour, alpha);
+        // Fallback glyphs perform their own padding. Passing the already
+        // reduced iconBounds made minimise/maximise/tray glyphs tiny.
+        drawFallbackIcon (g, bounds.transformedBy (iconShift), drawColour, alpha);
 }
 
 } // namespace askp::live

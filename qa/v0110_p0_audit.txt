@@ -1,0 +1,31 @@
+v0.11.0 P0 source audit
+Checks : 26
+Passed : 26
+Failed : 0
+
+[ PASS ] Version 0.11.0
+[ PASS ] Async stability recovery
+[ PASS ] Native/estimated xrun telemetry
+[ PASS ] Deadline telemetry
+[ PASS ] Callback gap telemetry
+[ PASS ] Bounded instability window
+[ PASS ] Automatic buffer recovery
+[ PASS ] Recovery cooldown
+[ PASS ] Cross-device safe floor
+[ PASS ] Settings guard switch
+[ PASS ] Stability footer state
+[ PASS ] Narrower side panels
+[ PASS ] Rack two-line hierarchy
+[ PASS ] Compact enhancer card
+[ PASS ] Higher small-label contrast
+[ PASS ] Wider expander meter
+[ PASS ] Cached expander coefficients
+[ PASS ] Pointer-based expander processing
+[ PASS ] Vectorised output peak scan
+[ PASS ] No allocation in callback
+[ PASS ] No mutex in callback
+[ PASS ] Brace balance LiveAudioEngine.cpp
+[ PASS ] Brace balance LiveAudioEngine.h
+[ PASS ] Brace balance LiveMainComponent.cpp
+[ PASS ] Brace balance LiveWidgets.cpp
+[ PASS ] Brace balance MusicalNoiseClean.cpp

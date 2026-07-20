@@ -1,4 +1,8 @@
-# Implementation Status — v0.10.3
+# Implementation Status — v0.11.0
+
+## v0.11.0 Stability Guard
+
+Implemented xrun/deadline/gap telemetry, conservative automatic buffer fallback, cross-device safe-floor policy, Settings control and footer status. Native dual-client drift-resampling transport remains future work and is documented explicitly.
 
 ## v0.10.1 build reliability completed
 

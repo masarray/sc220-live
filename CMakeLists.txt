@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.22)
 
-project(SonkupikLive VERSION 0.10.3 LANGUAGES C CXX)
+project(SonkupikLive VERSION 0.11.0 LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -20,7 +20,7 @@ set(SONKUPIK_ASKP_SOURCE_DIR "" CACHE PATH
     "Path to the authoritative masarray/askp-vst source checkout")
 set(SONKUPIK_AUDITED_ASKP_COMMIT
     "655874dee6ee69df7212b8073ab941f9607d8faa" CACHE STRING
-    "askp-vst commit audited for Sonkupik Live v0.10.1")
+    "askp-vst commit audited for Sonkupik Live v0.11.0")
 
 set(_askp_engine_dir "")
 set(_askp_asset_dir "")
@@ -52,7 +52,7 @@ if(SONKUPIK_ASKP_SOURCE_DIR)
                 set(_askp_source_identity "${_askp_root} @ ${_askp_commit}")
                 if(NOT _askp_commit STREQUAL SONKUPIK_AUDITED_ASKP_COMMIT)
                     message(WARNING
-                        "askp-vst commit ${_askp_commit} differs from the audited v0.10.1 lock "
+                        "askp-vst commit ${_askp_commit} differs from the audited v0.11.0 lock "
                         "${SONKUPIK_AUDITED_ASKP_COMMIT}. The newer source will be used, but rerun QA.")
                 endif()
             endif()

@@ -4,14 +4,17 @@
 #include "PluginProcessor.h"
 
 #include <juce_audio_devices/juce_audio_devices.h>
+#include <juce_events/juce_events.h>
 
 #include <atomic>
+#include <cstdint>
 #include <memory>
 
 namespace askp::live {
 
 class LiveAudioEngine final : public juce::AudioIODeviceCallback,
-                              private juce::ChangeListener
+                              private juce::ChangeListener,
+                              private juce::AsyncUpdater
 {
 public:
     struct Status
@@ -30,8 +33,16 @@ public:
         float gainReductionDb = 0.0f;
         float expanderReductionDb = 0.0f;
         int dropouts = 0;
+        int deadlineMisses = 0;
+        int timingGlitches = 0;
+        int stabilityRecoveries = 0;
+        int driverXruns = -1;
+        bool crossDeviceRouting = false;
+        bool stabilityGuardEnabled = true;
+        bool stabilityRecoveryPending = false;
         unsigned int visualDrops = 0;
         int totalLatencySamples = 0;
+        juce::String stabilityState;
         juce::String inputDevice;
         juce::String outputDevice;
         juce::String lastError;
@@ -76,6 +87,9 @@ public:
     void setOutputMuted (bool value) noexcept { outputMuted.store (value); }
     bool isOutputMuted() const noexcept { return outputMuted.load(); }
     void restartAudio();
+    void setStabilityGuardEnabled (bool enabled);
+    bool isStabilityGuardEnabled() const noexcept { return stabilityGuardEnabled.load(); }
+    void resetStabilityTelemetry() noexcept;
     void applyVstReferenceConditions() noexcept;
 
     void setPresetIndex (int index);
@@ -118,6 +132,7 @@ public:
 
 private:
     void changeListenerCallback (juce::ChangeBroadcaster*) override;
+    void handleAsyncUpdate() override;
     void clearOutputs (float* const* outputChannelData, int channels, int samples) noexcept;
     void updateMeters (const juce::AudioBuffer<float>& finalOutput) noexcept;
     void refreshDeviceStatus();
@@ -125,6 +140,11 @@ private:
     float getAskpParameter (const char* parameterId, float fallback = 0.0f) const noexcept;
     void updateInputTrimRouting() noexcept;
     void updateOutputTrimRouting() noexcept;
+    void observeRealtimeTiming (std::int64_t startNs, std::int64_t elapsedNs,
+                                int numSamples, double sampleRate) noexcept;
+    void requestStabilityRecoveryFromAudioThread() noexcept;
+    int chooseNextStableBufferSize (int currentSize) const;
+    void applyCrossDeviceSafeFloorIfNeeded();
     static bool looksLikeVirtualCable (const juce::String& name);
 
     juce::AudioDeviceManager deviceManager;
@@ -162,7 +182,23 @@ private:
     std::atomic<float> outputPeakR { -120.0f };
     std::atomic<float> gainReduction { 0.0f };
     std::atomic<int> dropoutCount { 0 };
+    std::atomic<int> deadlineMissCount { 0 };
+    std::atomic<int> timingGlitchCount { 0 };
+    std::atomic<int> stabilityRecoveryCount { 0 };
+    std::atomic<bool> stabilityGuardEnabled { true };
+    std::atomic<bool> stabilityRecoveryPending { false };
+    std::atomic<bool> timingWatchActive { false };
+    std::atomic<bool> crossDeviceRouting { false };
     std::atomic<int> totalLatencySamples { 0 };
+
+    // Audio-thread-only timing window. These values are reset in
+    // audioDeviceAboutToStart before callbacks begin.
+    std::int64_t previousCallbackStartNs = 0;
+    int timingWindowBlocks = 0;
+    int timingWindowRiskBlocks = 0;
+    int timingWindowMisses = 0;
+    int timingWindowGlitches = 0;
+    double lastRecoveryMs = -60000.0;
 
     mutable juce::CriticalSection statusLock;
     juce::String currentInputName;

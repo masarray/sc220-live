@@ -1,4 +1,26 @@
-# Sonkupik Live v0.10.3 — Source Delivery Summary
+# Sonkupik Live v0.11.0 — Source Delivery Summary
+
+## v0.11.0 P0 stability and visual hierarchy
+
+Implemented:
+
+- native/estimated xrun telemetry through JUCE AudioDeviceManager;
+- callback deadline and scheduling-gap detection;
+- conservative 128-block instability window;
+- asynchronous automatic buffer fallback with cooldown;
+- cross-endpoint 128-sample safe floor;
+- Settings toggle and footer stability state;
+- narrower side panels and collision-free rack-row hierarchy;
+- compact Smart Sound Enhancer and larger Noise Clean visual area;
+- cached expander coefficients and pointer-based processing.
+
+Documentation and audit:
+
+```text
+docs/P0_STABILITY_AND_VISUAL_HIERARCHY_v0.11.0.md
+docs/P0_ENGINE_LIMITATIONS_v0.11.0.md
+qa/v0110_p0_audit.txt
+```
 
 ## P1 premium polish and repository/build hygiene
 

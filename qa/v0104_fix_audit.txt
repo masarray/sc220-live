@@ -1,0 +1,17 @@
+v0.10.4 source audit
+Checks : 12
+Passed : 12
+Failed : 0
+
+[ PASS ] Version 0.10.4
+[ PASS ] Opaque premium tooltip wrapper
+[ PASS ] Tooltip paints every pixel
+[ PASS ] Fallback gets full bounds
+[ PASS ] No double-reduced fallback call
+[ PASS ] CPU display uses wall-clock cadence
+[ PASS ] CPU display smoothed
+[ PASS ] Peak display decays
+[ PASS ] Package version
+[ PASS ] BAT version
+[ PASS ] Audio engine unchanged
+[ PASS ] Noise clean engine unchanged

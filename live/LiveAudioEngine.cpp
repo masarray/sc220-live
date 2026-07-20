@@ -2,6 +2,8 @@
 
 #include <chrono>
 #include <cmath>
+#include <cstdint>
+#include <limits>
 
 namespace askp::live {
 namespace {
@@ -18,6 +20,12 @@ constexpr auto bypassId = "bypass";
 float dbFromPeak (float peak) noexcept
 {
     return juce::Decibels::gainToDecibels (juce::jmax (peak, 1.0e-9f), -120.0f);
+}
+
+std::int64_t steadyNowNs() noexcept
+{
+    return std::chrono::duration_cast<std::chrono::nanoseconds> (
+        std::chrono::steady_clock::now().time_since_epoch()).count();
 }
 } // namespace
 
@@ -62,16 +70,20 @@ bool LiveAudioEngine::initialise (const juce::XmlElement* savedDeviceState)
         }
     }
 
+    refreshDeviceStatus();
+    applyCrossDeviceSafeFloorIfNeeded();
     return error.isEmpty();
 }
 
 void LiveAudioEngine::shutdown()
 {
+    running.store (false);
+    cancelPendingUpdate();
+    stabilityRecoveryPending.store (false);
     if (callbackRegistered.exchange (false))
         deviceManager.removeAudioCallback (this);
     deviceManager.closeAudioDevice();
     enhancerProcessor.releaseResources();
-    running.store (false);
     deviceOpen.store (false);
 }
 
@@ -120,6 +132,7 @@ juce::String LiveAudioEngine::selectInputDevice (const juce::String& name)
         lastError = error;
     }
     refreshDeviceStatus();
+    applyCrossDeviceSafeFloorIfNeeded();
     return error;
 }
 
@@ -134,11 +147,13 @@ juce::String LiveAudioEngine::selectOutputDevice (const juce::String& name)
         lastError = error;
     }
     refreshDeviceStatus();
+    applyCrossDeviceSafeFloorIfNeeded();
     return error;
 }
 
 juce::String LiveAudioEngine::setSampleRate (double value)
 {
+    resetStabilityTelemetry();
     auto setup = deviceManager.getAudioDeviceSetup();
     setup.sampleRate = value;
     const auto error = deviceManager.setAudioDeviceSetup (setup, true);
@@ -148,6 +163,7 @@ juce::String LiveAudioEngine::setSampleRate (double value)
 
 juce::String LiveAudioEngine::setBufferSize (int value)
 {
+    resetStabilityTelemetry();
     auto setup = deviceManager.getAudioDeviceSetup();
     setup.bufferSize = value;
     const auto error = deviceManager.setAudioDeviceSetup (setup, true);
@@ -187,6 +203,7 @@ void LiveAudioEngine::setBypassed (bool value) noexcept
 
 void LiveAudioEngine::restartAudio()
 {
+    resetStabilityTelemetry();
     const auto setup = deviceManager.getAudioDeviceSetup();
     deviceManager.closeAudioDevice();
     const auto error = deviceManager.setAudioDeviceSetup (setup, true);
@@ -196,6 +213,30 @@ void LiveAudioEngine::restartAudio()
         lastError = error;
     }
     refreshDeviceStatus();
+}
+
+void LiveAudioEngine::setStabilityGuardEnabled (bool enabled)
+{
+    stabilityGuardEnabled.store (enabled);
+    if (! enabled)
+    {
+        stabilityRecoveryPending.store (false);
+        cancelPendingUpdate();
+        return;
+    }
+
+    resetStabilityTelemetry();
+    applyCrossDeviceSafeFloorIfNeeded();
+}
+
+void LiveAudioEngine::resetStabilityTelemetry() noexcept
+{
+    deadlineMissCount.store (0);
+    timingGlitchCount.store (0);
+    stabilityRecoveryPending.store (false);
+    timingWatchActive.store (false);
+    // Audio-thread-local counters are reset in audioDeviceAboutToStart after
+    // the device has stopped, avoiding a message-thread/audio-thread race.
 }
 
 void LiveAudioEngine::applyVstReferenceConditions() noexcept
@@ -289,8 +330,21 @@ LiveAudioEngine::Status LiveAudioEngine::getStatus() const
     status.outputPeakDbR = outputPeakR.load();
     status.gainReductionDb = gainReduction.load();
     status.expanderReductionDb = expander.getGainReductionDb();
-    status.dropouts = dropoutCount.load();
+    status.deadlineMisses = deadlineMissCount.load();
+    status.timingGlitches = timingGlitchCount.load();
+    status.stabilityRecoveries = stabilityRecoveryCount.load();
+    status.driverXruns = deviceManager.getXRunCount();
+    status.crossDeviceRouting = crossDeviceRouting.load();
+    status.stabilityGuardEnabled = stabilityGuardEnabled.load();
+    status.stabilityRecoveryPending = stabilityRecoveryPending.load();
+    const int observedDropouts = dropoutCount.load() + status.deadlineMisses + status.timingGlitches;
+    status.dropouts = status.driverXruns >= 0 ? juce::jmax (observedDropouts, status.driverXruns)
+                                             : observedDropouts;
     status.totalLatencySamples = totalLatencySamples.load();
+    status.stabilityState = status.stabilityRecoveryPending ? "RECOVERING"
+                          : ! status.stabilityGuardEnabled ? "MANUAL"
+                          : timingWatchActive.load() ? "WATCH"
+                          : status.crossDeviceRouting ? "GUARDED" : "STABLE";
 
     const juce::ScopedLock lock (statusLock);
     status.inputDevice = currentInputName;
@@ -309,7 +363,7 @@ void LiveAudioEngine::audioDeviceIOCallbackWithContext (
     float* const* outputChannelData, int numOutputChannels,
     int numSamples, const juce::AudioIODeviceCallbackContext&)
 {
-    const auto start = std::chrono::high_resolution_clock::now();
+    const auto startNs = steadyNowNs();
     clearOutputs (outputChannelData, numOutputChannels, numSamples);
 
     if (! running.load() || ! engineEnabled.load() || numOutputChannels <= 0)
@@ -377,15 +431,18 @@ void LiveAudioEngine::audioDeviceIOCallbackWithContext (
         }
     }
 
-    const auto elapsed = std::chrono::duration<double> (
-        std::chrono::high_resolution_clock::now() - start).count();
-    const auto budget = static_cast<double> (numSamples)
-                      / juce::jmax (1.0, currentSampleRate.load());
-    const float blockCpu = budget > 0.0 ? static_cast<float> (elapsed / budget * 100.0) : 0.0f;
-    cpuPercent.store (cpuPercent.load() * 0.92f + blockCpu * 0.08f);
+    const auto elapsedNs = steadyNowNs() - startNs;
+    const auto sampleRate = juce::jmax (1.0, currentSampleRate.load());
+    const auto budget = static_cast<double> (numSamples) / sampleRate;
+    const float blockCpu = budget > 0.0
+                         ? static_cast<float> ((static_cast<double> (elapsedNs) * 1.0e-9) / budget * 100.0)
+                         : 0.0f;
+    cpuPercent.store (cpuPercent.load() * 0.94f + blockCpu * 0.06f,
+                      std::memory_order_relaxed);
     const float previousPeak = callbackPeakPercent.load (std::memory_order_relaxed);
-    callbackPeakPercent.store (blockCpu > previousPeak ? blockCpu : previousPeak * 0.9975f,
+    callbackPeakPercent.store (blockCpu > previousPeak ? blockCpu : previousPeak * 0.996f,
                                std::memory_order_relaxed);
+    observeRealtimeTiming (startNs, elapsedNs, numSamples, sampleRate);
 }
 
 void LiveAudioEngine::audioDeviceAboutToStart (juce::AudioIODevice* device)
@@ -427,14 +484,21 @@ void LiveAudioEngine::audioDeviceAboutToStart (juce::AudioIODevice* device)
     running.store (true);
     deviceOpen.store (true);
     dropoutCount.store (0);
+    deadlineMissCount.store (0);
+    timingGlitchCount.store (0);
+    timingWatchActive.store (false);
     callbackPeakPercent.store (0.0f);
+    previousCallbackStartNs = 0;
+    timingWindowBlocks = 0;
+    timingWindowRiskBlocks = 0;
+    timingWindowMisses = 0;
+    timingWindowGlitches = 0;
     refreshDeviceStatus();
 }
 
 void LiveAudioEngine::audioDeviceStopped()
 {
     enhancerProcessor.releaseResources();
-    running.store (false);
     deviceOpen.store (false);
 }
 
@@ -465,15 +529,8 @@ void LiveAudioEngine::updateMeters (const juce::AudioBuffer<float>& finalOutput)
 
     const int samples = finalOutput.getNumSamples();
     const int right = juce::jmin (1, finalOutput.getNumChannels() - 1);
-    const auto* leftData = finalOutput.getReadPointer (0);
-    const auto* rightData = finalOutput.getReadPointer (right);
-    float leftPeak = 0.0f;
-    float rightPeak = 0.0f;
-    for (int sample = 0; sample < samples; ++sample)
-    {
-        leftPeak = juce::jmax (leftPeak, std::abs (leftData[sample]));
-        rightPeak = juce::jmax (rightPeak, std::abs (rightData[sample]));
-    }
+    const float leftPeak = finalOutput.getMagnitude (0, 0, samples);
+    const float rightPeak = finalOutput.getMagnitude (right, 0, samples);
 
     const float releaseDb = static_cast<float> (26.0 * static_cast<double> (samples)
                                                 / juce::jmax (1.0, currentSampleRate.load()));
@@ -491,6 +548,9 @@ void LiveAudioEngine::refreshDeviceStatus()
         currentOutputName = setup.outputDeviceName;
     }
     outputCable.store (looksLikeVirtualCable (setup.outputDeviceName));
+    crossDeviceRouting.store (setup.inputDeviceName.isNotEmpty()
+                              && setup.outputDeviceName.isNotEmpty()
+                              && setup.inputDeviceName != setup.outputDeviceName);
     deviceOpen.store (deviceManager.getCurrentAudioDevice() != nullptr);
 }
 
@@ -526,6 +586,160 @@ void LiveAudioEngine::updateOutputTrimRouting() noexcept
     // Positive and normal attenuation remain inside the exact VST lookahead
     // safety path. Only attenuation below -12 dB is completed after processing.
     setAskpParameter (finalOutputGainId, juce::jlimit (-12.0f, 12.0f, requested));
+}
+
+void LiveAudioEngine::observeRealtimeTiming (std::int64_t startNs,
+                                                 std::int64_t elapsedNs,
+                                                 int numSamples,
+                                                 double sampleRate) noexcept
+{
+    if (numSamples <= 0 || sampleRate <= 0.0)
+        return;
+
+    const auto budgetNs = static_cast<std::int64_t> (
+        static_cast<double> (numSamples) / sampleRate * 1.0e9);
+    if (budgetNs <= 0)
+        return;
+
+    ++timingWindowBlocks;
+    if (elapsedNs >= static_cast<std::int64_t> (static_cast<double> (budgetNs) * 0.72))
+        ++timingWindowRiskBlocks;
+    if (elapsedNs >= budgetNs)
+    {
+        ++timingWindowMisses;
+        deadlineMissCount.fetch_add (1, std::memory_order_relaxed);
+    }
+
+    if (previousCallbackStartNs > 0)
+    {
+        const auto callbackGap = startNs - previousCallbackStartNs;
+        if (callbackGap > static_cast<std::int64_t> (static_cast<double> (budgetNs) * 2.35))
+        {
+            ++timingWindowGlitches;
+            timingGlitchCount.fetch_add (1, std::memory_order_relaxed);
+        }
+    }
+    previousCallbackStartNs = startNs;
+
+    // A bounded 128-block decision window avoids reacting to a single Windows
+    // scheduling spike. Recovery is only requested when the callback repeatedly
+    // approaches or misses its deadline.
+    if (timingWindowBlocks >= 128)
+    {
+        const bool unstable = timingWindowMisses >= 2
+                           || timingWindowGlitches >= 2
+                           || timingWindowRiskBlocks >= 8;
+        timingWatchActive.store (unstable, std::memory_order_relaxed);
+        if (unstable)
+            requestStabilityRecoveryFromAudioThread();
+
+        timingWindowBlocks = 0;
+        timingWindowRiskBlocks = 0;
+        timingWindowMisses = 0;
+        timingWindowGlitches = 0;
+    }
+}
+
+void LiveAudioEngine::requestStabilityRecoveryFromAudioThread() noexcept
+{
+    if (! running.load (std::memory_order_relaxed)
+        || ! stabilityGuardEnabled.load (std::memory_order_relaxed))
+        return;
+
+    bool expected = false;
+    if (stabilityRecoveryPending.compare_exchange_strong (expected, true,
+                                                           std::memory_order_acq_rel))
+        triggerAsyncUpdate();
+}
+
+int LiveAudioEngine::chooseNextStableBufferSize (int currentSize) const
+{
+    auto sizes = getAvailableBufferSizes();
+    if (sizes.isEmpty())
+        return currentSize;
+
+    const int preferredFloor = currentSize < 128 ? 128 : currentSize + 1;
+    int bestPreferred = std::numeric_limits<int>::max();
+    int bestAny = std::numeric_limits<int>::max();
+    for (const auto size : sizes)
+    {
+        if (size >= preferredFloor && size <= 512)
+            bestPreferred = juce::jmin (bestPreferred, size);
+        if (size > currentSize)
+            bestAny = juce::jmin (bestAny, size);
+    }
+
+    if (bestPreferred != std::numeric_limits<int>::max())
+        return bestPreferred;
+    if (bestAny != std::numeric_limits<int>::max())
+        return bestAny;
+    return currentSize;
+}
+
+void LiveAudioEngine::applyCrossDeviceSafeFloorIfNeeded()
+{
+    if (! stabilityGuardEnabled.load() || ! crossDeviceRouting.load())
+        return;
+
+    auto setup = deviceManager.getAudioDeviceSetup();
+    if (setup.bufferSize >= 128)
+        return;
+
+    const int saferSize = chooseNextStableBufferSize (setup.bufferSize);
+    if (saferSize < 128 || saferSize == setup.bufferSize)
+        return;
+
+    setup.bufferSize = saferSize;
+    const auto error = deviceManager.setAudioDeviceSetup (setup, true);
+    if (error.isEmpty())
+    {
+        stabilityRecoveryCount.fetch_add (1, std::memory_order_relaxed);
+        const juce::ScopedLock lock (statusLock);
+        lastError = "Stability Guard selected " + juce::String (saferSize)
+                  + " samples for separate input/output endpoints.";
+    }
+    else
+    {
+        const juce::ScopedLock lock (statusLock);
+        lastError = "Could not apply the cross-device safe buffer floor: " + error;
+    }
+    refreshDeviceStatus();
+}
+
+void LiveAudioEngine::handleAsyncUpdate()
+{
+    if (! stabilityRecoveryPending.exchange (false))
+        return;
+
+    const auto nowMs = juce::Time::getMillisecondCounterHiRes();
+    if (nowMs - lastRecoveryMs < 30000.0)
+        return;
+
+    auto setup = deviceManager.getAudioDeviceSetup();
+    const int nextSize = chooseNextStableBufferSize (setup.bufferSize);
+    if (nextSize <= setup.bufferSize)
+    {
+        const juce::ScopedLock lock (statusLock);
+        lastError = "Stability Guard detected timing pressure, but no larger supported buffer is available.";
+        return;
+    }
+
+    setup.bufferSize = nextSize;
+    const auto error = deviceManager.setAudioDeviceSetup (setup, true);
+    lastRecoveryMs = nowMs;
+    if (error.isEmpty())
+    {
+        stabilityRecoveryCount.fetch_add (1, std::memory_order_relaxed);
+        const juce::ScopedLock lock (statusLock);
+        lastError = "Stability Guard increased the audio buffer to "
+                  + juce::String (nextSize) + " samples after repeated callback timing pressure.";
+    }
+    else
+    {
+        const juce::ScopedLock lock (statusLock);
+        lastError = "Stability Guard could not apply a safer buffer: " + error;
+    }
+    refreshDeviceStatus();
 }
 
 bool LiveAudioEngine::looksLikeVirtualCable (const juce::String& name)

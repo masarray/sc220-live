@@ -148,8 +148,8 @@ WorkspaceLayout makeWorkspaceLayout (juce::Rectangle<int> bounds)
     l.statusPill = { 276, 15, juce::jlimit (250, 340, x - 294), 30 };
 
     auto workspace = bounds.reduced (outerPad, metrics::space10);
-    const int sideWidth = juce::jlimit (224, metrics::sidePanelWidth,
-                                        static_cast<int> (workspace.getWidth() * 0.172f));
+    const int sideWidth = juce::jlimit (212, metrics::sidePanelWidth,
+                                        static_cast<int> (workspace.getWidth() * 0.158f));
     l.leftPanel = workspace.removeFromLeft (sideWidth);
     workspace.removeFromLeft (metrics::space12);
     l.rightPanel = workspace.removeFromRight (sideWidth);
@@ -158,11 +158,11 @@ WorkspaceLayout makeWorkspaceLayout (juce::Rectangle<int> bounds)
     auto centre = workspace;
     l.ioStrip = centre.removeFromTop (48);
     centre.removeFromTop (metrics::space10);
-    const int noiseHeight = juce::jlimit (328, 356,
-                                          static_cast<int> (centre.getHeight() * 0.545f));
-    l.noiseCard = centre.removeFromTop (noiseHeight);
-    centre.removeFromTop (metrics::space10);
-    l.enhancerCard = centre;
+    const int enhancerHeight = juce::jlimit (266, 286,
+                                             static_cast<int> (centre.getHeight() * 0.405f));
+    l.enhancerCard = centre.removeFromBottom (enhancerHeight);
+    centre.removeFromBottom (metrics::space10);
+    l.noiseCard = centre;
 
     auto left = l.leftPanel.reduced (metrics::space12);
     l.leftTitle = left.removeFromTop (42);
@@ -196,8 +196,8 @@ WorkspaceLayout makeWorkspaceLayout (juce::Rectangle<int> bounds)
     l.noiseHeader = noiseInner.removeFromTop (40);
     l.noiseBypass = l.noiseHeader.removeFromRight (34).withSizeKeepingCentre (34, 34);
     auto noiseBody = noiseInner;
-    const int controlWidth = juce::jlimit (350, 392,
-                                           static_cast<int> (noiseBody.getWidth() * 0.43f));
+    const int controlWidth = juce::jlimit (360, 390,
+                                           static_cast<int> (noiseBody.getWidth() * 0.40f));
     auto controlRegion = noiseBody.removeFromLeft (controlWidth);
     l.noiseControlSurface = controlRegion;
     auto controls = controlRegion.reduced (metrics::space10, metrics::space8);
@@ -209,7 +209,7 @@ WorkspaceLayout makeWorkspaceLayout (juce::Rectangle<int> bounds)
     visualContent.removeFromTop (metrics::space2);
     l.visualizer = visualContent;
 
-    auto meter = controls.removeFromRight (72);
+    auto meter = controls.removeFromRight (76);
     controls.removeFromRight (metrics::space12);
     auto knobRow = controls.removeFromTop (140);
     const int knobWidth = knobRow.getWidth() / 3;
@@ -219,18 +219,18 @@ WorkspaceLayout makeWorkspaceLayout (juce::Rectangle<int> bounds)
     l.profile = controls.removeFromTop (34);
     controls.removeFromTop (metrics::space8);
     l.learn = controls.removeFromTop (36);
-    l.expanderMeter = meter.withSizeKeepingCentre (68, juce::jmin (186, meter.getHeight() - 8));
+    l.expanderMeter = meter.withSizeKeepingCentre (72, juce::jmin (198, meter.getHeight() - 8));
 
     auto enhancerInner = l.enhancerCard.reduced (metrics::space14, metrics::space12);
     l.enhancerHeader = enhancerInner.removeFromTop (40);
     l.enhancerBypass = l.enhancerHeader.removeFromRight (34).withSizeKeepingCentre (34, 34);
-    l.enhancerPresetSurface = enhancerInner.removeFromTop (52);
+    l.enhancerPresetSurface = enhancerInner.removeFromTop (48);
     auto presetStrip = l.enhancerPresetSurface.reduced (metrics::space8, metrics::space2);
     auto captionRow = presetStrip.removeFromTop (12);
-    l.presetCaption = captionRow.removeFromLeft (440);
+    l.presetCaption = captionRow.removeFromLeft (juce::jmin (560, presetStrip.getWidth()));
     presetStrip.removeFromTop (2);
-    l.presetCombo = presetStrip.removeFromLeft (440);
-    enhancerInner.removeFromTop (metrics::space6);
+    l.presetCombo = presetStrip.removeFromLeft (juce::jmin (560, presetStrip.getWidth()));
+    enhancerInner.removeFromTop (metrics::space2);
     l.enhancerMacroSurface = enhancerInner;
     auto macroContent = enhancerInner.reduced (metrics::space4, metrics::space2);
     l.enhancerMacroCaption = {};
@@ -255,11 +255,11 @@ public:
         : engine (engineToUse), refresh (std::move (refreshCallback))
     {
         setLookAndFeel (&cardLookAndFeel);
-        setSize (338, 456);
+        setSize (338, 500);
 
         for (juce::Component* component : std::initializer_list<juce::Component*> {
                  &sampleRate, &bufferSize, &channelMode, &noiseQuality,
-                 &hearRemoved, &restartButton, &refreshButton, &referenceButton, &learnButton, &message })
+                 &hearRemoved, &stabilityGuard, &restartButton, &refreshButton, &referenceButton, &learnButton, &message })
             addAndMakeVisible (component);
 
         styleCombo (sampleRate, "Sample Rate|Set the live engine sample rate. Higher rates may use more CPU.");
@@ -281,6 +281,9 @@ public:
         hearRemoved.setButtonText ("Hear Removed Noise");
         hearRemoved.setToggleState (engine.getNoiseClean().isListeningRemoved(),
                                     juce::dontSendNotification);
+        stabilityGuard.setButtonText ("Auto Stability Guard");
+        stabilityGuard.setTooltip ("Stability Guard|Detect repeated callback timing pressure and move to the next supported buffer size automatically.");
+        stabilityGuard.setToggleState (engine.isStabilityGuardEnabled(), juce::dontSendNotification);
 
         restartButton.setButtonText ("Restart Audio Engine");
         refreshButton.setButtonText ("Refresh Device Lists");
@@ -323,6 +326,16 @@ public:
         hearRemoved.onClick = [this]
         {
             engine.getNoiseClean().setListenRemoved (hearRemoved.getToggleState());
+        };
+        stabilityGuard.onClick = [this]
+        {
+            engine.setStabilityGuardEnabled (stabilityGuard.getToggleState());
+            message.setText (stabilityGuard.getToggleState()
+                                 ? "Stability Guard enabled. Repeated deadline pressure may raise the buffer automatically."
+                                 : "Stability Guard disabled. Buffer changes are manual.",
+                             juce::dontSendNotification);
+            message.setColour (juce::Label::textColourId,
+                               stabilityGuard.getToggleState() ? colours::green : colours::amber);
         };
         restartButton.onClick = [this]
         {
@@ -375,10 +388,10 @@ public:
         drawFieldLabel (g, cardLookAndFeel, { 18, 201, 110, 20 }, "Noise quality");
 
         g.setColour (colours::border);
-        g.drawHorizontalLine (252, 18.0f, static_cast<float> (getWidth() - 18));
+        g.drawHorizontalLine (284, 18.0f, static_cast<float> (getWidth() - 18));
         g.setColour (colours::textMuted);
         g.setFont (cardLookAndFeel.jakarta (9.0f, true));
-        g.drawText ("AUDIO ENGINE", 18, 260, getWidth() - 36, 18,
+        g.drawText ("AUDIO ENGINE", 18, 292, getWidth() - 36, 18,
                     juce::Justification::centredLeft, false);
     }
 
@@ -389,12 +402,13 @@ public:
         channelMode.setBounds (142, 154, 178, 34);
         noiseQuality.setBounds (142, 198, 178, 34);
         hearRemoved.setBounds (18, 232, 210, 28);
+        stabilityGuard.setBounds (18, 260, 230, 28);
 
-        restartButton.setBounds (18, 284, 146, 36);
-        refreshButton.setBounds (174, 284, 146, 36);
-        referenceButton.setBounds (18, 330, 302, 36);
-        learnButton.setBounds (18, 376, 302, 36);
-        message.setBounds (18, 416, 302, 30);
+        restartButton.setBounds (18, 316, 146, 36);
+        refreshButton.setBounds (174, 316, 146, 36);
+        referenceButton.setBounds (18, 362, 302, 36);
+        learnButton.setBounds (18, 408, 302, 36);
+        message.setBounds (18, 452, 302, 38);
     }
 
 private:
@@ -434,6 +448,7 @@ private:
     juce::ComboBox channelMode;
     juce::ComboBox noiseQuality;
     juce::ToggleButton hearRemoved;
+    juce::ToggleButton stabilityGuard;
     juce::TextButton restartButton;
     juce::TextButton refreshButton;
     juce::TextButton referenceButton;
@@ -938,9 +953,32 @@ void LiveMainComponent::updateStatus()
     if (noiseBypass.getToggleState() != audioEngine.getNoiseClean().isEnabled())
         noiseBypass.setToggleState (audioEngine.getNoiseClean().isEnabled(), juce::dontSendNotification);
 
-    cpuStat.setValue (juce::String (status.cpuPercent, 1) + "% / peak "
-                      + juce::String (status.callbackPeakPercent, 0) + "%",
-                      status.callbackPeakPercent > 75.0f ? colours::red : colours::text);
+    // Audio/meter refresh remains 24 Hz, but numerical CPU text is intentionally
+    // sampled at 1 Hz and smoothed. Rapid callback jitter is useful internally,
+    // but flickering digits are unreadable and cause needless footer repaints.
+    const auto nowMs = juce::Time::getMillisecondCounter();
+    if (! cpuDisplayInitialised
+        || static_cast<juce::int32> (nowMs - nextCpuUiUpdateMs) >= 0)
+    {
+        nextCpuUiUpdateMs = nowMs + 1000u;
+        if (! cpuDisplayInitialised)
+        {
+            displayedCpuPercent = status.cpuPercent;
+            displayedPeakPercent = status.callbackPeakPercent;
+            cpuDisplayInitialised = true;
+        }
+        else
+        {
+            displayedCpuPercent += (status.cpuPercent - displayedCpuPercent) * 0.28f;
+            displayedPeakPercent = juce::jmax (status.callbackPeakPercent,
+                                                displayedPeakPercent * 0.90f);
+        }
+
+        cpuStat.setValue (juce::String (displayedCpuPercent, 1) + "%  /  peak "
+                          + juce::String (displayedPeakPercent, 0) + "%",
+                          displayedPeakPercent > 75.0f ? colours::red : colours::text);
+    }
+
     const double latencyMs = status.sampleRate > 0.0
                            ? static_cast<double> (status.totalLatencySamples) / status.sampleRate * 1000.0
                            : 0.0;
@@ -950,8 +988,12 @@ void LiveMainComponent::updateStatus()
                            status.dropouts > 0 ? colours::red : colours::text);
     profileStat.setValue (cleaner.hasProfile() ? "Learned" : "Pending",
                           cleaner.hasProfile() ? colours::green : colours::textMuted);
-    trayStat.setValue (status.running ? "Ready" : "Stopped",
-                       status.running ? colours::cyan : colours::amber);
+    const auto stabilityColour = status.stabilityRecoveryPending ? colours::amber
+                                : status.stabilityState == "WATCH" ? colours::amber
+                                : status.stabilityState == "GUARDED" ? colours::green
+                                : status.stabilityState == "STABLE" ? colours::cyan
+                                : colours::textMuted;
+    trayStat.setValue (status.running ? status.stabilityState : "STOPPED", stabilityColour);
 
     repaint (0, 0, getWidth(), headerHeight);
 

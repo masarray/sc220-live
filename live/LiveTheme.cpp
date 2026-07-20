@@ -346,18 +346,23 @@ juce::Rectangle<int> LiveLookAndFeel::getTooltipBounds (const juce::String& tipT
 void LiveLookAndFeel::drawTooltip (juce::Graphics& g, const juce::String& text,
                                    int width, int height)
 {
+    // TooltipWindow may be backed by a native/opaque surface on Windows. Fill
+    // every pixel first so rounded corners or a resize never expose the OS
+    // default white background.
+    g.fillAll (colours::panelLo);
+
     const bool structured = text.containsChar ('|');
     const auto title = structured ? text.upToFirstOccurrenceOf ("|", false, false).trim()
                                   : juce::String ("Info");
     const auto body = structured ? text.fromFirstOccurrenceOf ("|", false, false).trim()
                                  : text.trim();
 
-    auto shell = juce::Rectangle<float> (1.0f, 1.0f,
-                                         static_cast<float> (width - 2),
-                                         static_cast<float> (height - 2));
+    auto shell = juce::Rectangle<float> (0.5f, 0.5f,
+                                         static_cast<float> (width - 1),
+                                         static_cast<float> (height - 1));
 
-    g.setColour (juce::Colours::black.withAlpha (0.22f));
-    g.fillRoundedRectangle (shell.translated (0.0f, 2.0f), 11.0f);
+    g.setColour (juce::Colours::black.withAlpha (0.13f));
+    g.fillRoundedRectangle (shell.translated (0.0f, 1.0f), 10.0f);
 
     juce::ColourGradient background (colours::panelHi.brighter (0.025f), shell.getX(), shell.getY(),
                                      colours::panelLo, shell.getRight(), shell.getBottom(), false);

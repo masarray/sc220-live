@@ -539,6 +539,10 @@ void MusicalNoiseClean::process (juce::AudioBuffer<float>& buffer) noexcept
 void SmoothDownwardExpander::prepare (double newSampleRate) noexcept
 {
     sampleRate = newSampleRate > 0.0 ? newSampleRate : 48000.0;
+    detectorAttackCoefficient = 1.0f - std::exp (-1.0f / static_cast<float> (sampleRate * 0.008));
+    detectorReleaseCoefficient = 1.0f - std::exp (-1.0f / static_cast<float> (sampleRate * 0.085));
+    gainOpenCoefficient = 1.0f - std::exp (-1.0f / static_cast<float> (sampleRate * 0.004));
+    gainCloseCoefficient = 1.0f - std::exp (-1.0f / static_cast<float> (sampleRate * 0.45));
     reset();
 }
 
@@ -581,21 +585,18 @@ void SmoothDownwardExpander::process (juce::AudioBuffer<float>& target,
     const float openThresholdDb = thresholdDb + 3.0f;
     const int holdLength = static_cast<int> (sampleRate * juce::jmap (value, 0.145f, 0.085f));
 
-    const float detectorAttack = 1.0f - std::exp (-1.0f / static_cast<float> (sampleRate * 0.008));
-    const float detectorRelease = 1.0f - std::exp (-1.0f / static_cast<float> (sampleRate * 0.085));
-    const float gainOpen = 1.0f - std::exp (-1.0f / static_cast<float> (sampleRate * 0.004));
-    const float gainClose = 1.0f - std::exp (-1.0f / static_cast<float> (sampleRate * 0.45));
+    const auto* detectorLeft = detector.getReadPointer (0);
+    const auto* detectorRight = detector.getReadPointer (juce::jmin (1, channels - 1));
+    auto* targetLeft = target.getWritePointer (0);
+    auto* targetRight = target.getWritePointer (juce::jmin (1, target.getNumChannels() - 1));
 
     for (int sample = 0; sample < samples; ++sample)
     {
-        float power = 0.0f;
-        for (int channel = 0; channel < channels; ++channel)
-        {
-            const float x = detector.getSample (channel, sample);
-            power += x * x;
-        }
+        const float xL = detectorLeft[sample];
+        const float xR = detectorRight[sample];
+        const float power = channels > 1 ? xL * xL + xR * xR : xL * xL;
         const float rms = std::sqrt (power / static_cast<float> (channels) + 1.0e-14f);
-        const float detectorAlpha = rms > detectorEnvelope ? detectorAttack : detectorRelease;
+        const float detectorAlpha = rms > detectorEnvelope ? detectorAttackCoefficient : detectorReleaseCoefficient;
         detectorEnvelope += detectorAlpha * (rms - detectorEnvelope);
         const float levelDb = gainToDb (detectorEnvelope);
 
@@ -634,12 +635,13 @@ void SmoothDownwardExpander::process (juce::AudioBuffer<float>& target,
             }
         }
 
-        const float gainAlpha = desiredGainDb > gainDbState ? gainOpen : gainClose;
+        const float gainAlpha = desiredGainDb > gainDbState ? gainOpenCoefficient : gainCloseCoefficient;
         gainDbState += gainAlpha * (desiredGainDb - gainDbState);
         const float gain = dbToGain (gainDbState);
 
-        for (int channel = 0; channel < target.getNumChannels(); ++channel)
-            target.setSample (channel, sample, target.getSample (channel, sample) * gain);
+        targetLeft[sample] *= gain;
+        if (target.getNumChannels() > 1)
+            targetRight[sample] *= gain;
     }
 
     gainReductionDb.store (-gainDbState);

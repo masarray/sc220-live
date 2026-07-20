@@ -8,6 +8,17 @@
 
 namespace askp::live {
 
+class PremiumTooltipWindow final : public juce::TooltipWindow
+{
+public:
+    explicit PremiumTooltipWindow (juce::Component* parent)
+        : juce::TooltipWindow (parent, 850)
+    {
+        setOpaque (true);
+        setInterceptsMouseClicks (false, false);
+    }
+};
+
 class LiveMainComponent final : public juce::Component,
                                 private juce::Timer
 {
@@ -87,11 +98,15 @@ private:
     MiniStat latencyStat { "Total Latency", "activity_svg" };
     MiniStat dropoutsStat { "Dropouts", "radio_svg" };
     MiniStat profileStat { "Profile", "circle_check_svg" };
-    MiniStat trayStat { "Tray Mode", "monitor_up_svg" };
+    MiniStat trayStat { "Stability", "shield_check_svg" };
 
-    juce::TooltipWindow tooltip { this, 850 };
+    PremiumTooltipWindow tooltip { this };
     bool updatingControls = false;
     bool uiActive = false;
+    juce::uint32 nextCpuUiUpdateMs = 0;
+    bool cpuDisplayInitialised = false;
+    float displayedCpuPercent = 0.0f;
+    float displayedPeakPercent = 0.0f;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (LiveMainComponent)
 };

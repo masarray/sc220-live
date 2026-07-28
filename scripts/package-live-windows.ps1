@@ -2,9 +2,8 @@ param(
     [ValidateSet('Release','Debug')]
     [string]$Configuration = 'Release',
     [string]$BuildDir = 'build-live',
-    [string]$Version = '0.11.0',
+    [string]$Version = '0.13.0',
     [string]$JuceSourceDir = '',
-    [string]$AskpSourceDir = '',
     [switch]$Clean
 )
 
@@ -28,7 +27,6 @@ $buildScriptArgs = @{
     Configuration = $Configuration
     BuildDir = $BuildDir
     JuceSourceDir = $JuceSourceDir
-    AskpSourceDir = $AskpSourceDir
 }
 if ($Clean) { $buildScriptArgs.Clean = $true }
 

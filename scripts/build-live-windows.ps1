@@ -4,7 +4,6 @@ param(
 
     [string]$BuildDir = 'build-live',
     [string]$JuceSourceDir = '',
-    [string]$AskpSourceDir = '',
 
     [ValidateSet('Auto','VisualStudio','Ninja')]
     [string]$Generator = 'Auto',
@@ -249,58 +248,11 @@ function Remove-IncompatibleBuildTree([string]$buildPath, [string]$wantedGenerat
     }
 }
 
-function Resolve-AskpAuthority([string]$explicitPath, [string]$projectRoot) {
-    $candidates = [System.Collections.Generic.List[string]]::new()
-    if ($explicitPath) { $candidates.Add($explicitPath) }
-    if ($env:ASKP_SOURCE_DIR) { $candidates.Add($env:ASKP_SOURCE_DIR) }
-    $candidates.Add((Join-Path (Split-Path $projectRoot -Parent) 'askp-vstvisualizer'))
-    $candidates.Add((Join-Path (Split-Path $projectRoot -Parent) 'askp-vst'))
-    $candidates.Add((Join-Path $projectRoot '.deps\askp-vst'))
-    $candidates.Add((Join-Path $projectRoot 'third_party\askp-vst'))
-
-    foreach ($candidate in ($candidates | Select-Object -Unique)) {
-        if (-not $candidate) { continue }
-        $dsp = Join-Path $candidate 'engine\arsonkupik_dsp.cpp'
-        $header = Join-Path $candidate 'engine\arsonkupik_dsp.hpp'
-        $presets = Join-Path $candidate 'engine\arsonkupik_presets.cpp'
-        if ((Test-Path $dsp) -and (Test-Path $header) -and (Test-Path $presets)) {
-            return (Resolve-Path $candidate).Path
-        }
-    }
-
-    $syncScript = Join-Path $projectRoot 'scripts\sync-askp-authority.ps1'
-    $synced = Join-Path $projectRoot '.deps\askp-vst'
-    if (Test-Path $syncScript) {
-        Write-Host '==> ArSonKuPik authority was not found locally.' -ForegroundColor Yellow
-        Write-Host '==> Syncing the audited private askp-vst commit into .deps\askp-vst'
-        & $syncScript -Destination $synced
-        if ($LASTEXITCODE -ne 0) {
-            throw "ArSonKuPik source sync failed with exit code $LASTEXITCODE"
-        }
-        if ((Test-Path (Join-Path $synced 'engine\arsonkupik_dsp.cpp')) -and
-            (Test-Path (Join-Path $synced 'engine\arsonkupik_dsp.hpp')) -and
-            (Test-Path (Join-Path $synced 'engine\arsonkupik_presets.cpp'))) {
-            return (Resolve-Path $synced).Path
-        }
-    }
-
-    throw @"
-The authoritative masarray/askp-vst engine was not found or could not be synced.
-Sonkupik Live v0.8.0 intentionally refuses to build the stale fallback recipe.
-
-Use one of these options:
-  1. Keep the repositories side-by-side:
-       D:\Git\askp-vst
-       D:\Git\sonkupik-live
-  2. Pass the path explicitly:
-       -AskpSourceDir D:\Git\askp-vst
-  3. Set ASKP_SOURCE_DIR.
-  4. Authenticate Git Credential Manager/GitHub CLI, then rerun the build.
-"@
+$embeddedEngine = Join-Path $root 'third_party\askp-engine-v0.5.19\engine\arsonkupik_dsp.cpp'
+if (-not (Test-Path $embeddedEngine)) {
+    throw "Embedded ArSonKuPik v0.5.19 authority is missing: $embeddedEngine"
 }
-
-$askpAuthority = Resolve-AskpAuthority $AskpSourceDir $root
-Write-Host "==> ArSonKuPik authority: $askpAuthority"
+Write-Host '==> Enhancer authority: embedded ArSonKuPik v0.5.19 (deterministic local port)'
 
 $vs = Get-VisualStudioInstallation
 $vsMajor = 0
@@ -379,8 +331,7 @@ Remove-IncompatibleBuildTree $build $selectedGenerator
 $cmakeArgs = @(
     '-S', $root,
     '-B', $build,
-    '-G', $selectedGenerator,
-    "-DSONKUPIK_ASKP_SOURCE_DIR=$askpAuthority"
+    '-G', $selectedGenerator
 )
 
 if ($ParityQa) {

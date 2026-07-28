@@ -1,0 +1,28 @@
+ARSONKUPIK PROPRIETARY SOURCE CODE LICENCE NOTICE
+
+Copyright (C) 2026 Tutorial Mas Ari / MasArray. All rights reserved.
+
+This repository, including its source code, DSP implementation, preset recipes,
+user-interface code, artwork, build scripts, private activation tooling, and
+associated documentation, is proprietary and confidential except for materials
+identified in THIRD_PARTY_NOTICES.txt or in the licenses directory.
+
+No licence is granted to copy, publish, distribute, sublicense, sell, disclose,
+reverse engineer, or create derivative works from this repository or any
+substantial part of it without prior written permission from the copyright
+owner. Access to a private repository, source archive, build artifact, or review
+copy does not grant any ownership or redistribution right.
+
+Compiled ArSonKuPik products are licensed to end users only under the applicable
+End User Licence Agreement supplied with the product. This source-code notice is
+not the end-user licence.
+
+The separately published masarray/ArSonkuPik project remains available under its
+original MIT licence. Rights already granted for that separately published MIT
+code are not withdrawn or restricted by this notice. ArSonKuPik VST is a
+separate proprietary product and retains the required MIT notice for any reused
+or adapted portions.
+
+Third-party components remain subject exclusively to their respective licence
+terms. Nothing in this notice grants rights in JUCE, the Steinberg VST3 SDK,
+Plus Jakarta Sans, or any other third-party material.

@@ -11,7 +11,7 @@ permissions:
 jobs:
   source-audit:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -19,9 +19,27 @@ jobs:
           python-version: '3.12'
       - name: Install numerical reference dependency
         run: python -m pip install --disable-pip-version-check numpy
-      - name: Validate current P0 stability and hierarchy
-        run: python qa/audit_v0110_p0.py
+      - name: Validate v0.12.0 engine port and deterministic authority
+        run: python qa/audit_v0120_engine_port.py
       - name: Validate fixed transform reference
         run: python qa/verify_fixed_fft.py
-      - name: Validate expander pointer-path parity
-        run: python qa/verify_expander_pointer_parity.py
+      - name: Compile v0.5.19 preset/profile audit
+        run: >-
+          g++ -std=c++17 -O2
+          -Ithird_party/askp-engine-v0.5.19/engine
+          qa/preset_profile_v0519_audit.cpp
+          third_party/askp-engine-v0.5.19/engine/arsonkupik_dsp.cpp
+          third_party/askp-engine-v0.5.19/engine/arsonkupik_presets.cpp
+          -o /tmp/sonkupik-preset-profile-audit
+      - name: Run v0.5.19 preset/profile audit
+        run: /tmp/sonkupik-preset-profile-audit
+      - name: Compile floor-only gain architecture audit
+        run: >-
+          g++ -std=c++17 -O2
+          -Ithird_party/askp-engine-v0.5.19/engine
+          qa/floor_only_gain_p7g_audit.cpp
+          third_party/askp-engine-v0.5.19/engine/arsonkupik_dsp.cpp
+          third_party/askp-engine-v0.5.19/engine/arsonkupik_presets.cpp
+          -o /tmp/sonkupik-floor-only-gain-audit
+      - name: Run floor-only gain architecture audit
+        run: /tmp/sonkupik-floor-only-gain-audit

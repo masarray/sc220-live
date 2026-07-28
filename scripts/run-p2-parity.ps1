@@ -3,7 +3,6 @@ param(
     [string]$Configuration = 'Release',
     [string]$BuildDir = 'build-live',
     [string]$JuceSourceDir = '',
-    [string]$AskpSourceDir = '',
     [ValidateSet('Auto','VisualStudio','Ninja')]
     [string]$Generator = 'Auto',
     [switch]$Clean
@@ -28,7 +27,6 @@ $buildArgs = @(
 )
 if ($Clean) { $buildArgs += '-Clean' }
 if ($JuceSourceDir) { $buildArgs += @('-JuceSourceDir', $JuceSourceDir) }
-if ($AskpSourceDir) { $buildArgs += @('-AskpSourceDir', $AskpSourceDir) }
 
 Write-Host '==> Building P2 parity renderers'
 & powershell @buildArgs
@@ -45,11 +43,11 @@ $liveExe = Find-Renderer 'SonkupikParityLive|Live Renderer'
 if ($null -eq $referenceExe) { throw 'SonkupikParityReference executable was not found.' }
 if ($null -eq $liveExe) { throw 'SonkupikParityLive executable was not found.' }
 
-$referenceJson = Join-Path $results 'askp-vst-reference.json'
+$referenceJson = Join-Path $results 'askp-v0519-reference.json'
 $liveJson = Join-Path $results 'sonkupik-live.json'
 $report = Join-Path $results 'p2-preset-parity.txt'
 
-Write-Host "==> Rendering askp-vst authority: $($referenceExe.FullName)"
+Write-Host "==> Rendering embedded v0.5.19 reference: $($referenceExe.FullName)"
 & $referenceExe.FullName $referenceJson
 if ($LASTEXITCODE -ne 0) { throw "Reference renderer failed with exit code $LASTEXITCODE" }
 

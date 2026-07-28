@@ -2,7 +2,8 @@
 
 #include "LiveAudioEngine.h"
 #include "LiveWidgets.h"
-#include "AquariumVisualizer.h"
+#include "LiveLicensePanel.h"
+#include "SonkupikSphereVisualizer.h"
 
 #include <juce_gui_extra/juce_gui_extra.h>
 
@@ -58,6 +59,7 @@ private:
     LiveLookAndFeel lookAndFeel;
     juce::ComponentDragger windowDragger;
 
+    juce::TextButton licenseButton { "TRIAL" };
     LucideIconButton settingsButton { "Settings", "settings_svg", colours::textMuted };
     LucideIconButton trayButton { "Tray", "panel_top_open_svg", colours::textMuted };
     LucideIconButton minimiseButton { "Minimise", "minimize_2_svg", colours::textMuted };
@@ -75,7 +77,8 @@ private:
     KnobControl noiseReduction { "Reduction", " dB", colours::cyan, 0.0, 12.0, 0.1 };
     KnobControl silenceAmount { "Silence", "%", colours::violet, 0.0, 100.0, 1.0 };
     KnobControl preserveAmount { "Preserve", "%", colours::cyan, 0.0, 100.0, 1.0 };
-    askp::live::AquariumVisualizer visualizer;
+    askp::live::SonkupikSphereVisualizer visualizer;
+    LiveLicensePanel licensePanel;
     StatusPill profileStatus;
     juce::TextButton learnNoise { "Learn Noise" };
 
@@ -98,7 +101,7 @@ private:
     MiniStat latencyStat { "Total Latency", "activity_svg" };
     MiniStat dropoutsStat { "Dropouts", "radio_svg" };
     MiniStat profileStat { "Profile", "circle_check_svg" };
-    MiniStat trayStat { "Stability", "shield_check_svg" };
+    MiniStat trayStat { "Tray Mode", "monitor_up_svg" };
 
     PremiumTooltipWindow tooltip { this };
     bool updatingControls = false;

@@ -1,0 +1,46 @@
+Sonkupik Live v0.13.0 licensing source audit
+
+Checks : 40
+Passed : 40
+Failed : 0
+
+[ PASS ] Application version 0.13.0
+[ PASS ] Thirty-day trial
+[ PASS ] Final seven-day warning
+[ PASS ] Product-specific state salt
+[ PASS ] Product-specific fingerprint
+[ PASS ] Separate registry storage
+[ PASS ] Separate application-data storage
+[ PASS ] Request ID stays server-compatible
+[ PASS ] Local RSA signature verification retained
+[ PASS ] No private RSA key embedded
+[ PASS ] QRIS client source compiled
+[ PASS ] Native Live licence panel compiled
+[ PASS ] MasArray API endpoint
+[ PASS ] Dedicated product ID
+[ PASS ] Rp249000 product price
+[ PASS ] Server price mismatch rejected
+[ PASS ] Only trusted Midtrans checkout domains
+[ PASS ] Checkout worker is low priority
+[ PASS ] Checkout recovery persisted
+[ PASS ] Automatic payment polling
+[ PASS ] Automatic activation delivery
+[ PASS ] Offline activation fallback
+[ PASS ] Engine bridge gates creative parameters
+[ PASS ] Live engine exposes licence manager
+[ PASS ] Trim changes gated after trial
+[ PASS ] Bypass changes gated after trial
+[ PASS ] Noise controls gated in UI
+[ PASS ] Enhancer controls gated in UI
+[ PASS ] Enhancer bypass disabled after trial
+[ PASS ] Licence status in header
+[ PASS ] Expired trial opens purchase panel
+[ PASS ] Audio callback has no checkout or licence network work
+[ PASS ] Server credentials absent
+[ PASS ] Licence documentation
+[ PASS ] Server product configuration documentation
+[ PASS ] Hash lock third_party/askp-engine-v0.5.19/src/LicenseManager.cpp
+[ PASS ] Hash lock third_party/askp-engine-v0.5.19/src/LicenseManager.h
+[ PASS ] Hash lock third_party/askp-engine-v0.5.19/src/LicensePublicKey.h
+[ PASS ] Hash lock live/LicenseCheckoutClient.cpp
+[ PASS ] Hash lock live/LiveLicensePanel.cpp

@@ -1,0 +1,4 @@
+profiles=13 multirate/material finite=yes worstPeak=0.887078583
+rock preservation correlation=0.999999993 levelDelta=+0.0008 dB
+dark-lift articulated focused/neutral residual=-69.657 dB
+V0519_PRESET_PROFILE_AUDIT=PASS

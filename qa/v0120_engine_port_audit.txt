@@ -1,0 +1,33 @@
+Sonkupik Live v0.12.0 enhancer engine port audit
+Checks : 28
+Passed : 28
+Failed : 0
+
+[ PASS ] Version 0.12.0
+[ PASS ] Embedded engine revision
+[ PASS ] 13 factory profiles
+[ PASS ] Single immutable Signature DSP
+[ PASS ] Live processor headless
+[ PASS ] Live control glide 12 ms
+[ PASS ] Reference control glide 80 ms
+[ PASS ] Only intended processor delta
+[ PASS ] Engine bridge owns APVTS boundary
+[ PASS ] Live audio uses bridge
+[ PASS ] Gain Match disabled by default
+[ PASS ] No external ASK-P checkout dependency
+[ PASS ] Hash-locked configure
+[ PASS ] Local visualizer source
+[ PASS ] Approved sphere has no new delayed-frame regression
+[ PASS ] Single local black bezel
+[ PASS ] No configure-time visual source patch
+[ PASS ] No VST editor/QRIS source in target
+[ PASS ] Build package version
+[ PASS ] Engine source hash
+[ PASS ] Preset source hash
+[ PASS ] Live processor hash
+[ PASS ] Sphere source hash
+[ PASS ] Adaptive generated scene lanes
+[ PASS ] P7G floor-only gain policy
+[ PASS ] Final limiter policy retained
+[ PASS ] Cold-start crackle guard retained
+[ PASS ] Callback has no user-preset file IO

@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.22)
 
-project(SonkupikLive VERSION 0.11.0 LANGUAGES C CXX)
+project(SonkupikLive VERSION 0.13.0 LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -11,227 +11,73 @@ if(MSVC)
 endif()
 
 # ---------------------------------------------------------------------------
-# Authoritative ArSonKuPik DSP and preset source
+# Embedded ArSonKuPik Signature Engine v0.5.19
 # ---------------------------------------------------------------------------
-# Sonkupik Live intentionally does not maintain a divergent copy of the Smart
-# Enhancer recipe. Point this at the private askp-vst checkout so the Live app
-# compiles the same engine and the same 40-preset bank as the audited VST.
-set(SONKUPIK_ASKP_SOURCE_DIR "" CACHE PATH
-    "Path to the authoritative masarray/askp-vst source checkout")
-set(SONKUPIK_AUDITED_ASKP_COMMIT
-    "655874dee6ee69df7212b8073ab941f9607d8faa" CACHE STRING
-    "askp-vst commit audited for Sonkupik Live v0.11.0")
+# v0.12.0 no longer reads DSP or visualizer source from a neighbouring checkout.
+# The reviewed engine is vendored and hash-locked, making clean builds fully
+# deterministic. The Sonkupik sphere remains a separate, locally versioned UI.
+set(ASKP_PORT_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/third_party/askp-engine-v0.5.19")
+set(ASKP_ENGINE_DIR "${ASKP_PORT_ROOT}/engine")
+set(ASKP_PROCESSOR_DIR "${ASKP_PORT_ROOT}/src")
+set(ASKP_REFERENCE_DIR "${ASKP_PORT_ROOT}/reference")
+set(SONKUPIK_SPHERE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/third_party/sonkupik-sphere-v0.10.4")
 
-set(_askp_engine_dir "")
-set(_askp_asset_dir "")
-set(_askp_font_dir "")
-set(_askp_src_dir "")
-set(_askp_source_identity "not configured")
+set(ASKP_DSP_SOURCE "${ASKP_ENGINE_DIR}/arsonkupik_dsp.cpp")
+set(ASKP_PRESET_SOURCE "${ASKP_ENGINE_DIR}/arsonkupik_presets.cpp")
+set(ASKP_LIVE_PROCESSOR_SOURCE "${ASKP_PROCESSOR_DIR}/PluginProcessor.cpp")
+set(ASKP_REFERENCE_PROCESSOR_SOURCE "${ASKP_REFERENCE_DIR}/PluginProcessor.cpp")
+set(ASKP_LICENSE_SOURCE "${ASKP_PROCESSOR_DIR}/LicenseManager.cpp")
+set(SONKUPIK_LOOK_AND_FEEL_SOURCE "${SONKUPIK_SPHERE_DIR}/AskpLookAndFeel.cpp")
+set(SONKUPIK_ORB_SOURCE "${SONKUPIK_SPHERE_DIR}/OrbVisualizer.cpp")
 
-if(SONKUPIK_ASKP_SOURCE_DIR)
-    cmake_path(ABSOLUTE_PATH SONKUPIK_ASKP_SOURCE_DIR
-               BASE_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
-               NORMALIZE OUTPUT_VARIABLE _askp_root)
-    if(EXISTS "${_askp_root}/engine/arsonkupik_dsp.cpp"
-       AND EXISTS "${_askp_root}/engine/arsonkupik_dsp.hpp"
-       AND EXISTS "${_askp_root}/engine/arsonkupik_presets.cpp")
-        set(_askp_engine_dir "${_askp_root}/engine")
-        set(_askp_asset_dir "${_askp_root}/assets/ui")
-        set(_askp_font_dir "${_askp_root}/assets/fonts")
-        set(_askp_src_dir "${_askp_root}/src")
-        set(_askp_source_identity "${_askp_root}")
-
-        find_package(Git QUIET)
-        if(Git_FOUND AND EXISTS "${_askp_root}/.git")
-            execute_process(
-                COMMAND "${GIT_EXECUTABLE}" -C "${_askp_root}" rev-parse HEAD
-                OUTPUT_VARIABLE _askp_commit
-                OUTPUT_STRIP_TRAILING_WHITESPACE
-                ERROR_QUIET)
-            if(_askp_commit)
-                set(_askp_source_identity "${_askp_root} @ ${_askp_commit}")
-                if(NOT _askp_commit STREQUAL SONKUPIK_AUDITED_ASKP_COMMIT)
-                    message(WARNING
-                        "askp-vst commit ${_askp_commit} differs from the audited v0.11.0 lock "
-                        "${SONKUPIK_AUDITED_ASKP_COMMIT}. The newer source will be used, but rerun QA.")
-                endif()
-            endif()
-        endif()
-    else()
+function(sonkupik_assert_sha256 file_path expected_sha)
+    if(NOT EXISTS "${file_path}")
+        message(FATAL_ERROR "Required embedded authority file is missing: ${file_path}")
+    endif()
+    file(SHA256 "${file_path}" actual_sha)
+    if(NOT actual_sha STREQUAL expected_sha)
         message(FATAL_ERROR
-            "SONKUPIK_ASKP_SOURCE_DIR does not contain the authoritative engine files: "
-            "${SONKUPIK_ASKP_SOURCE_DIR}")
+            "Embedded authority hash mismatch for ${file_path}\n"
+            "Expected: ${expected_sha}\nActual:   ${actual_sha}\n"
+            "Re-port and rerun QA instead of building an unreviewed engine.")
     endif()
+endfunction()
+
+sonkupik_assert_sha256("${ASKP_DSP_SOURCE}"
+    "d716a086dfcba06332871405f85058304be7f96bc356e8aa755fcc5300f79df2")
+sonkupik_assert_sha256("${ASKP_ENGINE_DIR}/arsonkupik_dsp.hpp"
+    "fbfe14be0ea8e7254341c85cc03f96cea8cf96c247c2fbb5b310cb88f02d62c2")
+sonkupik_assert_sha256("${ASKP_PRESET_SOURCE}"
+    "948ecf3bc7520413d1ea7a7b42cfca44291bbbf1ecb12c74aaeaca58a746910f")
+sonkupik_assert_sha256("${ASKP_LIVE_PROCESSOR_SOURCE}"
+    "3b8a31b753449386febf4d28478b1023e0ec10ec9b64ac0d1aff4215b84493ed")
+sonkupik_assert_sha256("${ASKP_PROCESSOR_DIR}/PluginProcessor.h"
+    "e2b5fef5a34330a8e26c437aed82aef97ba3703115de5094edd7142fbdd7fc6e")
+sonkupik_assert_sha256("${ASKP_LICENSE_SOURCE}"
+    "5e052cf06d65692cac1e03765e5e037a38bc2e4fa3b211b89ccbef658a342228")
+sonkupik_assert_sha256("${ASKP_PROCESSOR_DIR}/LicenseManager.h"
+    "dc6832ad9ccdb566f45dadb4ca36ec744845d212714f696389ae2b41207e3755")
+sonkupik_assert_sha256("${ASKP_PROCESSOR_DIR}/LicensePublicKey.h"
+    "8fa4238d321dbdeb00b5408a10365cbc8110cd28006aa2ccd526c90f2e5ca372")
+sonkupik_assert_sha256("${CMAKE_CURRENT_SOURCE_DIR}/live/LicenseCheckoutClient.cpp"
+    "eae7ce93266eca6fb3b7a3ce3e4149e1b69eff93076ae9cbb12ea8ee67af2b38")
+sonkupik_assert_sha256("${CMAKE_CURRENT_SOURCE_DIR}/live/LiveLicensePanel.cpp"
+    "3d34980d62f4b5bb8a90e3a91fbc6b64f281eda47b553da87360d80789ae3140")
+sonkupik_assert_sha256("${SONKUPIK_ORB_SOURCE}"
+    "f5ed2351fb9d22dfbc520b56c86e19091632c516d174cc83983d708d4eda7a04")
+
+file(READ "${ASKP_ENGINE_DIR}/arsonkupik_dsp.hpp" _askp_header)
+if(NOT _askp_header MATCHES "ASKP_DSP_HEADER_REVISION 2026072702")
+    message(FATAL_ERROR "Expected ArSonKuPik engine revision 2026072702 was not found")
 endif()
-
-if(NOT _askp_engine_dir)
-    message(FATAL_ERROR
-        "Authoritative askp-vst source is required. Pass "
-        "-DSONKUPIK_ASKP_SOURCE_DIR=D:/Git/askp-vst or run "
-        "scripts/sync-askp-authority.ps1 first.")
+file(READ "${ASKP_PRESET_SOURCE}" _askp_presets)
+if(NOT _askp_presets MATCHES "profiles.reserve\\(13\\)")
+    message(FATAL_ERROR "Expected the reviewed 13-profile v0.5.19 platform")
 endif()
+message(STATUS "Sonkupik Live enhancer authority: embedded ArSonKuPik v0.5.19 / revision 2026072702")
+message(STATUS "Sonkupik Live sphere authority: local approved v0.10.4 visual baseline")
 
-set(ASKP_DSP_SOURCE "${_askp_engine_dir}/arsonkupik_dsp.cpp")
-set(ASKP_PRESET_SOURCE "${_askp_engine_dir}/arsonkupik_presets.cpp")
-set(ASKP_PROCESSOR_SOURCE "${_askp_src_dir}/PluginProcessor.cpp")
-set(ASKP_PROCESSOR_HEADER "${_askp_src_dir}/PluginProcessor.h")
-set(ASKP_LICENSE_SOURCE "${_askp_src_dir}/LicenseManager.cpp")
-set(ASKP_LOOK_AND_FEEL_SOURCE "${_askp_src_dir}/AskpLookAndFeel.cpp")
-set(ASKP_ORB_SOURCE "${_askp_src_dir}/OrbVisualizer.cpp")
-set(ASKP_ORB_HEADER "${_askp_src_dir}/OrbVisualizer.h")
-
-# ---------------------------------------------------------------------------
-# Live-control response overlay
-# ---------------------------------------------------------------------------
-# The authoritative VST intentionally uses an 80 ms macro glide, which is ideal
-# for host automation but feels detached under continuous mouse control in a
-# live rack. Sonkupik Live keeps the exact processor/engine/preset source and
-# applies one auditable source overlay at configure time: creative macro glide
-# becomes 12 ms. Settled values, preset transitions, WOW policy, limiter,
-# coefficient-retune ceiling and DSP recipes remain byte-for-byte authoritative.
-set(SONKUPIK_LIVE_CONTROL_RAMP_SECONDS "0.012" CACHE STRING
-    "Creative macro smoothing time used only by Sonkupik Live")
-set(_askp_live_processor_dir "${CMAKE_CURRENT_BINARY_DIR}/generated/askp-live")
-file(MAKE_DIRECTORY "${_askp_live_processor_dir}")
-
-# Sonkupik Live embeds only the audio processor, not the VST editor. This is
-# deliberate: PluginEditor pulls activation/QRIS/update UI dependencies that
-# are irrelevant to the standalone live rack and caused unresolved symbols
-# when the private askp-vst editor gained QrisLicensePanel.
-file(READ "${ASKP_PROCESSOR_HEADER}" _askp_processor_header_text)
-set(_askp_has_editor_anchor "bool hasEditor() const override { return true; }")
-string(FIND "${_askp_processor_header_text}" "${_askp_has_editor_anchor}" _askp_has_editor_pos)
-if(_askp_has_editor_pos EQUAL -1)
-    message(FATAL_ERROR
-        "Unable to generate the headless Sonkupik processor header. "
-        "The audited hasEditor() anchor was not found in ${ASKP_PROCESSOR_HEADER}.")
-endif()
-string(REPLACE
-    "${_askp_has_editor_anchor}"
-    "bool hasEditor() const override { return false; }"
-    _askp_live_processor_header_text
-    "${_askp_processor_header_text}")
-set(ASKP_LIVE_PROCESSOR_HEADER "${_askp_live_processor_dir}/PluginProcessor.h")
-file(WRITE "${ASKP_LIVE_PROCESSOR_HEADER}" "${_askp_live_processor_header_text}")
-# OrbVisualizer.h includes PluginProcessor.h with quote lookup. Copying it next
-# to the generated header ensures every translation unit sees the same headless
-# Processor class definition rather than falling back to the original VST header.
-configure_file("${ASKP_ORB_HEADER}"
-               "${_askp_live_processor_dir}/OrbVisualizer.h" COPYONLY)
-
-file(READ "${ASKP_PROCESSOR_SOURCE}" _askp_processor_text)
-set(_askp_editor_include_anchor "#include \"PluginEditor.h\"")
-string(FIND "${_askp_processor_text}" "${_askp_editor_include_anchor}" _askp_editor_include_pos)
-if(_askp_editor_include_pos EQUAL -1)
-    message(FATAL_ERROR
-        "Unable to generate the headless Sonkupik processor. "
-        "PluginEditor include anchor was not found in ${ASKP_PROCESSOR_SOURCE}.")
-endif()
-string(REPLACE
-    "${_askp_editor_include_anchor}"
-    "// Sonkupik Live headless processor: VST editor intentionally omitted."
-    _askp_headless_processor_text
-    "${_askp_processor_text}")
-
-set(_askp_create_editor_anchor
-"juce::AudioProcessorEditor* Processor::createEditor()
-{
-    return new Editor(*this);
-}")
-string(FIND "${_askp_headless_processor_text}" "${_askp_create_editor_anchor}" _askp_create_editor_pos)
-if(_askp_create_editor_pos EQUAL -1)
-    message(FATAL_ERROR
-        "Unable to generate the headless Sonkupik processor. "
-        "createEditor() anchor was not found in ${ASKP_PROCESSOR_SOURCE}.")
-endif()
-string(REPLACE
-    "${_askp_create_editor_anchor}"
-"juce::AudioProcessorEditor* Processor::createEditor()
-{
-    return nullptr;
-}"
-    _askp_headless_processor_text
-    "${_askp_headless_processor_text}")
-
-# P2 reference renderer uses the authoritative 80 ms audio processor but the
-# same headless editor policy. Editor removal has no effect on rendered audio.
-set(ASKP_REFERENCE_PROCESSOR_SOURCE
-    "${_askp_live_processor_dir}/PluginProcessor_Reference.cpp")
-file(WRITE "${ASKP_REFERENCE_PROCESSOR_SOURCE}" "${_askp_headless_processor_text}")
-
-set(_askp_ramp_anchor "const double ramp = 0.08; // 80 ms knob glide")
-string(FIND "${_askp_headless_processor_text}" "${_askp_ramp_anchor}" _askp_ramp_anchor_pos)
-if(_askp_ramp_anchor_pos EQUAL -1)
-    message(FATAL_ERROR
-        "Unable to apply the Sonkupik Live fast-control overlay. "
-        "The audited 80 ms ramp anchor was not found in ${ASKP_PROCESSOR_SOURCE}. "
-        "Synchronise askp-vst or re-audit the newer processor before building.")
-endif()
-string(REPLACE
-    "${_askp_ramp_anchor}"
-    "const double ramp = ${SONKUPIK_LIVE_CONTROL_RAMP_SECONDS}; // Sonkupik Live low-latency macro glide"
-    _askp_live_processor_text
-    "${_askp_headless_processor_text}")
-set(ASKP_LIVE_PROCESSOR_SOURCE "${_askp_live_processor_dir}/PluginProcessor_Live.cpp")
-file(WRITE "${ASKP_LIVE_PROCESSOR_SOURCE}" "${_askp_live_processor_text}")
-message(STATUS
-    "Sonkupik Live processor: headless/no VST editor; creative-control glide "
-    "${SONKUPIK_LIVE_CONTROL_RAMP_SECONDS} s (VST authority: 0.080 s)")
-
-
-# Visual-only sphere bezel overlay
-# Sonkupik Live keeps the authoritative orb motion/behavior, but swaps the
-# static silver outer rim for a metallic black rim so the sphere matches the
-# dark premium rack UX. Only the static bezel colours are changed.
-set(_askp_live_orb_dir "${CMAKE_CURRENT_BINARY_DIR}/generated/askp-live")
-file(READ "${ASKP_ORB_SOURCE}" _askp_orb_text)
-set(_askp_orb_anchor "juce::ColourGradient rim(juce::Colour(0xFFF8F8FA), centre.x - R * 0.30f, centre.y - R,")
-string(FIND "${_askp_orb_text}" "${_askp_orb_anchor}" _askp_orb_anchor_pos)
-if(_askp_orb_anchor_pos EQUAL -1)
-    message(FATAL_ERROR
-        "Unable to apply the Sonkupik Live black-bezel visual overlay. "
-        "The audited rim anchor was not found in ${ASKP_ORB_SOURCE}.")
-endif()
-string(REPLACE
-    "juce::ColourGradient rim(juce::Colour(0xFFF8F8FA), centre.x - R * 0.30f, centre.y - R,
-                             juce::Colour(0xFF83858D), centre.x + R * 0.36f, centre.y + R, false);
-    rim.addColour(0.34, juce::Colour(0xFFDCDDE3));
-    rim.addColour(0.70, juce::Colour(0xFF63656E));"
-    "juce::ColourGradient rim(juce::Colour(0xFF2B3948), centre.x - R * 0.30f, centre.y - R,
-                             juce::Colour(0xFF070D15), centre.x + R * 0.36f, centre.y + R, false);
-    rim.addColour(0.20, juce::Colour(0xFF223142));
-    rim.addColour(0.46, juce::Colour(0xFF111B27));
-    rim.addColour(0.78, juce::Colour(0xFF0A1018));"
-    _askp_live_orb_text
-    "${_askp_orb_text}")
-set(ASKP_LIVE_ORB_SOURCE "${_askp_live_orb_dir}/OrbVisualizer_Live.cpp")
-file(WRITE "${ASKP_LIVE_ORB_SOURCE}" "${_askp_live_orb_text}")
-message(STATUS "Sonkupik Live sphere bezel: metallic black overlay applied")
-
-foreach(_authority_file IN ITEMS
-        "${ASKP_PROCESSOR_SOURCE}" "${ASKP_PROCESSOR_HEADER}" "${ASKP_LICENSE_SOURCE}"
-        "${ASKP_LOOK_AND_FEEL_SOURCE}" "${ASKP_ORB_SOURCE}" "${ASKP_ORB_HEADER}")
-    if(NOT EXISTS "${_authority_file}")
-        message(FATAL_ERROR "The authoritative askp-vst checkout is missing ${_authority_file}")
-    endif()
-endforeach()
-set(ASKP_FONT_REGULAR "${_askp_font_dir}/plus_jakarta_sans_regular.ttf")
-set(ASKP_FONT_SEMIBOLD "${_askp_font_dir}/plus_jakarta_sans_semibold.ttf")
-if(NOT EXISTS "${ASKP_FONT_REGULAR}" OR NOT EXISTS "${ASKP_FONT_SEMIBOLD}")
-    message(FATAL_ERROR
-        "The authoritative askp-vst checkout is missing Plus Jakarta Sans assets.")
-endif()
-
-set(ASKP_SPHERE_GLOSS "${CMAKE_CURRENT_SOURCE_DIR}/assets/ui/askp_sphere_gloss.png")
-if(_askp_asset_dir AND EXISTS "${_askp_asset_dir}/askp_sphere_gloss.png")
-    set(ASKP_SPHERE_GLOSS "${_askp_asset_dir}/askp_sphere_gloss.png")
-endif()
-message(STATUS "Sonkupik Live Smart Enhancer authority: ${_askp_source_identity}")
-message(STATUS "Sonkupik Live visual gloss authority: ${ASKP_SPHERE_GLOSS}")
-
-# Match the audited v0.5.13/v0.5.14 performance release: relaxed contraction
-# is confined to the DSP translation unit. UI, denoise, metering and routing keep
-# normal compiler semantics.
+# Relaxed contraction stays confined to the DSP translation unit.
 set_property(SOURCE "${ASKP_DSP_SOURCE}" APPEND PROPERTY COMPILE_OPTIONS
     "$<$<AND:$<CONFIG:Release>,$<CXX_COMPILER_ID:MSVC>>:/fp:fast>"
     "$<$<AND:$<CONFIG:Release>,$<NOT:$<CXX_COMPILER_ID:MSVC>>>:-fno-math-errno>"
@@ -263,16 +109,16 @@ endif()
 # ---------------------------------------------------------------------------
 juce_add_binary_data(SonkupikLiveAssets
     SOURCES
-        "${ASKP_SPHERE_GLOSS}"
-        "${_askp_asset_dir}/askp_faceplate_brushed.png"
-        "${_askp_asset_dir}/askp_chassis_grain.png"
+        assets/ui/askp_sphere_gloss.png
+        assets/ui/askp_faceplate_brushed.png
+        assets/ui/askp_chassis_grain.png
         assets/ui/askp_app_logo.png
         assets/ui/askp_header_logo.png
         assets/ui/askp_header_icon.png
         assets/ui/favicon-96x96.png
         assets/ui/favicon-512x512.png
-        "${ASKP_FONT_REGULAR}"
-        "${ASKP_FONT_SEMIBOLD}"
+        assets/fonts/plus_jakarta_sans_regular.ttf
+        assets/fonts/plus_jakarta_sans_semibold.ttf
         assets/icons/activity.svg
         assets/icons/audio-waveform.svg
         assets/icons/chevron-down.svg
@@ -300,7 +146,7 @@ juce_add_binary_data(SonkupikLiveAssets
 )
 
 # ---------------------------------------------------------------------------
-# Sonkupik Live - lightweight live-streaming audio rack
+# Sonkupik Live
 # ---------------------------------------------------------------------------
 juce_add_gui_app(SonkupikLive
     PRODUCT_NAME "Sonkupik Live"
@@ -315,22 +161,25 @@ target_sources(SonkupikLive PRIVATE
     "${ASKP_PRESET_SOURCE}"
     "${ASKP_LIVE_PROCESSOR_SOURCE}"
     "${ASKP_LICENSE_SOURCE}"
-    "${ASKP_LOOK_AND_FEEL_SOURCE}"
-    "${ASKP_LIVE_ORB_SOURCE}"
+    "${SONKUPIK_LOOK_AND_FEEL_SOURCE}"
+    "${SONKUPIK_ORB_SOURCE}"
+    live/EnhancerEngineBridge.cpp
+    live/LicenseCheckoutClient.cpp
+    live/LiveLicensePanel.cpp
     live/MusicalNoiseClean.cpp
     live/LiveAudioEngine.cpp
     live/LiveTheme.cpp
     live/LiveIcons.cpp
     live/LiveWidgets.cpp
-    live/AquariumVisualizer.cpp
+    live/SonkupikSphereVisualizer.cpp
     live/LiveMainComponent.cpp
     live/LiveApplication.cpp
 )
 
 target_include_directories(SonkupikLive PRIVATE
-    "${_askp_live_processor_dir}"
-    "${_askp_engine_dir}"
-    "${_askp_src_dir}"
+    "${ASKP_PROCESSOR_DIR}"
+    "${ASKP_ENGINE_DIR}"
+    "${SONKUPIK_SPHERE_DIR}"
     live
 )
 
@@ -348,11 +197,14 @@ target_compile_definitions(SonkupikLive PRIVATE
     JucePlugin_ProducesMidiOutput=0
     JucePlugin_IsMidiEffect=0
     JucePlugin_EditorRequiresKeyboardFocus=0
-    JucePlugin_Version=0.5.14
-    JucePlugin_VersionCode=0x50E
-    JucePlugin_VersionString="0.5.14"
-    ASKP_BUILD_CHANNEL="Sonkupik Live Embedded Authority"
-    SONKUPIK_AUDITED_ASKP_COMMIT="${SONKUPIK_AUDITED_ASKP_COMMIT}"
+    JucePlugin_Version=0.5.19
+    JucePlugin_VersionCode=0x513
+    JucePlugin_VersionString="0.5.19"
+    ASKP_BUILD_CHANNEL="Sonkupik Live Embedded Engine v0.5.20"
+    SONKUPIK_ENGINE_REVISION=2026072702
+    SONKUPIK_LICENSE_API_URL="https://masarray-license-api.masari.workers.dev"
+    SONKUPIK_LICENSE_PRODUCT_ID="sonkupik-live"
+    SONKUPIK_LICENSE_PRICE_IDR=249000
 )
 
 target_link_libraries(SonkupikLive PRIVATE
@@ -368,62 +220,41 @@ target_link_libraries(SonkupikLive PRIVATE
     juce::juce_recommended_warning_flags
 )
 
-# The authoritative ArSonKuPik audio processor is embedded headlessly. PluginEditor,
-# QrisLicensePanel and UpdateChecker are deliberately excluded: they do not participate
-# in DSP or preset parity and only add VST-specific UI dependencies. The authoritative
-# ScopeTap/OrbVisualizer remain active. External VST hosting stays disabled until crash
-# isolation is ready.
-
 # ---------------------------------------------------------------------------
-# Optional P2 preset-by-preset parity renderers
+# Optional preset-by-preset parity renderers
 # ---------------------------------------------------------------------------
-# These targets are OFF by default because each intentionally compiles a full
-# independent Processor image. Keeping reference/live in separate executables
-# avoids ODR collisions and permits bit-exact comparison of all factory presets.
 option(SONKUPIK_BUILD_PARITY_QA
-    "Build authoritative VST and Sonkupik Live offline parity renderers" OFF)
+    "Build v0.5.19 reference and Sonkupik Live offline parity renderers" OFF)
 
 if(SONKUPIK_BUILD_PARITY_QA)
-    function(sonkupik_add_parity_renderer target_name product_name processor_source variant_name)
+    function(sonkupik_add_parity_renderer target_name product_name processor_source processor_include variant_name)
         juce_add_console_app(${target_name} PRODUCT_NAME "${product_name}")
-
         target_sources(${target_name} PRIVATE
             qa/ParityRendererMain.cpp
             "${ASKP_DSP_SOURCE}"
             "${ASKP_PRESET_SOURCE}"
             "${processor_source}"
             "${ASKP_LICENSE_SOURCE}"
-            "${ASKP_LOOK_AND_FEEL_SOURCE}"
-            "${ASKP_LIVE_ORB_SOURCE}"
         )
-
         target_include_directories(${target_name} PRIVATE
-            "${_askp_live_processor_dir}"
-            "${_askp_engine_dir}"
-            "${_askp_src_dir}"
+            "${processor_include}"
+            "${ASKP_PROCESSOR_DIR}"
+            "${ASKP_ENGINE_DIR}"
         )
-
         target_compile_definitions(${target_name} PRIVATE
-            JUCE_WEB_BROWSER=0
-            JUCE_USE_CURL=0
-            JUCE_MODAL_LOOPS_PERMITTED=1
-            JUCE_STANDALONE_APPLICATION=0
-            JucePlugin_Build_Standalone=0
+            JUCE_WEB_BROWSER=0 JUCE_USE_CURL=0 JUCE_MODAL_LOOPS_PERMITTED=1
+            JUCE_STANDALONE_APPLICATION=0 JucePlugin_Build_Standalone=0
             JucePlugin_Name="ArSonKuPik"
             JucePlugin_ManufacturerCode=0x4d734172
             JucePlugin_PluginCode=0x416b5673
-            JucePlugin_IsSynth=0
-            JucePlugin_WantsMidiInput=0
-            JucePlugin_ProducesMidiOutput=0
-            JucePlugin_IsMidiEffect=0
+            JucePlugin_IsSynth=0 JucePlugin_WantsMidiInput=0
+            JucePlugin_ProducesMidiOutput=0 JucePlugin_IsMidiEffect=0
             JucePlugin_EditorRequiresKeyboardFocus=0
-            JucePlugin_Version=0.5.14
-            JucePlugin_VersionCode=0x50E
-            JucePlugin_VersionString="0.5.14"
-            ASKP_BUILD_CHANNEL="Sonkupik Live P2 Parity"
+            JucePlugin_Version=0.5.19 JucePlugin_VersionCode=0x513
+            JucePlugin_VersionString="0.5.19"
+            ASKP_BUILD_CHANNEL="Sonkupik Live v0.5.19 Parity"
             SONKUPIK_PARITY_VARIANT="${variant_name}"
         )
-
         target_link_libraries(${target_name} PRIVATE
             SonkupikLiveAssets
             juce::juce_audio_utils
@@ -440,13 +271,15 @@ if(SONKUPIK_BUILD_PARITY_QA)
 
     sonkupik_add_parity_renderer(
         SonkupikParityReference
-        "Sonkupik P2 Reference Renderer"
+        "Sonkupik v0.5.19 Reference Renderer"
         "${ASKP_REFERENCE_PROCESSOR_SOURCE}"
-        "askp-vst-authority-headless")
+        "${ASKP_REFERENCE_DIR}"
+        "askp-v0.5.19-headless-80ms")
 
     sonkupik_add_parity_renderer(
         SonkupikParityLive
-        "Sonkupik P2 Live Renderer"
+        "Sonkupik v0.5.19 Live Renderer"
         "${ASKP_LIVE_PROCESSOR_SOURCE}"
-        "sonkupik-live")
+        "${ASKP_PROCESSOR_DIR}"
+        "sonkupik-live-12ms")
 endif()

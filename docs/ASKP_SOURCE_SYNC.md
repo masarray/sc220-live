@@ -1,51 +1,19 @@
-# Authoritative Smart Enhancer source
+# ASK-P authority migration note
 
-Sonkupik Live v0.8.0 intentionally refuses to build with its old vendored Smart
-Enhancer snapshot. The approved engine and all 40 presets come directly from the
-private ArSonKuPik VST repository.
+This document is retained at its historical path because older releases linked to it.
 
-## Preferred repository layout
+Starting with **Sonkupik Live v0.12.0**, the mature ArSonKuPik Signature Engine v0.5.19 is vendored and hash-locked under:
 
 ```text
-D:\Git\askp-vst
-D:\Git\sonkupik-live
+third_party/askp-engine-v0.5.19/
 ```
 
-Then run:
+A sibling `askp-vst` checkout, `ASKP_SOURCE_DIR`, `-AskpSourceDir`, and `sync-askp-authority.ps1` are no longer used. This makes clean builds deterministic and prevents the Live sphere visualizer from changing when a separate ASK-P repository changes.
 
-```powershell
-.\scripts\build-live-windows.ps1 -Clean
+The approved Sonkupik sphere is independently owned by this repository under:
+
+```text
+third_party/sonkupik-sphere-v0.10.4/
 ```
 
-The build script detects the sibling repository automatically. When no authority
-checkout is found, it also runs the locked sync automatically and creates
-`.deps\askp-vst`; Git Credential Manager may request authentication.
-
-## Explicit path
-
-```powershell
-.\scripts\build-live-windows.ps1 `
-  -AskpSourceDir D:\Git\askp-vst `
-  -Clean
-```
-
-## Locked checkout under this project
-
-```powershell
-.\scripts\sync-askp-authority.ps1
-.\scripts\build-live-windows.ps1 -Clean
-```
-
-The sync command checks out the exact commit recorded in `ASKP_AUTHORITY.lock`
-under `.deps\askp-vst`. Git Credential Manager may request authentication because
-the repository is private.
-
-A newer `askp-vst` checkout may compile, but CMake prints a warning because its
-sound and performance have not yet been frozen by the v0.8.0 QA lock.
-
-
-## Font authority
-
-Plus Jakarta Sans binaries are not duplicated in the Sonkupik Live delivery. CMake
-embeds the Regular and SemiBold files directly from the authenticated `askp-vst`
-checkout, alongside the exact DSP, presets and sphere gloss authority.
+Future engine upgrades must update `ASKP_AUTHORITY.lock`, the CMake SHA-256 gates, the bridge audit, and the preset/profile runtime audits together.

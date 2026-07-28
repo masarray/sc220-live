@@ -20,3 +20,13 @@ Sonkupik Live uses JUCE 8.0.14. The applicable JUCE licence must be satisfied fo
 intended distribution model. The repository's existing GPL direction must remain
 compatible with the selected JUCE licensing path.
 
+
+## ArSonKuPik Signature Engine v0.5.19
+
+The embedded enhancer engine is proprietary source supplied by and owned by
+Tutorial Mas Ari / MasArray. Its source licence notice is stored at
+`third_party/askp-engine-v0.5.19/LICENSE.txt`.
+
+Sonkupik Live v0.12.0 embeds only the DSP, profile bank, headless processor and
+licensing foundation required by the standalone application. The VST editor,
+QRIS checkout UI and updater are not included in this milestone.

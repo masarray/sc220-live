@@ -171,10 +171,6 @@ private:
     std::atomic<float> gainReductionDb { 0.0f };
 
     double sampleRate = 48000.0;
-    float detectorAttackCoefficient = 0.0f;
-    float detectorReleaseCoefficient = 0.0f;
-    float gainOpenCoefficient = 0.0f;
-    float gainCloseCoefficient = 0.0f;
     float detectorEnvelope = 0.0f;
     float gainDbState = 0.0f;
     int holdSamplesRemaining = 0;

@@ -520,47 +520,59 @@ void CompactRackRow::paint (juce::Graphics& g)
     const float hover = juce::jlimit (0.0f, 1.0f, hoverMix + (hovered ? 0.08f : 0.0f));
     const float press = juce::jlimit (0.0f, 1.0f, pressMix);
 
-    juce::ColourGradient surface (selectedState ? colours::panelHi.brighter (0.030f + hover * 0.010f)
-                                                : colours::panelLo.brighter (hover * 0.018f),
+    juce::ColourGradient surface (selectedState ? colours::panelHi.brighter (0.035f + hover * 0.012f)
+                                                : colours::panelLo.brighter (hover * 0.025f),
                                   bounds.getX(), bounds.getY(),
-                                  colours::panelLo.darker (0.035f), bounds.getRight(), bounds.getBottom(), false);
+                                  colours::panelLo.darker (0.045f - hover * 0.01f), bounds.getRight(), bounds.getBottom(), false);
     g.setGradientFill (surface);
     g.fillRoundedRectangle (bounds, 8.0f);
-    g.setColour (juce::Colours::black.withAlpha (0.08f + press * 0.04f));
+
+    g.setColour (juce::Colours::black.withAlpha (0.10f + press * 0.05f));
     g.drawRoundedRectangle (bounds.reduced (1.5f), 7.0f, 1.0f);
-    g.setColour (selectedState ? colours::cyan.withAlpha (0.34f + hover * 0.12f)
-                               : colours::borderSoft.withAlpha (0.82f + hover * 0.12f));
+    g.setColour (selectedState ? colours::cyan.withAlpha (0.34f + hover * 0.16f)
+                               : colours::borderSoft.withAlpha (0.78f + hover * 0.16f));
     g.drawRoundedRectangle (bounds, 8.0f, 1.0f);
+    g.setColour (juce::Colours::white.withAlpha (0.016f + hover * 0.018f));
+    g.fillRoundedRectangle (juce::Rectangle<float> (bounds.getX() + 12.0f, bounds.getY() + 1.5f,
+                                                    juce::jmax (0.0f, bounds.getWidth() - 24.0f), 1.3f), 1.0f);
 
     const auto railColour = openOnlyState ? colours::violet
                            : lockedState ? colours::green
                            : active ? colours::cyan : colours::textMuted;
-    g.setColour (railColour.withAlpha (0.52f + hover * 0.28f));
+    g.setColour (railColour.withAlpha (0.48f + hover * 0.34f));
     g.fillRoundedRectangle (juce::Rectangle<float> (bounds.getX() + 1.0f, bounds.getY() + 8.0f,
                                                     2.0f, bounds.getHeight() - 16.0f), 1.0f);
 
     auto& lf = static_cast<LiveLookAndFeel&> (getLookAndFeel());
-    g.setFont (lf.jakarta (8.2f, true));
-    g.setColour ((selectedState ? colours::cyan : colours::textMuted).withAlpha (bypassed ? 0.42f : 0.70f));
-    g.drawText (juce::String (rowIndex).paddedLeft ('0', 2), 7, 4, 24, 18,
-                juce::Justification::centredLeft, false);
+    g.setFont (lf.jakarta (8.8f, true));
+    g.setColour ((selectedState ? colours::cyan : colours::textMuted).withAlpha (bypassed ? 0.42f : 0.72f));
+    g.drawText (juce::String (rowIndex).paddedLeft ('0', 2), 8, 0, 22, getHeight(),
+                juce::Justification::centred, false);
 
-    const int actionLeft = actionButton != nullptr ? actionButton->getX() : getWidth() - 40;
-    auto nameArea = juce::Rectangle<int> (34, 5, juce::jmax (0, actionLeft - 39), 23);
-    g.setColour ((selectedState ? colours::cyan : colours::text).withAlpha (bypassed ? 0.46f : 0.96f));
-    g.setFont (lf.jakarta (10.5f, true));
-    g.drawFittedText (moduleName, nameArea, juce::Justification::centredLeft, 1, 0.82f);
+    auto iconArea = juce::Rectangle<float> (34.0f, 12.0f, 20.0f, bounds.getHeight() - 24.0f);
+    if (moduleIcon != nullptr)
+        moduleIcon->drawWithin (g, iconArea, juce::RectanglePlacement::centred,
+                                bypassed ? 0.34f : 0.82f + hover * 0.10f);
 
-    const juce::String status = openOnlyState ? "ADD SLOT"
+    g.setColour ((selectedState ? colours::cyan : colours::text).withAlpha (bypassed ? 0.44f : 0.94f));
+    g.setFont (lf.jakarta (10.8f, true));
+    g.drawFittedText (moduleName, 64, 0, juce::jmax (0, getWidth() - 136), getHeight(),
+                      juce::Justification::centredLeft, 1);
+
+    const juce::String status = openOnlyState ? "ADD"
                                : lockedState ? "SAFE"
-                               : bypassed ? "BYPASSED" : "ACTIVE";
+                               : bypassed ? "BYPASS" : "ON";
     const auto statusColour = openOnlyState ? colours::violet
                             : lockedState ? colours::green
                             : bypassed ? colours::textMuted : colours::cyan;
-    auto statusArea = juce::Rectangle<int> (34, 27, juce::jmax (0, actionLeft - 39), 14);
-    g.setColour (statusColour.withAlpha (bypassed ? 0.58f : 0.82f));
-    g.setFont (lf.jakarta (7.5f, true));
-    g.drawText (status, statusArea, juce::Justification::centredLeft, false);
+    auto statusArea = juce::Rectangle<float> ((float) getWidth() - 86.0f, 15.0f, 38.0f, 18.0f);
+    g.setColour (statusColour.withAlpha (0.055f));
+    g.fillRoundedRectangle (statusArea, 7.0f);
+    g.setColour (statusColour.withAlpha (0.18f + hover * 0.06f));
+    g.drawRoundedRectangle (statusArea, 7.0f, 1.0f);
+    g.setColour (statusColour.withAlpha (bypassed ? 0.58f : 0.84f));
+    g.setFont (lf.jakarta (7.2f, true));
+    g.drawText (status, statusArea.toNearestInt(), juce::Justification::centred, false);
 }
 
 void CompactRackRow::toggleBypassFromUi()

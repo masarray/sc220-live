@@ -80,6 +80,7 @@ struct WorkspaceLayout
 
     juce::Rectangle<int> logo;
     juce::Rectangle<int> statusPill;
+    juce::Rectangle<int> license;
     juce::Rectangle<int> settings;
     juce::Rectangle<int> tray;
     juce::Rectangle<int> minimise;
@@ -145,11 +146,14 @@ WorkspaceLayout makeWorkspaceLayout (juce::Rectangle<int> bounds)
     l.tray = { x - headerButton, metrics::space12, headerButton, headerButton };
     x -= headerButton + metrics::space4;
     l.settings = { x - headerButton, metrics::space12, headerButton, headerButton };
-    l.statusPill = { 276, 15, juce::jlimit (250, 340, x - 294), 30 };
+    x -= headerButton + metrics::space8;
+    l.license = { x - 132, metrics::space12, 132, headerButton };
+    x -= 132;
+    l.statusPill = { 276, 15, juce::jlimit (210, 320, x - 294), 30 };
 
     auto workspace = bounds.reduced (outerPad, metrics::space10);
-    const int sideWidth = juce::jlimit (212, metrics::sidePanelWidth,
-                                        static_cast<int> (workspace.getWidth() * 0.158f));
+    const int sideWidth = juce::jlimit (224, metrics::sidePanelWidth,
+                                        static_cast<int> (workspace.getWidth() * 0.172f));
     l.leftPanel = workspace.removeFromLeft (sideWidth);
     workspace.removeFromLeft (metrics::space12);
     l.rightPanel = workspace.removeFromRight (sideWidth);
@@ -158,11 +162,11 @@ WorkspaceLayout makeWorkspaceLayout (juce::Rectangle<int> bounds)
     auto centre = workspace;
     l.ioStrip = centre.removeFromTop (48);
     centre.removeFromTop (metrics::space10);
-    const int enhancerHeight = juce::jlimit (266, 286,
-                                             static_cast<int> (centre.getHeight() * 0.405f));
-    l.enhancerCard = centre.removeFromBottom (enhancerHeight);
-    centre.removeFromBottom (metrics::space10);
-    l.noiseCard = centre;
+    const int noiseHeight = juce::jlimit (328, 356,
+                                          static_cast<int> (centre.getHeight() * 0.545f));
+    l.noiseCard = centre.removeFromTop (noiseHeight);
+    centre.removeFromTop (metrics::space10);
+    l.enhancerCard = centre;
 
     auto left = l.leftPanel.reduced (metrics::space12);
     l.leftTitle = left.removeFromTop (42);
@@ -196,8 +200,8 @@ WorkspaceLayout makeWorkspaceLayout (juce::Rectangle<int> bounds)
     l.noiseHeader = noiseInner.removeFromTop (40);
     l.noiseBypass = l.noiseHeader.removeFromRight (34).withSizeKeepingCentre (34, 34);
     auto noiseBody = noiseInner;
-    const int controlWidth = juce::jlimit (360, 390,
-                                           static_cast<int> (noiseBody.getWidth() * 0.40f));
+    const int controlWidth = juce::jlimit (350, 392,
+                                           static_cast<int> (noiseBody.getWidth() * 0.43f));
     auto controlRegion = noiseBody.removeFromLeft (controlWidth);
     l.noiseControlSurface = controlRegion;
     auto controls = controlRegion.reduced (metrics::space10, metrics::space8);
@@ -209,7 +213,7 @@ WorkspaceLayout makeWorkspaceLayout (juce::Rectangle<int> bounds)
     visualContent.removeFromTop (metrics::space2);
     l.visualizer = visualContent;
 
-    auto meter = controls.removeFromRight (76);
+    auto meter = controls.removeFromRight (72);
     controls.removeFromRight (metrics::space12);
     auto knobRow = controls.removeFromTop (140);
     const int knobWidth = knobRow.getWidth() / 3;
@@ -219,18 +223,18 @@ WorkspaceLayout makeWorkspaceLayout (juce::Rectangle<int> bounds)
     l.profile = controls.removeFromTop (34);
     controls.removeFromTop (metrics::space8);
     l.learn = controls.removeFromTop (36);
-    l.expanderMeter = meter.withSizeKeepingCentre (72, juce::jmin (198, meter.getHeight() - 8));
+    l.expanderMeter = meter.withSizeKeepingCentre (68, juce::jmin (186, meter.getHeight() - 8));
 
     auto enhancerInner = l.enhancerCard.reduced (metrics::space14, metrics::space12);
     l.enhancerHeader = enhancerInner.removeFromTop (40);
     l.enhancerBypass = l.enhancerHeader.removeFromRight (34).withSizeKeepingCentre (34, 34);
-    l.enhancerPresetSurface = enhancerInner.removeFromTop (48);
+    l.enhancerPresetSurface = enhancerInner.removeFromTop (52);
     auto presetStrip = l.enhancerPresetSurface.reduced (metrics::space8, metrics::space2);
     auto captionRow = presetStrip.removeFromTop (12);
-    l.presetCaption = captionRow.removeFromLeft (juce::jmin (560, presetStrip.getWidth()));
+    l.presetCaption = captionRow.removeFromLeft (440);
     presetStrip.removeFromTop (2);
-    l.presetCombo = presetStrip.removeFromLeft (juce::jmin (560, presetStrip.getWidth()));
-    enhancerInner.removeFromTop (metrics::space2);
+    l.presetCombo = presetStrip.removeFromLeft (440);
+    enhancerInner.removeFromTop (metrics::space6);
     l.enhancerMacroSurface = enhancerInner;
     auto macroContent = enhancerInner.reduced (metrics::space4, metrics::space2);
     l.enhancerMacroCaption = {};
@@ -255,11 +259,11 @@ public:
         : engine (engineToUse), refresh (std::move (refreshCallback))
     {
         setLookAndFeel (&cardLookAndFeel);
-        setSize (338, 500);
+        setSize (338, 456);
 
         for (juce::Component* component : std::initializer_list<juce::Component*> {
                  &sampleRate, &bufferSize, &channelMode, &noiseQuality,
-                 &hearRemoved, &stabilityGuard, &restartButton, &refreshButton, &referenceButton, &learnButton, &message })
+                 &hearRemoved, &restartButton, &refreshButton, &referenceButton, &learnButton, &message })
             addAndMakeVisible (component);
 
         styleCombo (sampleRate, "Sample Rate|Set the live engine sample rate. Higher rates may use more CPU.");
@@ -281,15 +285,18 @@ public:
         hearRemoved.setButtonText ("Hear Removed Noise");
         hearRemoved.setToggleState (engine.getNoiseClean().isListeningRemoved(),
                                     juce::dontSendNotification);
-        stabilityGuard.setButtonText ("Auto Stability Guard");
-        stabilityGuard.setTooltip ("Stability Guard|Detect repeated callback timing pressure and move to the next supported buffer size automatically.");
-        stabilityGuard.setToggleState (engine.isStabilityGuardEnabled(), juce::dontSendNotification);
 
         restartButton.setButtonText ("Restart Audio Engine");
         refreshButton.setButtonText ("Refresh Device Lists");
         referenceButton.setButtonText ("Match VST Reference");
         referenceButton.setTooltip ("Match VST Reference|Bypass the live-only denoise and expander stages, reset trims to 0 dB, and keep the main enhancer active for direct A/B comparison.");
         learnButton.setButtonText ("Learn Noise Again");
+
+        const bool premiumAllowed = engine.fullFeaturesAllowed();
+        noiseQuality.setEnabled (premiumAllowed);
+        hearRemoved.setEnabled (premiumAllowed);
+        referenceButton.setEnabled (premiumAllowed);
+        learnButton.setEnabled (premiumAllowed);
 
         message.setJustificationType (juce::Justification::centredLeft);
         message.setColour (juce::Label::textColourId, colours::amber);
@@ -316,6 +323,11 @@ public:
         };
         noiseQuality.onChange = [this]
         {
+            if (! engine.fullFeaturesAllowed())
+            {
+                showResult ("The 30-day trial has ended. Unlock the Full Version to change Noise Clean quality.");
+                return;
+            }
             engine.getNoiseClean().setQuality (
                 noiseQuality.getSelectedId() == 2
                     ? MusicalNoiseClean::Quality::clean512
@@ -325,17 +337,13 @@ public:
         };
         hearRemoved.onClick = [this]
         {
+            if (! engine.fullFeaturesAllowed())
+            {
+                hearRemoved.setToggleState (engine.getNoiseClean().isListeningRemoved(), juce::dontSendNotification);
+                showResult ("Unlock the Full Version to audition removed noise.");
+                return;
+            }
             engine.getNoiseClean().setListenRemoved (hearRemoved.getToggleState());
-        };
-        stabilityGuard.onClick = [this]
-        {
-            engine.setStabilityGuardEnabled (stabilityGuard.getToggleState());
-            message.setText (stabilityGuard.getToggleState()
-                                 ? "Stability Guard enabled. Repeated deadline pressure may raise the buffer automatically."
-                                 : "Stability Guard disabled. Buffer changes are manual.",
-                             juce::dontSendNotification);
-            message.setColour (juce::Label::textColourId,
-                               stabilityGuard.getToggleState() ? colours::green : colours::amber);
         };
         restartButton.onClick = [this]
         {
@@ -350,6 +358,11 @@ public:
         };
         referenceButton.onClick = [this]
         {
+            if (! engine.fullFeaturesAllowed())
+            {
+                showResult ("Unlock the Full Version to change reference processing conditions.");
+                return;
+            }
             engine.applyVstReferenceConditions();
             message.setText ("VST reference conditions applied. Align recorded files by reported latency.",
                              juce::dontSendNotification);
@@ -358,6 +371,11 @@ public:
         };
         learnButton.onClick = [this]
         {
+            if (! engine.fullFeaturesAllowed())
+            {
+                showResult ("Unlock the Full Version to learn a new noise profile.");
+                return;
+            }
             engine.getNoiseClean().startLearning (2.0);
             message.setText ("Listening to static noise for 2 seconds...", juce::dontSendNotification);
         };
@@ -388,10 +406,10 @@ public:
         drawFieldLabel (g, cardLookAndFeel, { 18, 201, 110, 20 }, "Noise quality");
 
         g.setColour (colours::border);
-        g.drawHorizontalLine (284, 18.0f, static_cast<float> (getWidth() - 18));
+        g.drawHorizontalLine (252, 18.0f, static_cast<float> (getWidth() - 18));
         g.setColour (colours::textMuted);
         g.setFont (cardLookAndFeel.jakarta (9.0f, true));
-        g.drawText ("AUDIO ENGINE", 18, 292, getWidth() - 36, 18,
+        g.drawText ("AUDIO ENGINE", 18, 260, getWidth() - 36, 18,
                     juce::Justification::centredLeft, false);
     }
 
@@ -402,13 +420,12 @@ public:
         channelMode.setBounds (142, 154, 178, 34);
         noiseQuality.setBounds (142, 198, 178, 34);
         hearRemoved.setBounds (18, 232, 210, 28);
-        stabilityGuard.setBounds (18, 260, 230, 28);
 
-        restartButton.setBounds (18, 316, 146, 36);
-        refreshButton.setBounds (174, 316, 146, 36);
-        referenceButton.setBounds (18, 362, 302, 36);
-        learnButton.setBounds (18, 408, 302, 36);
-        message.setBounds (18, 452, 302, 38);
+        restartButton.setBounds (18, 284, 146, 36);
+        refreshButton.setBounds (174, 284, 146, 36);
+        referenceButton.setBounds (18, 330, 302, 36);
+        learnButton.setBounds (18, 376, 302, 36);
+        message.setBounds (18, 416, 302, 30);
     }
 
 private:
@@ -448,7 +465,6 @@ private:
     juce::ComboBox channelMode;
     juce::ComboBox noiseQuality;
     juce::ToggleButton hearRemoved;
-    juce::ToggleButton stabilityGuard;
     juce::TextButton restartButton;
     juce::TextButton refreshButton;
     juce::TextButton referenceButton;
@@ -458,7 +474,8 @@ private:
 } // namespace
 
 LiveMainComponent::LiveMainComponent (LiveAudioEngine& engine, WindowActions actions)
-    : audioEngine (engine), windowActions (std::move (actions)), visualizer (engine.getAskpProcessor())
+    : audioEngine (engine), windowActions (std::move (actions)),
+      visualizer (engine.getAskpProcessor()), licensePanel (engine.getEnhancerBridge())
 {
     setLookAndFeel (&lookAndFeel);
     setWantsKeyboardFocus (true);
@@ -470,6 +487,8 @@ LiveMainComponent::LiveMainComponent (LiveAudioEngine& engine, WindowActions act
     // window creation paths. The application calls setUiActive(true) after the
     // window is visible.
     audioEngine.setVisualTapEnabled (false);
+    if (! audioEngine.fullFeaturesAllowed())
+        licensePanel.setVisible (true);
 }
 
 LiveMainComponent::~LiveMainComponent()
@@ -482,7 +501,7 @@ LiveMainComponent::~LiveMainComponent()
 void LiveMainComponent::configureControls()
 {
     for (juce::Component* component : std::initializer_list<juce::Component*> {
-             &settingsButton, &trayButton, &minimiseButton, &maximiseButton, &closeButton,
+             &licenseButton, &settingsButton, &trayButton, &minimiseButton, &maximiseButton, &closeButton,
              &inputDevice, &outputDevice,
              &inputTrimRow, &noiseRow, &vstPreRow, &inputFader,
              &noiseReduction, &silenceAmount, &preserveAmount, &visualizer,
@@ -492,6 +511,14 @@ void LiveMainComponent::configureControls()
              &vstPostRow, &outputTrimRow, &limiterRow, &outputFader,
              &cpuStat, &latencyStat, &dropoutsStat, &profileStat, &trayStat })
         addAndMakeVisible (component);
+
+    addChildComponent (licensePanel);
+    licensePanel.onClose = [this] { updateStatus(); };
+    licensePanel.onLicenseChanged = [this]
+    {
+        refreshAllControls();
+        updateStatus();
+    };
 
     settingsButton.setOffColour (colours::textMuted);
     trayButton.setOffColour (colours::textMuted);
@@ -504,6 +531,12 @@ void LiveMainComponent::configureControls()
     gainReductionMeter.setVertical (true);
     gainReductionMeter.setTitle ("EXPANDER");
 
+    licenseButton.setTooltip ("Licence|View trial status, buy the Full Version with QRIS, or activate an offline code.");
+    licenseButton.onClick = [this]
+    {
+        licensePanel.setVisible (true);
+        licensePanel.toFront (true);
+    };
     settingsButton.setTooltip ("Settings|Open audio engine, device and noise-clean options.");
     trayButton.setTooltip ("Mini Controller|Open the compact tray controller view.");
     minimiseButton.setTooltip ("Minimise|Send the main window to the taskbar.");
@@ -521,6 +554,13 @@ void LiveMainComponent::configureControls()
     noiseBypass.setToggleState (! audioEngine.getNoiseClean().isEnabled() ? false : true, juce::dontSendNotification);
     noiseBypass.onClick = [this]
     {
+        if (! audioEngine.fullFeaturesAllowed())
+        {
+            noiseBypass.setToggleState (audioEngine.getNoiseClean().isEnabled(), juce::dontSendNotification);
+            licensePanel.setVisible (true);
+            licensePanel.toFront (true);
+            return;
+        }
         const bool enabled = noiseBypass.getToggleState();
         audioEngine.getNoiseClean().setEnabled (enabled);
         audioEngine.getExpander().setEnabled (enabled);
@@ -533,6 +573,13 @@ void LiveMainComponent::configureControls()
     enhancerPower.setToggleState (! audioEngine.isBypassed(), juce::dontSendNotification);
     enhancerPower.onClick = [this]
     {
+        if (! audioEngine.fullFeaturesAllowed())
+        {
+            enhancerPower.setToggleState (! audioEngine.isBypassed(), juce::dontSendNotification);
+            licensePanel.setVisible (true);
+            licensePanel.toFront (true);
+            return;
+        }
         audioEngine.setBypassed (! enhancerPower.getToggleState());
         updateStatus();
         repaint();
@@ -568,7 +615,16 @@ void LiveMainComponent::configureControls()
     };
 
     learnNoise.setTooltip ("Learn Noise|Play only the noise you want removed, then capture it for about two seconds.");
-    learnNoise.onClick = [this] { audioEngine.getNoiseClean().startLearning (2.0); };
+    learnNoise.onClick = [this]
+    {
+        if (! audioEngine.fullFeaturesAllowed())
+        {
+            licensePanel.setVisible (true);
+            licensePanel.toFront (true);
+            return;
+        }
+        audioEngine.getNoiseClean().startLearning (2.0);
+    };
 
     noiseReduction.setFormatter ([] (double value) { return juce::String (value, 1) + " dB"; });
     silenceAmount.setFormatter ([] (double value) { return juce::String (static_cast<int> (value)) + "%"; });
@@ -810,6 +866,7 @@ void LiveMainComponent::resized()
 {
     const auto layout = makeWorkspaceLayout (getLocalBounds());
 
+    licenseButton.setBounds (layout.license);
     settingsButton.setBounds (layout.settings);
     trayButton.setBounds (layout.tray);
     minimiseButton.setBounds (layout.minimise);
@@ -851,6 +908,9 @@ void LiveMainComponent::resized()
     dropoutsStat.setBounds (layout.stats[2]);
     profileStat.setBounds (layout.stats[3]);
     trayStat.setBounds (layout.stats[4]);
+    licensePanel.setBounds (getLocalBounds());
+    if (licensePanel.isVisible())
+        licensePanel.toFront (false);
 }
 
 void LiveMainComponent::mouseDown (const juce::MouseEvent& event)
@@ -933,20 +993,53 @@ void LiveMainComponent::updateStatus()
 
     visualizer.refresh (audioEngine.isBypassed());
 
-    const bool noiseEnabled = audioEngine.getNoiseClean().isEnabled();
+    auto& licence = audioEngine.getLicenseManager();
+    licence.refresh();
+    const bool fullFeatures = licence.editingAllowed();
+    const bool noiseEnabled = fullFeatures && audioEngine.getNoiseClean().isEnabled();
     noiseReduction.setEnabled (noiseEnabled);
     silenceAmount.setEnabled (noiseEnabled);
     preserveAmount.setEnabled (noiseEnabled);
     learnNoise.setEnabled (noiseEnabled);
     gainReductionMeter.setEnabled (noiseEnabled);
+    inputFader.setEnabled (fullFeatures);
+    outputFader.setEnabled (fullFeatures);
+    inputTrimRow.setEnabled (fullFeatures);
+    outputTrimRow.setEnabled (fullFeatures);
+    noiseRow.setEnabled (fullFeatures);
+    noiseBypass.setEnabled (fullFeatures);
 
-    const bool enhancerEnabled = ! audioEngine.isBypassed();
+    enhancerPower.setEnabled (fullFeatures);
+    const bool enhancerEnabled = fullFeatures && ! audioEngine.isBypassed();
     preset.setEnabled (enhancerEnabled);
     enhanceKnob.setEnabled (enhancerEnabled);
     bassKnob.setEnabled (enhancerEnabled);
     trebleKnob.setEnabled (enhancerEnabled);
     vocalKnob.setEnabled (enhancerEnabled);
     stereoKnob.setEnabled (enhancerEnabled);
+
+    const auto licenceState = licence.state();
+    if (licence.isLicensed())
+    {
+        licenseButton.setButtonText ("FULL VERSION");
+        licenseButton.setColour (juce::TextButton::textColourOffId, colours::green);
+    }
+    else if (licenceState == askp::LicenseManager::State::ReadOnly)
+    {
+        licenseButton.setButtonText ("UNLOCK • Rp249K");
+        licenseButton.setColour (juce::TextButton::textColourOffId, colours::amber);
+    }
+    else if (licenceState == askp::LicenseManager::State::ClockNeedsAttention)
+    {
+        licenseButton.setButtonText ("CHECK CLOCK");
+        licenseButton.setColour (juce::TextButton::textColourOffId, colours::red);
+    }
+    else
+    {
+        licenseButton.setButtonText ("TRIAL • " + juce::String (licence.daysRemaining()) + " DAYS");
+        licenseButton.setColour (juce::TextButton::textColourOffId,
+                                 licence.daysRemaining() <= 7 ? colours::amber : colours::cyan);
+    }
 
     if (enhancerPower.getToggleState() == audioEngine.isBypassed())
         enhancerPower.setToggleState (! audioEngine.isBypassed(), juce::dontSendNotification);
@@ -988,12 +1081,8 @@ void LiveMainComponent::updateStatus()
                            status.dropouts > 0 ? colours::red : colours::text);
     profileStat.setValue (cleaner.hasProfile() ? "Learned" : "Pending",
                           cleaner.hasProfile() ? colours::green : colours::textMuted);
-    const auto stabilityColour = status.stabilityRecoveryPending ? colours::amber
-                                : status.stabilityState == "WATCH" ? colours::amber
-                                : status.stabilityState == "GUARDED" ? colours::green
-                                : status.stabilityState == "STABLE" ? colours::cyan
-                                : colours::textMuted;
-    trayStat.setValue (status.running ? status.stabilityState : "STOPPED", stabilityColour);
+    trayStat.setValue (status.running ? "Ready" : "Stopped",
+                       status.running ? colours::cyan : colours::amber);
 
     repaint (0, 0, getWidth(), headerHeight);
 

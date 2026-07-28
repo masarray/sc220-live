@@ -1,27 +1,36 @@
-# Sonkupik Live v0.11.0
+# Sonkupik Live v0.13.0
 
-- P0 visual hierarchy consolidation and real-time Stability Guard.
-- Added native/estimated xrun telemetry through JUCE AudioDeviceManager.
-- Added deadline and callback-gap monitoring plus bounded automatic buffer fallback.
-- Added a 128-sample safe floor for separate input/output endpoints when Stability Guard is enabled.
-- Reduced side-panel width, repaired rack-row name/status hierarchy, expanded the centre workspace and compacted Smart Sound Enhancer.
-- Optimised expander coefficient preparation and pointer-based sample access without changing its transfer behaviour.
+## v0.13.0 — 2026-07-28 — 30-day trial and QRIS licensing
+
+- Ported the latest stable local licence validation and checkout recovery architecture from askp-vst.
+- Product-specific 30-day Sonkupik Live trial with separate fingerprint/state storage.
+- Added native QRIS purchase and offline activation panel without importing the VST editor.
+- Added `sonkupik-live` checkout product with a client-enforced Rp249.000 price.
+- Added automatic Midtrans payment polling, restart recovery and locally verified signed activation.
+- Added read-only control gating after trial expiry while preserving uninterrupted audio.
+
+# Sonkupik Live v0.12.0
+
+## v0.12.0 — 2026-07-27 — ArSonKuPik v0.5.19 Signature Engine port
+
+- Rebased from the visually approved v0.10.4 line rather than the regressed v0.11.0 runtime experiment.
+- Ported the supplied mature ArSonKuPik v0.5.19 engine revision `2026072702`.
+- Replaced 40 legacy tonal presets with the v0.5.19 immutable Signature foundation and 13 professional profile starting points.
+- Added `EnhancerEngineBridge` as the only boundary between the Live audio rack and ASK-P processor internals.
+- Vendored and SHA-256 locked the engine, profile bank, processor port and approved sphere source.
+- Removed the runtime/build dependency on sibling `askp-vst` and `askp-vstvisualizer` checkouts.
+- Kept the approved v0.10.4 local sphere; the v0.5.19 ASK-P visualizer is intentionally excluded.
+- Kept VST editor, QRIS checkout UI and updater outside the headless processor target.
+- Retained the Live-only 12 ms creative-control glide while preserving the v0.5.19 DSP/profile/safety implementation.
+- Updated Windows build and parity scripts for a deterministic single-repository build.
+
+# Sonkupik Live v0.10.4
+
+- Fixed intermittent white outer rectangles around premium tooltips on Windows.
+- Restored proportional title-bar fallback icons for tray, minimise and maximise.
+- Stabilised footer CPU text with one-second smoothed updates while preserving full-rate internal monitoring.
 
 # Changelog
-
-## v0.11.0 - 2026-07-20 - P0 stability and visual hierarchy
-
-- Added callback deadline telemetry, scheduling-gap telemetry and OS/native xrun reporting.
-- Added a conservative 128-block instability window to avoid reacting to one isolated Windows scheduling spike.
-- Added automatic buffer fallback with a 30-second recovery cooldown.
-- Added an Auto Stability Guard switch in Settings.
-- Added cross-device routing state and a Stability footer indicator.
-- Added a 128-sample minimum when separate input/output endpoints are selected under Stability Guard.
-- Reduced side panels to give the core processors more visual authority.
-- Rebuilt rack rows into a two-line name/state hierarchy so long module names no longer collide.
-- Rebalanced Noise Clean and made Smart Sound Enhancer more compact.
-- Increased small-label contrast and expanded the vertical expander meter.
-
 
 ## v0.10.4 - 2026-07-19 - Tooltip, titlebar and smart CPU display fix
 

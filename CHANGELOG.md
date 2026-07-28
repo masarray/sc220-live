@@ -1,3 +1,12 @@
+# Sonkupik Live v0.13.2
+
+## v0.13.2 — 2026-07-28 — Correct immutable authority hash scope
+
+- Removes stale SHA-256 configure gates from mutable `LicenseCheckoutClient.cpp` and `LiveLicensePanel.cpp`.
+- Keeps hard SHA-256 locks for the embedded DSP processor, preset authority, licensing public-key authority and approved Sonkupik sphere.
+- Updates the app, package, CMake preset and checkout User-Agent identity to v0.13.2.
+- Prevents legitimate UI/licensing patches from being misreported as an unreviewed DSP engine change.
+
 # Sonkupik Live v0.13.1
 
 ## v0.13.1 — 2026-07-28 — MSVC licensing panel build fix

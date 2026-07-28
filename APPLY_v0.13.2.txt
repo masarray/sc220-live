@@ -1,0 +1,9 @@
+Sonkupik Live v0.13.2 hash-scope build fix
+
+1. Extract this ZIP into C:\Git\Sonkupik-Live
+2. Allow overwrite for all files.
+3. In PowerShell run:
+
+   .\build-live-windows.bat clean
+
+This fix removes stale CMake hash locks from mutable Sonkupik licensing UI/client source while retaining hard locks for the embedded DSP, processor, licensing authority and approved sphere.

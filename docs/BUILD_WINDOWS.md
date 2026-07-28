@@ -1,4 +1,4 @@
-# Build Sonkupik Live v0.13.1 on Windows
+# Build Sonkupik Live v0.13.2 on Windows
 
 Requirements:
 
@@ -19,7 +19,7 @@ build-live-windows.bat clean
 ```
 
 The BAT builds Release x64, creates
-`dist\Sonkupik-Live-v0.13.1-win-x64-portable.zip`, and opens the `dist` folder.
+`dist\Sonkupik-Live-v0.13.2-win-x64-portable.zip`, and opens the `dist` folder.
 
 ## PowerShell
 

@@ -1,4 +1,4 @@
-# Sonkupik Live v0.13.1 — Source Delivery Summary
+# Sonkupik Live v0.13.2 — Source Delivery Summary
 
 This source package ports the supplied ArSonKuPik v0.5.19 Signature Engine into
 Sonkupik Live through a deterministic embedded engine boundary.

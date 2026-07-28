@@ -558,7 +558,7 @@ LicenseCheckoutClient::HttpResult LicenseCheckoutClient::request(const juce::Str
     juce::String headers;
     headers << "Accept: application/json\r\n"
             << "Content-Type: application/json\r\n"
-            << "User-Agent: Sonkupik-Live/0.13.1\r\n";
+            << "User-Agent: Sonkupik-Live/0.13.2\r\n";
     if (bearerToken.isNotEmpty())
         headers << "Authorization: Bearer " << bearerToken << "\r\n";
 

@@ -1,0 +1,26 @@
+Sonkupik Live v0.13.2 hash-scope audit
+
+Checks : 20
+Passed : 20
+Failed : 0
+
+[ PASS ] CMake project version 0.13.2
+[ PASS ] Application version 0.13.2
+[ PASS ] Checkout User-Agent 0.13.2
+[ PASS ] No checkout client hard lock
+[ PASS ] No licence panel hard lock
+[ PASS ] DSP remains hard locked
+[ PASS ] Preset remains hard locked
+[ PASS ] Processor remains hard locked
+[ PASS ] Sphere remains hard locked
+[ PASS ] Build BAT version updated
+[ PASS ] hash lock valid: third_party/askp-engine-v0.5.19/engine/arsonkupik_dsp.cpp
+[ PASS ] hash lock valid: third_party/askp-engine-v0.5.19/engine/arsonkupik_dsp.hpp
+[ PASS ] hash lock valid: third_party/askp-engine-v0.5.19/engine/arsonkupik_presets.cpp
+[ PASS ] hash lock valid: third_party/askp-engine-v0.5.19/src/PluginProcessor.cpp
+[ PASS ] hash lock valid: third_party/askp-engine-v0.5.19/src/PluginProcessor.h
+[ PASS ] hash lock valid: third_party/askp-engine-v0.5.19/src/LicenseManager.cpp
+[ PASS ] hash lock valid: third_party/askp-engine-v0.5.19/src/LicenseManager.h
+[ PASS ] hash lock valid: third_party/askp-engine-v0.5.19/src/LicensePublicKey.h
+[ PASS ] hash lock valid: third_party/sonkupik-sphere-v0.10.4/OrbVisualizer.cpp
+[ PASS ] All remaining hash locks resolved

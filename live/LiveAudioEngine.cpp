@@ -101,30 +101,110 @@ juce::Array<int> LiveAudioEngine::getAvailableBufferSizes() const
 
 juce::String LiveAudioEngine::selectInputDevice (const juce::String& name)
 {
-    auto setup = deviceManager.getAudioDeviceSetup();
-    setup.inputDeviceName = name;
-    const auto error = deviceManager.setAudioDeviceSetup (setup, true);
-    if (error.isNotEmpty())
-    {
-        const juce::ScopedLock lock (statusLock);
-        lastError = error;
-    }
-    refreshDeviceStatus();
-    return error;
+    return applyDeviceSelection (&name, nullptr);
 }
 
 juce::String LiveAudioEngine::selectOutputDevice (const juce::String& name)
 {
-    auto setup = deviceManager.getAudioDeviceSetup();
-    setup.outputDeviceName = name;
-    const auto error = deviceManager.setAudioDeviceSetup (setup, true);
-    if (error.isNotEmpty())
+    return applyDeviceSelection (nullptr, &name);
+}
+
+juce::String LiveAudioEngine::applyDeviceSelection (const juce::String* inputName,
+                                                     const juce::String* outputName)
+{
+    if (inputName == nullptr && outputName == nullptr)
+        return {};
+
+    if (auto* type = deviceManager.getCurrentDeviceTypeObject())
+        type->scanForDevices();
+
+    const auto previous = deviceManager.getAudioDeviceSetup();
+    auto requested = previous;
+    if (inputName != nullptr)
+        requested.inputDeviceName = inputName->trim();
+    if (outputName != nullptr)
+        requested.outputDeviceName = outputName->trim();
+
+    // Let each newly selected endpoint expose its normal channel mask. Keeping
+    // a stale BigInteger from the previous device is a common reason a valid
+    // Windows/WASAPI selection needs several attempts before it opens.
+    requested.useDefaultInputChannels = true;
+    requested.useDefaultOutputChannels = true;
+
+    auto selectionApplied = [this, inputName, outputName]()
+    {
+        const auto applied = deviceManager.getAudioDeviceSetup();
+        const bool inputOk = inputName == nullptr
+            || applied.inputDeviceName.equalsIgnoreCase (inputName->trim());
+        const bool outputOk = outputName == nullptr
+            || applied.outputDeviceName.equalsIgnoreCase (outputName->trim());
+        return inputOk && outputOk && deviceManager.getCurrentAudioDevice() != nullptr;
+    };
+
+    auto trySetup = [this, &selectionApplied] (const juce::AudioDeviceManager::AudioDeviceSetup& setup)
+    {
+        const auto error = deviceManager.setAudioDeviceSetup (setup, true);
+        refreshDeviceStatus();
+        if (error.isEmpty() && selectionApplied())
+            return juce::String();
+        if (error.isNotEmpty())
+            return error;
+        return juce::String ("The audio backend did not keep the requested device selection.");
+    };
+
+    // First preserve the user's current latency settings.
+    auto firstError = trySetup (requested);
+    if (firstError.isEmpty())
     {
         const juce::ScopedLock lock (statusLock);
-        lastError = error;
+        lastError.clear();
+        return {};
     }
+
+    // A new input/output pair may not support the previous pair's exact sample
+    // rate or buffer size. Zero asks JUCE/WASAPI to negotiate compatible values
+    // in one transaction instead of requiring repeated manual selections.
+    auto automatic = requested;
+    automatic.sampleRate = 0.0;
+    automatic.bufferSize = 0;
+    auto automaticError = trySetup (automatic);
+    if (automaticError.isEmpty())
+    {
+        const juce::ScopedLock lock (statusLock);
+        lastError.clear();
+        return {};
+    }
+
+    // Some Windows drivers retain a busy endpoint until the old device is
+    // explicitly closed. Reopen once with automatic timing, then roll back if
+    // the requested pair still cannot be established.
+    deviceManager.closeAudioDevice();
+    auto reopenError = trySetup (automatic);
+    if (reopenError.isEmpty())
+    {
+        const juce::ScopedLock lock (statusLock);
+        lastError.clear();
+        return {};
+    }
+
+    const auto rollbackError = deviceManager.setAudioDeviceSetup (previous, true);
     refreshDeviceStatus();
-    return error;
+
+    juce::String message = "Unable to open the selected audio device in a compatible input/output pair.";
+    message << "\n\nInitial attempt: " << firstError;
+    if (automaticError != firstError)
+        message << "\nAutomatic sample-rate/buffer attempt: " << automaticError;
+    if (reopenError != automaticError)
+        message << "\nClean reopen attempt: " << reopenError;
+    if (rollbackError.isNotEmpty())
+        message << "\nPrevious device restore: " << rollbackError;
+    message << "\n\nTry Refresh Device Lists, then select the output first and the input second.";
+
+    {
+        const juce::ScopedLock lock (statusLock);
+        lastError = message;
+    }
+    return message;
 }
 
 juce::String LiveAudioEngine::setSampleRate (double value)

@@ -34,13 +34,13 @@ LiveLicensePanel::LiveLicensePanel (EnhancerEngineBridge& engineToUse)
     setLabel (title, 25.0f, true, colours::text, juce::Justification::centredLeft);
     title.setText ("SONKUPIK LIVE FULL VERSION", juce::dontSendNotification);
     setLabel (subtitle, 13.5f, false, colours::textMuted, juce::Justification::centredLeft);
-    subtitle.setText ("30-day full-feature trial. Unlock permanently on this computer with one QRIS payment.",
+    subtitle.setText ("All features are available during evaluation. Unlock permanently with one QRIS payment.",
                       juce::dontSendNotification);
     setLabel (trialBadge, 11.0f, true, colours::cyan, juce::Justification::centred);
     setLabel (price, 31.0f, true, colours::text, juce::Justification::centredLeft);
     price.setText (formatIdr (fullVersionPriceIdr), juce::dontSendNotification);
     setLabel (priceCaption, 11.5f, false, colours::textMuted, juce::Justification::centredLeft);
-    priceCaption.setText ("ONE-TIME PERPETUAL LICENCE • 1 COMPUTER", juce::dontSendNotification);
+    priceCaption.setText ("ONE-TIME PERPETUAL LICENCE / 1 COMPUTER", juce::dontSendNotification);
 
     setLabel (nameLabel, 10.0f, true, colours::textMuted, juce::Justification::centredLeft);
     setLabel (emailLabel, 10.0f, true, colours::textMuted, juce::Justification::centredLeft);
@@ -55,7 +55,7 @@ LiveLicensePanel::LiveLicensePanel (EnhancerEngineBridge& engineToUse)
     paymentStatus.setMinimumHorizontalScale (0.75f);
 
     setLabel (requestLabel, 10.0f, true, colours::textMuted, juce::Justification::centredLeft);
-    requestLabel.setText ("OFFLINE ACTIVATION • COMPUTER REQUEST ID", juce::dontSendNotification);
+    requestLabel.setText ("OFFLINE ACTIVATION / COMPUTER REQUEST ID", juce::dontSendNotification);
     configureEditor (requestId, {});
     requestId.setReadOnly (true);
     requestId.setText (license.requestId(), false);
@@ -268,20 +268,18 @@ void LiveLicensePanel::refreshState()
     }
     else
     {
-        const int days = license.daysRemaining();
         const bool expired = state == askp::LicenseManager::State::ReadOnly;
         const bool clockIssue = state == askp::LicenseManager::State::ClockNeedsAttention;
         trialBadge.setText (clockIssue ? "CHECK SYSTEM CLOCK"
                                       : expired ? "TRIAL ENDED"
-                                                : "FULL TRIAL • " + juce::String (days) + " DAYS LEFT",
+                                                : "FULL FEATURES ACTIVE",
                             juce::dontSendNotification);
         trialBadge.setColour (juce::Label::textColourId,
-                              clockIssue || expired ? colours::amber
-                                                   : days <= 7 ? colours::amber : colours::cyan);
+                              clockIssue || expired ? colours::amber : colours::cyan);
         const int amount = snap.amountIdr > 0 ? snap.amountIdr : fullVersionPriceIdr;
         price.setText (formatIdr (amount), juce::dontSendNotification);
         price.setColour (juce::Label::textColourId, colours::text);
-        priceCaption.setText ("ONE-TIME PERPETUAL LICENCE • 1 COMPUTER", juce::dontSendNotification);
+        priceCaption.setText ("ONE-TIME PERPETUAL LICENCE / 1 COMPUTER", juce::dontSendNotification);
         buyButton.setButtonText (snap.checkoutCanOpen ? "OPEN QRIS PAYMENT PAGE"
                                                        : snap.hasPendingOrder ? "VERIFY SAVED PURCHASE"
                                                                               : "BUY FULL VERSION - QRIS");

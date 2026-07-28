@@ -1,4 +1,4 @@
-# Sonkupik Live v0.13.2
+# Sonkupik Live v0.13.3
 
 **Sonkupik Live** is a lightweight native Windows live-audio rack for streamers who need professional enhancement without opening a full DAW.
 
@@ -13,6 +13,13 @@ Audio Interface
   -> CABLE Input / VB-CABLE
   -> OBS or TikTok Studio captures CABLE Output
 ```
+
+## v0.13.3 — Quiet evaluation UX and reliable device switching
+
+- No active-trial countdown is shown in the main header. `TRIAL ENDED` appears only after the evaluation expires.
+- License purchase and activation remain available from **Settings → License & Activation**.
+- Input/output selection now retries with compatible automatic timing, clean reopen and safe rollback.
+- Runtime UI strings use ASCII-safe separators to avoid Windows mojibake.
 
 ## v0.13.0 — 30-day trial and QRIS Full Version
 

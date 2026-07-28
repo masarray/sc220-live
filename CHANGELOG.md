@@ -1,3 +1,13 @@
+# Sonkupik Live v0.13.3
+
+## v0.13.3 — 2026-07-28 — Device selection reliability and quiet evaluation UX
+
+- Removes the active-trial countdown from the top bar; the header only warns after expiry or a clock problem.
+- Adds a neutral License & Activation entry inside Settings so purchasing remains available without pressuring new users.
+- Replaces runtime bullet glyphs with ASCII separators to prevent Windows mojibake.
+- Applies input/output changes as one verified device transaction with automatic sample-rate/buffer fallback, clean reopen, and rollback.
+- Queues device changes after the combo popup closes and prevents the status timer from restoring the previous selection mid-gesture.
+
 # Sonkupik Live v0.13.2
 
 ## v0.13.2 — 2026-07-28 — Correct immutable authority hash scope

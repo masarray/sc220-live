@@ -125,6 +125,8 @@ private:
     void clearOutputs (float* const* outputChannelData, int channels, int samples) noexcept;
     void updateMeters (const juce::AudioBuffer<float>& finalOutput) noexcept;
     void refreshDeviceStatus();
+    juce::String applyDeviceSelection (const juce::String* inputName,
+                                       const juce::String* outputName);
     void updateInputTrimRouting() noexcept;
     void updateOutputTrimRouting() noexcept;
     static bool looksLikeVirtualCable (const juce::String& name);

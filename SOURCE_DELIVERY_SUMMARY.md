@@ -1,4 +1,4 @@
-# Sonkupik Live v0.13.2 — Source Delivery Summary
+# Sonkupik Live v0.13.3 — Source Delivery Summary
 
 This source package ports the supplied ArSonKuPik v0.5.19 Signature Engine into
 Sonkupik Live through a deterministic embedded engine boundary.
@@ -25,6 +25,14 @@ build-live-windows.bat clean
 - `docs/ENHANCER_ENGINE_PORT_v0.12.0.md`
 - `qa/v0120_engine_port_audit.txt`
 
+
+## v0.13.3 device and evaluation UX
+
+- Quiet active evaluation: no header countdown.
+- Expiry-only `TRIAL ENDED` warning.
+- License access moved to Settings during evaluation.
+- Verified input/output transaction with automatic timing fallback, reopen and rollback.
+- ASCII-only runtime labels in licensing surfaces.
 
 ## v0.13.0 licensing additions
 

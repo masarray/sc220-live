@@ -51,6 +51,7 @@ private:
     void updateStatus();
     void showSettingsCard();
     void showExternalVstRoadmap();
+    void requestDeviceSelection (bool input, const juce::String& name);
     void setComboTextWithoutNotification (juce::ComboBox&, const juce::String&);
     void showError (const juce::String& title, const juce::String& message);
 
@@ -59,7 +60,7 @@ private:
     LiveLookAndFeel lookAndFeel;
     juce::ComponentDragger windowDragger;
 
-    juce::TextButton licenseButton { "TRIAL" };
+    juce::TextButton licenseButton { "TRIAL ENDED" };
     LucideIconButton settingsButton { "Settings", "settings_svg", colours::textMuted };
     LucideIconButton trayButton { "Tray", "panel_top_open_svg", colours::textMuted };
     LucideIconButton minimiseButton { "Minimise", "minimize_2_svg", colours::textMuted };
@@ -105,6 +106,7 @@ private:
 
     PremiumTooltipWindow tooltip { this };
     bool updatingControls = false;
+    bool deviceSwitchInProgress = false;
     bool uiActive = false;
     juce::uint32 nextCpuUiUpdateMs = 0;
     bool cpuDisplayInitialised = false;

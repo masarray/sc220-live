@@ -24,13 +24,13 @@ if /I "%~1"=="clean" (
     powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass ^
       -File "%~dp0scripts\package-live-windows.ps1" ^
       -Configuration Release ^
-      -Version 0.13.2 ^
+      -Version 0.13.3 ^
       -Clean
 ) else (
     powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass ^
       -File "%~dp0scripts\package-live-windows.ps1" ^
       -Configuration Release ^
-      -Version 0.13.2
+      -Version 0.13.3
 )
 
 set "BUILD_RC=%ERRORLEVEL%"

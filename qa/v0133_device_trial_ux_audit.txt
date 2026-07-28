@@ -1,0 +1,29 @@
+Sonkupik Live v0.13.3 device/trial UX source audit
+
+Checks : 23
+Passed : 23
+Failed : 0
+
+[ PASS ] CMake project version 0.13.3
+[ PASS ] Application version 0.13.3
+[ PASS ] Checkout User-Agent 0.13.3
+[ PASS ] Active trial hidden from header
+[ PASS ] Expired warning retained
+[ PASS ] Neutral settings licensing access
+[ PASS ] Panel hides countdown
+[ PASS ] Runtime bullet removed
+[ PASS ] Verified device transaction
+[ PASS ] Automatic rate buffer fallback
+[ PASS ] Device reopen fallback
+[ PASS ] Rollback on failure
+[ PASS ] UI queues device switch
+[ PASS ] Timer cannot revert selection
+[ PASS ] Authority unchanged: third_party/askp-engine-v0.5.19/engine/arsonkupik_dsp.cpp
+[ PASS ] Authority unchanged: third_party/askp-engine-v0.5.19/engine/arsonkupik_dsp.hpp
+[ PASS ] Authority unchanged: third_party/askp-engine-v0.5.19/engine/arsonkupik_presets.cpp
+[ PASS ] Authority unchanged: third_party/askp-engine-v0.5.19/src/PluginProcessor.cpp
+[ PASS ] Authority unchanged: third_party/askp-engine-v0.5.19/src/PluginProcessor.h
+[ PASS ] Authority unchanged: third_party/askp-engine-v0.5.19/src/LicenseManager.cpp
+[ PASS ] Authority unchanged: third_party/askp-engine-v0.5.19/src/LicenseManager.h
+[ PASS ] Authority unchanged: third_party/askp-engine-v0.5.19/src/LicensePublicKey.h
+[ PASS ] Authority unchanged: third_party/sonkupik-sphere-v0.10.4/OrbVisualizer.cpp

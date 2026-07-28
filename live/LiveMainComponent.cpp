@@ -128,7 +128,7 @@ struct WorkspaceLayout
     juce::Rectangle<int> stats[5];
 };
 
-WorkspaceLayout makeWorkspaceLayout (juce::Rectangle<int> bounds)
+WorkspaceLayout makeWorkspaceLayout (juce::Rectangle<int> bounds, bool showLicenseButton)
 {
     WorkspaceLayout l;
     l.header = bounds.removeFromTop (headerHeight);
@@ -147,9 +147,16 @@ WorkspaceLayout makeWorkspaceLayout (juce::Rectangle<int> bounds)
     x -= headerButton + metrics::space4;
     l.settings = { x - headerButton, metrics::space12, headerButton, headerButton };
     x -= headerButton + metrics::space8;
-    l.license = { x - 132, metrics::space12, 132, headerButton };
-    x -= 132;
-    l.statusPill = { 276, 15, juce::jlimit (210, 320, x - 294), 30 };
+    if (showLicenseButton)
+    {
+        l.license = { x - 132, metrics::space12, 132, headerButton };
+        x -= 132;
+    }
+    else
+    {
+        l.license = {};
+    }
+    l.statusPill = { 276, 15, juce::jlimit (210, 452, x - 294), 30 };
 
     auto workspace = bounds.reduced (outerPad, metrics::space10);
     const int sideWidth = juce::jlimit (224, metrics::sidePanelWidth,
@@ -255,15 +262,18 @@ class AudioSettingsCard final : public juce::Component
 {
 public:
     AudioSettingsCard (LiveAudioEngine& engineToUse,
-                       std::function<void()> refreshCallback)
-        : engine (engineToUse), refresh (std::move (refreshCallback))
+                       std::function<void()> refreshCallback,
+                       std::function<void()> openLicenseCallback)
+        : engine (engineToUse), refresh (std::move (refreshCallback)),
+          openLicense (std::move (openLicenseCallback))
     {
         setLookAndFeel (&cardLookAndFeel);
-        setSize (338, 456);
+        setSize (338, 506);
 
         for (juce::Component* component : std::initializer_list<juce::Component*> {
                  &sampleRate, &bufferSize, &channelMode, &noiseQuality,
-                 &hearRemoved, &restartButton, &refreshButton, &referenceButton, &learnButton, &message })
+                 &hearRemoved, &restartButton, &refreshButton, &referenceButton, &learnButton,
+                 &licenseAndActivationButton, &message })
             addAndMakeVisible (component);
 
         styleCombo (sampleRate, "Sample Rate|Set the live engine sample rate. Higher rates may use more CPU.");
@@ -291,6 +301,8 @@ public:
         referenceButton.setButtonText ("Match VST Reference");
         referenceButton.setTooltip ("Match VST Reference|Bypass the live-only denoise and expander stages, reset trims to 0 dB, and keep the main enhancer active for direct A/B comparison.");
         learnButton.setButtonText ("Learn Noise Again");
+        licenseAndActivationButton.setButtonText ("License & Activation");
+        licenseAndActivationButton.setTooltip ("License & Activation|Buy the Full Version with QRIS, verify a saved payment, or enter an offline activation code.");
 
         const bool premiumAllowed = engine.fullFeaturesAllowed();
         noiseQuality.setEnabled (premiumAllowed);
@@ -379,6 +391,11 @@ public:
             engine.getNoiseClean().startLearning (2.0);
             message.setText ("Listening to static noise for 2 seconds...", juce::dontSendNotification);
         };
+        licenseAndActivationButton.onClick = [this]
+        {
+            if (openLicense)
+                openLicense();
+        };
     }
 
     ~AudioSettingsCard() override
@@ -425,7 +442,8 @@ public:
         refreshButton.setBounds (174, 284, 146, 36);
         referenceButton.setBounds (18, 330, 302, 36);
         learnButton.setBounds (18, 376, 302, 36);
-        message.setBounds (18, 416, 302, 30);
+        licenseAndActivationButton.setBounds (18, 422, 302, 36);
+        message.setBounds (18, 464, 302, 30);
     }
 
 private:
@@ -460,6 +478,7 @@ private:
     LiveAudioEngine& engine;
     LiveLookAndFeel cardLookAndFeel;
     std::function<void()> refresh;
+    std::function<void()> openLicense;
     juce::ComboBox sampleRate;
     juce::ComboBox bufferSize;
     juce::ComboBox channelMode;
@@ -469,6 +488,7 @@ private:
     juce::TextButton refreshButton;
     juce::TextButton referenceButton;
     juce::TextButton learnButton;
+    juce::TextButton licenseAndActivationButton;
     juce::Label message;
 };
 } // namespace
@@ -531,7 +551,8 @@ void LiveMainComponent::configureControls()
     gainReductionMeter.setVertical (true);
     gainReductionMeter.setTitle ("EXPANDER");
 
-    licenseButton.setTooltip ("Licence|View trial status, buy the Full Version with QRIS, or activate an offline code.");
+    licenseButton.setVisible (false);
+    licenseButton.setTooltip ("License Required|The evaluation period has ended. Open licensing and activation options.");
     licenseButton.onClick = [this]
     {
         licensePanel.setVisible (true);
@@ -600,18 +621,12 @@ void LiveMainComponent::configureControls()
     inputDevice.onChange = [this]
     {
         if (! updatingControls)
-        {
-            const auto error = audioEngine.selectInputDevice (inputDevice.getText());
-            if (error.isNotEmpty()) showError ("Input device", error);
-        }
+            requestDeviceSelection (true, inputDevice.getText());
     };
     outputDevice.onChange = [this]
     {
         if (! updatingControls)
-        {
-            const auto error = audioEngine.selectOutputDevice (outputDevice.getText());
-            if (error.isNotEmpty()) showError ("Output device", error);
-        }
+            requestDeviceSelection (false, outputDevice.getText());
     };
 
     learnNoise.setTooltip ("Learn Noise|Play only the noise you want removed, then capture it for about two seconds.");
@@ -771,7 +786,7 @@ void LiveMainComponent::updateDeviceLists()
 
 void LiveMainComponent::paint (juce::Graphics& g)
 {
-    const auto layout = makeWorkspaceLayout (getLocalBounds());
+    const auto layout = makeWorkspaceLayout (getLocalBounds(), licenseButton.isVisible());
     g.fillAll (colours::appBg);
 
     juce::ColourGradient headerGradient (juce::Colour (0xff0d1725), 0.0f, 0.0f,
@@ -864,7 +879,7 @@ void LiveMainComponent::paint (juce::Graphics& g)
 
 void LiveMainComponent::resized()
 {
-    const auto layout = makeWorkspaceLayout (getLocalBounds());
+    const auto layout = makeWorkspaceLayout (getLocalBounds(), licenseButton.isVisible());
 
     licenseButton.setBounds (layout.license);
     settingsButton.setBounds (layout.settings);
@@ -1019,26 +1034,25 @@ void LiveMainComponent::updateStatus()
     stereoKnob.setEnabled (enhancerEnabled);
 
     const auto licenceState = licence.state();
-    if (licence.isLicensed())
-    {
-        licenseButton.setButtonText ("FULL VERSION");
-        licenseButton.setColour (juce::TextButton::textColourOffId, colours::green);
-    }
-    else if (licenceState == askp::LicenseManager::State::ReadOnly)
-    {
-        licenseButton.setButtonText ("UNLOCK • Rp249K");
-        licenseButton.setColour (juce::TextButton::textColourOffId, colours::amber);
-    }
-    else if (licenceState == askp::LicenseManager::State::ClockNeedsAttention)
+    const bool showLicenseWarning = licenceState == askp::LicenseManager::State::ReadOnly
+                                 || licenceState == askp::LicenseManager::State::ClockNeedsAttention;
+    const bool visibilityChanged = licenseButton.isVisible() != showLicenseWarning;
+    licenseButton.setVisible (showLicenseWarning);
+    if (licenceState == askp::LicenseManager::State::ClockNeedsAttention)
     {
         licenseButton.setButtonText ("CHECK CLOCK");
         licenseButton.setColour (juce::TextButton::textColourOffId, colours::red);
     }
-    else
+    else if (licenceState == askp::LicenseManager::State::ReadOnly)
     {
-        licenseButton.setButtonText ("TRIAL • " + juce::String (licence.daysRemaining()) + " DAYS");
-        licenseButton.setColour (juce::TextButton::textColourOffId,
-                                 licence.daysRemaining() <= 7 ? colours::amber : colours::cyan);
+        licenseButton.setButtonText ("TRIAL ENDED");
+        licenseButton.setColour (juce::TextButton::textColourOffId, colours::amber);
+    }
+
+    if (visibilityChanged)
+    {
+        resized();
+        repaint (0, 0, getWidth(), headerHeight);
     }
 
     if (enhancerPower.getToggleState() == audioEngine.isBypassed())
@@ -1086,7 +1100,7 @@ void LiveMainComponent::updateStatus()
 
     repaint (0, 0, getWidth(), headerHeight);
 
-    if (! updatingControls)
+    if (! updatingControls && ! deviceSwitchInProgress)
     {
         if (status.inputDevice.isNotEmpty() && inputDevice.getText() != status.inputDevice)
             setComboTextWithoutNotification (inputDevice, status.inputDevice);
@@ -1095,10 +1109,48 @@ void LiveMainComponent::updateStatus()
     }
 }
 
+void LiveMainComponent::requestDeviceSelection (bool input, const juce::String& name)
+{
+    const auto requestedName = name.trim();
+    if (requestedName.isEmpty() || deviceSwitchInProgress)
+        return;
+
+    deviceSwitchInProgress = true;
+    inputDevice.setEnabled (false);
+    outputDevice.setEnabled (false);
+
+    // Queue the transaction so the native combo popup can close cleanly before
+    // WASAPI tears down and reopens the device pair. This also prevents the 24 Hz
+    // status refresh from restoring the old name during the selection gesture.
+    juce::Component::SafePointer<LiveMainComponent> safeThis (this);
+    juce::MessageManager::callAsync ([safeThis, input, requestedName]
+    {
+        if (safeThis == nullptr)
+            return;
+
+        const auto error = input
+            ? safeThis->audioEngine.selectInputDevice (requestedName)
+            : safeThis->audioEngine.selectOutputDevice (requestedName);
+
+        safeThis->updateDeviceLists();
+        safeThis->deviceSwitchInProgress = false;
+        safeThis->inputDevice.setEnabled (true);
+        safeThis->outputDevice.setEnabled (true);
+        safeThis->updateStatus();
+
+        if (error.isNotEmpty())
+            safeThis->showError (input ? "Input device" : "Output device", error);
+    });
+}
+
 void LiveMainComponent::showSettingsCard()
 {
     auto card = std::make_unique<AudioSettingsCard> (
-        audioEngine, [this] { refreshAllControls(); });
+        audioEngine, [this] { refreshAllControls(); }, [this]
+        {
+            licensePanel.setVisible (true);
+            licensePanel.toFront (true);
+        });
     juce::CallOutBox::launchAsynchronously (std::move (card),
                                             settingsButton.getScreenBounds(), nullptr);
 }

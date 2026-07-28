@@ -2,7 +2,7 @@ param(
     [ValidateSet('Release','Debug')]
     [string]$Configuration = 'Release',
     [string]$BuildDir = 'build-live',
-    [string]$Version = '0.13.0',
+    [string]$Version = '0.13.1',
     [string]$JuceSourceDir = '',
     [switch]$Clean
 )

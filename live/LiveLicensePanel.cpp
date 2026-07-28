@@ -70,12 +70,15 @@ LiveLicensePanel::LiveLicensePanel (EnhancerEngineBridge& engineToUse)
     privacyNote.setText ("Payment is hosted by Midtrans. Sonkupik sends only receipt details, the order capability and this computer request ID to the licence server. Audio is never uploaded.",
                          juce::dontSendNotification);
 
-    for (auto* component : { static_cast<juce::Component*> (&title), &subtitle, &trialBadge,
-                             &price, &priceCaption, &nameLabel, &emailLabel,
-                             &customerName, &customerEmail, &buyButton, &checkButton,
-                             &cancelButton, &paymentStatus, &requestLabel, &requestId,
-                             &copyRequest, &activationLabel, &activationCode,
-                             &activateButton, &closeButton, &privacyNote })
+    const std::array<juce::Component*, 21> components {{
+        &title, &subtitle, &trialBadge, &price, &priceCaption,
+        &nameLabel, &emailLabel, &customerName, &customerEmail,
+        &buyButton, &checkButton, &cancelButton, &paymentStatus,
+        &requestLabel, &requestId, &copyRequest, &activationLabel,
+        &activationCode, &activateButton, &closeButton, &privacyNote
+    }};
+
+    for (auto* component : components)
         addAndMakeVisible (*component);
 
     buyButton.onClick = [this] { startOrOpenCheckout(); };
@@ -232,7 +235,7 @@ void LiveLicensePanel::timerCallback()
         if (result.ok)
         {
             checkout.markActivated();
-                setStatus ("Payment verified. Sonkupik Live Full Version is activated.", colours::green);
+            setStatus ("Payment verified. Sonkupik Live Full Version is activated.", colours::green);
             if (onLicenseChanged)
                 onLicenseChanged();
         }

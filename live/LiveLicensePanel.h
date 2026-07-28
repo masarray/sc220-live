@@ -6,6 +6,8 @@
 
 #include <juce_gui_extra/juce_gui_extra.h>
 
+#include <array>
+
 #ifndef SONKUPIK_LICENSE_PRICE_IDR
  #define SONKUPIK_LICENSE_PRICE_IDR 249000
 #endif

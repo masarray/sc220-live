@@ -378,17 +378,27 @@ $buildTargets = @('SonkupikLive')
 if ($ParityQa) { $buildTargets += @('SonkupikParityReference', 'SonkupikParityLive') }
 $buildArgs = @('--build', $build, '--target') + $buildTargets + @('--parallel')
 if ($useMultiConfig) { $buildArgs += @('--config', $Configuration) }
-& $cmake.Path @buildArgs
+
+$buildLog = Join-Path $build 'sonkupik-build-last.log'
+& $cmake.Path @buildArgs 2>&1 | Tee-Object -FilePath $buildLog
 $firstBuildExitCode = $LASTEXITCODE
 if ($firstBuildExitCode -ne 0) {
-    Write-Host '==> First build attempt failed. Releasing possible executable locks and retrying once.' -ForegroundColor Yellow
+    $buildText = if (Test-Path $buildLog) { Get-Content -Raw $buildLog } else { '' }
+    $isExecutableLock = $buildText -match 'LNK1104' -and
+                        $buildText -match 'Sonkupik(?: Live|Live).*\.exe'
+
+    if (-not $isExecutableLock) {
+        throw "Build failed with exit code $firstBuildExitCode. This is a compile/source error; linker-lock retry was skipped."
+    }
+
+    Write-Host '==> Linker reported a locked Sonkupik Live executable. Releasing it and retrying once.' -ForegroundColor Yellow
     Stop-SonkupikLiveProcesses | Out-Null
     Remove-StaleSonkupikOutputs $build $Configuration
     Start-Sleep -Milliseconds 900
-    & $cmake.Path @buildArgs
+    & $cmake.Path @buildArgs 2>&1 | Tee-Object -FilePath $buildLog
 }
 if ($LASTEXITCODE -ne 0) {
-    throw "Build failed with exit code $LASTEXITCODE after automatic linker-lock retry"
+    throw "Build failed with exit code $LASTEXITCODE after the executable-lock retry"
 }
 
 $candidates = Get-SonkupikOutputCandidates $build $Configuration

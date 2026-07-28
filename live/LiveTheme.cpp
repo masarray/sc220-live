@@ -182,7 +182,7 @@ void LiveLookAndFeel::drawButtonText (juce::Graphics& g, juce::TextButton& butto
                       juce::Justification::centred, 1);
 }
 
-void LiveLookAndFeel::drawComboBox (juce::Graphics& g, int width, int height, bool isDown,
+void LiveLookAndFeel::drawComboBox (juce::Graphics& g, int width, int height, bool,
                                     int, int, int, int, juce::ComboBox& box)
 {
     auto bounds = juce::Rectangle<float> (0.5f, 0.5f, static_cast<float> (width - 1),

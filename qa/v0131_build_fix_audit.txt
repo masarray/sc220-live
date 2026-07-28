@@ -1,0 +1,15 @@
+Sonkupik Live v0.13.1 MSVC build-fix audit
+
+Checks : 9
+Passed : 9
+Failed : 0
+
+[ PASS ] Explicit homogeneous component array
+[ PASS ] No heterogeneous component braced loop
+[ PASS ] Array header included
+[ PASS ] Unused ComboBox bool unnamed
+[ PASS ] Display coordinates explicitly rounded
+[ PASS ] Application version 0.13.1
+[ PASS ] CMake version 0.13.1
+[ PASS ] Retry restricted to LNK1104
+[ PASS ] Compile errors skip linker retry

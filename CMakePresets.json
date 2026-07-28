@@ -8,7 +8,7 @@
   "configurePresets": [
     {
       "name": "windows-live-vs2026",
-      "displayName": "Sonkupik Live v0.13.0 - Visual Studio 2026",
+      "displayName": "Sonkupik Live v0.13.1 - Visual Studio 2026",
       "description": "Deterministic embedded Signature Engine v0.5.19. Requires CMake 4.2+ and Visual Studio 2026 Desktop development with C++.",
       "generator": "Visual Studio 18 2026",
       "architecture": "x64",
@@ -16,7 +16,7 @@
     },
     {
       "name": "windows-live-ninja",
-      "displayName": "Sonkupik Live v0.13.0 - Ninja + MSVC",
+      "displayName": "Sonkupik Live v0.13.1 - Ninja + MSVC",
       "description": "Run from a Visual Studio x64 Developer PowerShell/Command Prompt.",
       "generator": "Ninja",
       "binaryDir": "${sourceDir}/build-live-ninja",

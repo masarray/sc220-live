@@ -1,0 +1,12 @@
+Sonkupik Live v0.13.1 build-fix overlay
+
+1. Close Sonkupik Live.
+2. Extract this ZIP directly into the Sonkupik-Live repository root.
+3. Allow overwrite/replace for all files.
+4. Run: build-live-windows.bat clean
+
+Fixed:
+- MSVC C3535/C2440 in LiveLicensePanel.cpp
+- C4100 unused ComboBox parameter
+- C4244 float-to-int titlebar positioning warnings
+- Build retry now runs only for genuine LNK1104 executable locks

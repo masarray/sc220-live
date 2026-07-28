@@ -1,3 +1,12 @@
+# Sonkupik Live v0.13.1
+
+## v0.13.1 — 2026-07-28 — MSVC licensing panel build fix
+
+- Fixed MSVC C3535/C2440 errors in `LiveLicensePanel.cpp` by replacing a heterogeneous braced pointer list with an explicit `std::array<juce::Component*, 21>`.
+- Removed the unused ComboBox state parameter warning.
+- Added explicit pixel rounding for floating-point display bounds.
+- Build automation now retries only genuine LNK1104 executable-lock failures; compile errors are reported immediately.
+
 # Sonkupik Live v0.13.0
 
 ## v0.13.0 — 2026-07-28 — 30-day trial and QRIS licensing

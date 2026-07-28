@@ -234,7 +234,7 @@ class SonkupikLiveApplication final : public juce::JUCEApplication
 {
 public:
     const juce::String getApplicationName() override { return "Sonkupik Live"; }
-    const juce::String getApplicationVersion() override { return "0.13.0"; }
+    const juce::String getApplicationVersion() override { return "0.13.1"; }
     bool moreThanOneInstanceAllowed() override { return false; }
 
     void initialise (const juce::String&) override
@@ -371,8 +371,9 @@ private:
         if (display != nullptr)
         {
             const auto work = display->userBounds;
-            miniWindow->setTopLeftPosition (work.getRight() - miniWindow->getWidth() - 18,
-                                            work.getBottom() - miniWindow->getHeight() - 18);
+            miniWindow->setTopLeftPosition (
+                juce::roundToInt (work.getRight() - static_cast<float> (miniWindow->getWidth()) - 18.0f),
+                juce::roundToInt (work.getBottom() - static_cast<float> (miniWindow->getHeight()) - 18.0f));
         }
         miniWindow->setVisible (true);
         miniWindow->toFront (true);

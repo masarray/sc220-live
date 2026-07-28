@@ -1,6 +1,6 @@
 # Sonkupik Live Development Context
 
-Current milestone: **v0.13.0 — 30-day trial and QRIS Full Version licensing**.
+Current milestone: **v0.13.1 — 30-day trial and QRIS Full Version licensing**.
 
 ## Audio authority
 

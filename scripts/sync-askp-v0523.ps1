@@ -79,6 +79,44 @@ function Move-StaleAuthorityAside {
     Move-Item -LiteralPath $authority -Destination $backup -Force
 }
 
+function Normalize-TextFileToLf {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Path
+    )
+
+    if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) {
+        return
+    }
+
+    $bytes = [System.IO.File]::ReadAllBytes($Path)
+    $utf8 = New-Object System.Text.UTF8Encoding($false, $true)
+    try {
+        $text = $utf8.GetString($bytes)
+    }
+    catch {
+        throw "Unable to decode tracked source as UTF-8: $Path"
+    }
+
+    $normalised = $text.Replace("`r`n", "`n").Replace("`r", "`n")
+    $normalisedBytes = (New-Object System.Text.UTF8Encoding($false)).GetBytes($normalised)
+
+    $same = $bytes.Length -eq $normalisedBytes.Length
+    if ($same) {
+        for ($i = 0; $i -lt $bytes.Length; $i++) {
+            if ($bytes[$i] -ne $normalisedBytes[$i]) {
+                $same = $false
+                break
+            }
+        }
+    }
+
+    if (-not $same) {
+        [System.IO.File]::WriteAllBytes($Path, $normalisedBytes)
+        Write-Host "==> Normalised tracked source to LF: $Path" -ForegroundColor DarkGray
+    }
+}
+
 # Fail early when the local branch does not actually contain the reviewed
 # submodule gitlink. This usually means the user has not fetched/checked out the
 # complete port branch yet.
@@ -165,5 +203,11 @@ Run these diagnostics and share the complete output:
 if ($actual -ne $commit) {
     throw "ASK-P authority mismatch. Expected $commit but found $actual"
 }
+
+# Git for Windows may materialise tracked source as CRLF when an older checkout
+# predates .gitattributes. CMake's immutable SHA gate is byte-based, so normalise
+# only the reviewed sphere source before configuration. Any real source edit
+# still produces a different SHA and remains fail-closed.
+Normalize-TextFileToLf -Path (Join-Path $RepositoryRoot 'third_party\sonkupik-sphere-v0.10.4\OrbVisualizer.cpp')
 
 Write-Host "==> ASK-P authority verified: v0.5.23 @ $commit" -ForegroundColor Green

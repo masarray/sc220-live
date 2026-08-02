@@ -4,7 +4,6 @@
 
 namespace askp::live {
 namespace {
-constexpr auto presetId = "preset";
 constexpr auto inputGainId = "input_gain_db";
 constexpr auto finalOutputGainId = "final_output_gain_db";
 constexpr auto enhanceId = "enhance";
@@ -18,7 +17,7 @@ constexpr auto gainMatchId = "gain_match";
 
 EnhancerEngineBridge::EnhancerEngineBridge()
 {
-    static_assert (ASKP_DSP_HEADER_REVISION == 2026072702,
+    static_assert (ASKP_DSP_HEADER_REVISION == 2026073102,
                    "Unexpected ArSonKuPik engine revision");
     jassert (processor_.presetNames().size() == factoryProfileCount);
     processor_.scopeTap.setEnabled (false);
@@ -82,7 +81,7 @@ void EnhancerEngineBridge::setPresetIndex (int index)
         return;
 
     index = juce::jlimit (0, names.size() - 1, index);
-    // The public authority method performs the complete v0.5.19 profile handoff:
+    // The public authority method performs the complete v0.5.23 profile handoff:
     // scene dimensions, five visible macros, internal output trim and protect.
     processor_.applyPresetMacroToParameters (index);
 }
@@ -92,8 +91,7 @@ int EnhancerEngineBridge::presetIndex() const noexcept
     const int count = processor_.presetNames().size();
     if (count <= 0)
         return 0;
-    return juce::jlimit (0, count - 1,
-                         static_cast<int> (std::lround (getParameter (presetId))));
+    return juce::jlimit (0, count - 1, processor_.currentFactoryPresetIndex());
 }
 
 juce::StringArray EnhancerEngineBridge::presetNames() const
@@ -178,6 +176,12 @@ EnhancerEngineBridge::MeterSnapshot EnhancerEngineBridge::meters() const noexcep
     result.outputPeakDbL = processor_.meters.outputPeakDbL.load (std::memory_order_relaxed);
     result.outputPeakDbR = processor_.meters.outputPeakDbR.load (std::memory_order_relaxed);
     result.gainReductionDb = processor_.meters.gainReductionDb.load (std::memory_order_relaxed);
+    result.safetyGainReductionDb = processor_.meters.safetyGainReductionDb.load (std::memory_order_relaxed);
+    result.preSafetyPeakDbL = processor_.meters.preSafetyPeakDbL.load (std::memory_order_relaxed);
+    result.preSafetyPeakDbR = processor_.meters.preSafetyPeakDbR.load (std::memory_order_relaxed);
+    result.inputOver = processor_.meters.inputOver.load (std::memory_order_relaxed);
+    result.preSafetyOver = processor_.meters.preSafetyOver.load (std::memory_order_relaxed);
+    result.outputOver = processor_.meters.outputOver.load (std::memory_order_relaxed);
     result.gainMatchDb = processor_.meters.gainMatchDb.load (std::memory_order_relaxed);
     result.gainMatchReady = processor_.meters.gainMatchReady.load (std::memory_order_relaxed);
     result.correlation = processor_.meters.correlation.load (std::memory_order_relaxed);

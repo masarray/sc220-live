@@ -12,6 +12,7 @@ def read(path):
 cmake = read("CMakeLists.txt")
 bridge_h = read("live/EnhancerEngineBridge.h")
 bridge_cpp = read("live/EnhancerEngineBridge.cpp")
+sphere_host = read("live/SonkupikSphereVisualizer.h")
 lock = read("ASKP_AUTHORITY.lock")
 gitmodules = read(".gitmodules")
 gitattributes = read(".gitattributes")
@@ -34,6 +35,10 @@ check("honest safety meters bridged", all(x in bridge_h + bridge_cpp for x in [
 check("authoritative preset index API", "currentFactoryPresetIndex" in bridge_cpp)
 check("ASK-P Orb excluded", "${ASKP_PROCESSOR_DIR}/OrbVisualizer.cpp" not in cmake and "${ASKP_PORT_ROOT}/src/OrbVisualizer.cpp" not in cmake)
 check("local sphere retained", "third_party/sonkupik-sphere-v0.10.4" in cmake)
+check("sphere header is unambiguous", all(x in sphere_host for x in [
+    '../third_party/sonkupik-sphere-v0.10.4/OrbVisualizer.h',
+    'Do not use a generic']))
+check("generic Orb header lookup removed", '#include "OrbVisualizer.h"' not in sphere_host)
 check("tracked C++ source forced to LF", "*.cpp text eol=lf" in gitattributes)
 check("legacy CRLF sphere normalised before CMake", all(x in sync_script for x in [
     "Normalize-TextFileToLf", "OrbVisualizer.cpp", ".Replace(\"`r`n\", \"`n\")"]))

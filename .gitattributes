@@ -1,0 +1,25 @@
+# Keep source-authority text byte-stable across Windows and CI checkouts.
+# Batch files stay CRLF-friendly; C/C++, CMake, Python and PowerShell use LF.
+*.c text eol=lf
+*.cc text eol=lf
+*.cpp text eol=lf
+*.h text eol=lf
+*.hpp text eol=lf
+*.cmake text eol=lf
+CMakeLists.txt text eol=lf
+*.py text eol=lf
+*.ps1 text eol=lf
+*.md text eol=lf
+*.json text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+# Binary assets must never pass through text conversion.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.ttf binary
+*.zip binary
+*.exe binary

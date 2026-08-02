@@ -2,13 +2,15 @@ param(
     [ValidateSet('Release','Debug')]
     [string]$Configuration = 'Release',
     [string]$BuildDir = 'build-live',
-    [string]$Version = '0.13.3',
+    [string]$Version = '0.14.0',
     [string]$JuceSourceDir = '',
     [switch]$Clean
 )
 
 $ErrorActionPreference = 'Stop'
 $root = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
+
+& (Join-Path $PSScriptRoot 'sync-askp-v0523.ps1') -RepositoryRoot $root
 
 function Remove-PathWithRetry([string]$path) {
     if (-not (Test-Path $path)) { return }

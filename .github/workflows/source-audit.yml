@@ -12,6 +12,8 @@ jobs:
   source-audit:
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    env:
+      ASKP_REPO_TOKEN: ${{ secrets.ASKP_REPO_TOKEN }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -24,7 +26,7 @@ jobs:
       - name: Validate fixed transform reference
         run: python qa/verify_fixed_fft.py
       - name: Checkout private ASK-P authority when CI token is configured
-        if: ${{ secrets.ASKP_REPO_TOKEN != '' }}
+        if: ${{ env.ASKP_REPO_TOKEN != '' }}
         uses: actions/checkout@v4
         with:
           repository: masarray/askp-vst
@@ -32,7 +34,7 @@ jobs:
           token: ${{ secrets.ASKP_REPO_TOKEN }}
           path: third_party/askp-vst
       - name: Compile current profile and DSP audit
-        if: ${{ secrets.ASKP_REPO_TOKEN != '' }}
+        if: ${{ env.ASKP_REPO_TOKEN != '' }}
         run: >-
           g++ -std=c++17 -O2
           -Ithird_party/askp-vst/engine
@@ -41,5 +43,5 @@ jobs:
           third_party/askp-vst/engine/arsonkupik_presets.cpp
           -o /tmp/sonkupik-preset-profile-audit
       - name: Run current profile and DSP audit
-        if: ${{ secrets.ASKP_REPO_TOKEN != '' }}
+        if: ${{ env.ASKP_REPO_TOKEN != '' }}
         run: /tmp/sonkupik-preset-profile-audit

@@ -19,13 +19,19 @@ public:
         float outputPeakDbL = -120.0f;
         float outputPeakDbR = -120.0f;
         float gainReductionDb = 0.0f;
+        float safetyGainReductionDb = 0.0f;
+        float preSafetyPeakDbL = -120.0f;
+        float preSafetyPeakDbR = -120.0f;
+        bool inputOver = false;
+        bool preSafetyOver = false;
+        bool outputOver = false;
         float gainMatchDb = 0.0f;
         bool gainMatchReady = false;
         float correlation = 1.0f;
         bool clipping = false;
     };
 
-    static constexpr const char* engineVersion = "0.5.19";
+    static constexpr const char* engineVersion = "0.5.23";
     static constexpr int engineRevision = ASKP_DSP_HEADER_REVISION;
     static constexpr int factoryProfileCount = 13;
 

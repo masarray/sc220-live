@@ -14,6 +14,8 @@ bridge_h = read("live/EnhancerEngineBridge.h")
 bridge_cpp = read("live/EnhancerEngineBridge.cpp")
 lock = read("ASKP_AUTHORITY.lock")
 gitmodules = read(".gitmodules")
+gitattributes = read(".gitattributes")
+sync_script = read("scripts/sync-askp-v0523.ps1")
 
 commit = "5757119cab7a1a75f09dcf0edea6e3be97975439"
 check("Sonkupik version 0.14.0", "VERSION 0.14.0" in cmake)
@@ -32,6 +34,9 @@ check("honest safety meters bridged", all(x in bridge_h + bridge_cpp for x in [
 check("authoritative preset index API", "currentFactoryPresetIndex" in bridge_cpp)
 check("ASK-P Orb excluded", "${ASKP_PROCESSOR_DIR}/OrbVisualizer.cpp" not in cmake and "${ASKP_PORT_ROOT}/src/OrbVisualizer.cpp" not in cmake)
 check("local sphere retained", "third_party/sonkupik-sphere-v0.10.4" in cmake)
+check("tracked C++ source forced to LF", "*.cpp text eol=lf" in gitattributes)
+check("legacy CRLF sphere normalised before CMake", all(x in sync_script for x in [
+    "Normalize-TextFileToLf", "OrbVisualizer.cpp", ".Replace(\"`r`n\", \"`n\")"]))
 
 failed = [name for name, ok in checks if not ok]
 print("Sonkupik Live v0.14.0 ASK-P v0.5.23 port audit")

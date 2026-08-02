@@ -248,11 +248,11 @@ function Remove-IncompatibleBuildTree([string]$buildPath, [string]$wantedGenerat
     }
 }
 
-$embeddedEngine = Join-Path $root 'third_party\askp-engine-v0.5.19\engine\arsonkupik_dsp.cpp'
-if (-not (Test-Path $embeddedEngine)) {
-    throw "Embedded ArSonKuPik v0.5.19 authority is missing: $embeddedEngine"
+$pinnedEngine = Join-Path $root 'third_party\askp-vst\engine\arsonkupik_dsp.cpp'
+if (-not (Test-Path $pinnedEngine)) {
+    throw "Pinned ArSonKuPik v0.5.23 authority is missing: $pinnedEngine"
 }
-Write-Host '==> Enhancer authority: embedded ArSonKuPik v0.5.19 (deterministic local port)'
+Write-Host '==> Enhancer authority: ArSonKuPik v0.5.23 (pinned private submodule)'
 
 $vs = Get-VisualStudioInstallation
 $vsMajor = 0

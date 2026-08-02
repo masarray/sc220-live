@@ -1,0 +1,4 @@
+[submodule "third_party/askp-vst"]
+	path = third_party/askp-vst
+	url = ../askp-vst.git
+	branch = master

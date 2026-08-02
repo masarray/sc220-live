@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.22)
 
-project(SonkupikLive VERSION 0.13.3 LANGUAGES C CXX)
+project(SonkupikLive VERSION 0.14.0 LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -11,69 +11,144 @@ if(MSVC)
 endif()
 
 # ---------------------------------------------------------------------------
-# Embedded ArSonKuPik Signature Engine v0.5.19
+# Pinned ArSonKuPik v0.5.23 audio authority
 # ---------------------------------------------------------------------------
-# v0.12.0 no longer reads DSP or visualizer source from a neighbouring checkout.
-# The reviewed engine is vendored and hash-locked, making clean builds fully
-# deterministic. The Sonkupik sphere remains a separate, locally versioned UI.
-set(ASKP_PORT_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/third_party/askp-engine-v0.5.19")
+# The full ASK-P repository is mounted as a git submodule at one reviewed
+# commit. Sonkupik compiles only DSP, profile, processor and licence authority;
+# the ASK-P editor and OrbVisualizer remain excluded. The approved Sonkupik
+# sphere stays local and independent.
+set(SONKUPIK_ASKP_COMMIT "5757119cab7a1a75f09dcf0edea6e3be97975439")
+set(ASKP_PORT_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/third_party/askp-vst")
 set(ASKP_ENGINE_DIR "${ASKP_PORT_ROOT}/engine")
 set(ASKP_PROCESSOR_DIR "${ASKP_PORT_ROOT}/src")
-set(ASKP_REFERENCE_DIR "${ASKP_PORT_ROOT}/reference")
 set(SONKUPIK_SPHERE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/third_party/sonkupik-sphere-v0.10.4")
+
+foreach(_required IN ITEMS
+        "${ASKP_ENGINE_DIR}/arsonkupik_dsp.cpp"
+        "${ASKP_ENGINE_DIR}/arsonkupik_dsp.hpp"
+        "${ASKP_ENGINE_DIR}/arsonkupik_presets.cpp"
+        "${ASKP_ENGINE_DIR}/wow_headroom_guard.hpp"
+        "${ASKP_PROCESSOR_DIR}/PluginProcessor.cpp"
+        "${ASKP_PROCESSOR_DIR}/PluginProcessor.h"
+        "${ASKP_PROCESSOR_DIR}/LicenseManager.cpp"
+        "${ASKP_PROCESSOR_DIR}/LicenseManager.h"
+        "${ASKP_PROCESSOR_DIR}/LicensePublicKey.h")
+    if(NOT EXISTS "${_required}")
+        message(FATAL_ERROR
+            "Pinned ASK-P v0.5.23 authority is missing: ${_required}\n"
+            "Run: git submodule update --init --recursive third_party/askp-vst")
+    endif()
+endforeach()
+
+find_package(Git QUIET)
+if(Git_FOUND)
+    execute_process(
+        COMMAND "${GIT_EXECUTABLE}" -C "${ASKP_PORT_ROOT}" rev-parse HEAD
+        RESULT_VARIABLE _askp_git_result
+        OUTPUT_VARIABLE _askp_actual_commit
+        OUTPUT_STRIP_TRAILING_WHITESPACE
+        ERROR_QUIET)
+    if(_askp_git_result EQUAL 0
+       AND NOT _askp_actual_commit STREQUAL SONKUPIK_ASKP_COMMIT)
+        message(FATAL_ERROR
+            "ASK-P authority commit mismatch.\n"
+            "Expected: ${SONKUPIK_ASKP_COMMIT}\n"
+            "Actual:   ${_askp_actual_commit}\n"
+            "Run git submodule update --init --recursive --force --checkout third_party/askp-vst")
+    endif()
+endif()
 
 set(ASKP_DSP_SOURCE "${ASKP_ENGINE_DIR}/arsonkupik_dsp.cpp")
 set(ASKP_PRESET_SOURCE "${ASKP_ENGINE_DIR}/arsonkupik_presets.cpp")
-set(ASKP_LIVE_PROCESSOR_SOURCE "${ASKP_PROCESSOR_DIR}/PluginProcessor.cpp")
-set(ASKP_REFERENCE_PROCESSOR_SOURCE "${ASKP_REFERENCE_DIR}/PluginProcessor.cpp")
+set(ASKP_REFERENCE_PROCESSOR_SOURCE "${ASKP_PROCESSOR_DIR}/PluginProcessor.cpp")
+set(ASKP_REFERENCE_PROCESSOR_HEADER "${ASKP_PROCESSOR_DIR}/PluginProcessor.h")
 set(ASKP_LICENSE_SOURCE "${ASKP_PROCESSOR_DIR}/LicenseManager.cpp")
 set(SONKUPIK_LOOK_AND_FEEL_SOURCE "${SONKUPIK_SPHERE_DIR}/AskpLookAndFeel.cpp")
 set(SONKUPIK_ORB_SOURCE "${SONKUPIK_SPHERE_DIR}/OrbVisualizer.cpp")
 
 function(sonkupik_assert_sha256 file_path expected_sha)
     if(NOT EXISTS "${file_path}")
-        message(FATAL_ERROR "Required embedded authority file is missing: ${file_path}")
+        message(FATAL_ERROR "Required immutable Sonkupik authority file is missing: ${file_path}")
     endif()
     file(SHA256 "${file_path}" actual_sha)
     if(NOT actual_sha STREQUAL expected_sha)
         message(FATAL_ERROR
-            "Embedded authority hash mismatch for ${file_path}\n"
-            "Expected: ${expected_sha}\nActual:   ${actual_sha}\n"
-            "Re-port and rerun QA instead of building an unreviewed engine.")
+            "Immutable Sonkupik authority hash mismatch for ${file_path}\n"
+            "Expected: ${expected_sha}\nActual:   ${actual_sha}")
     endif()
 endfunction()
 
-sonkupik_assert_sha256("${ASKP_DSP_SOURCE}"
-    "d716a086dfcba06332871405f85058304be7f96bc356e8aa755fcc5300f79df2")
-sonkupik_assert_sha256("${ASKP_ENGINE_DIR}/arsonkupik_dsp.hpp"
-    "fbfe14be0ea8e7254341c85cc03f96cea8cf96c247c2fbb5b310cb88f02d62c2")
-sonkupik_assert_sha256("${ASKP_PRESET_SOURCE}"
-    "948ecf3bc7520413d1ea7a7b42cfca44291bbbf1ecb12c74aaeaca58a746910f")
-sonkupik_assert_sha256("${ASKP_LIVE_PROCESSOR_SOURCE}"
-    "3b8a31b753449386febf4d28478b1023e0ec10ec9b64ac0d1aff4215b84493ed")
-sonkupik_assert_sha256("${ASKP_PROCESSOR_DIR}/PluginProcessor.h"
-    "e2b5fef5a34330a8e26c437aed82aef97ba3703115de5094edd7142fbdd7fc6e")
-sonkupik_assert_sha256("${ASKP_LICENSE_SOURCE}"
-    "5e052cf06d65692cac1e03765e5e037a38bc2e4fa3b211b89ccbef658a342228")
-sonkupik_assert_sha256("${ASKP_PROCESSOR_DIR}/LicenseManager.h"
-    "dc6832ad9ccdb566f45dadb4ca36ec744845d212714f696389ae2b41207e3755")
-sonkupik_assert_sha256("${ASKP_PROCESSOR_DIR}/LicensePublicKey.h"
-    "8fa4238d321dbdeb00b5408a10365cbc8110cd28006aa2ccd526c90f2e5ca372")
-# Hash locks intentionally cover only immutable vendored authorities.
-# LiveLicensePanel and LicenseCheckoutClient are Sonkupik integration source,
-# not third-party engine authority; they are validated by source QA instead.
+# ASK-P is locked by its complete git commit. The local sphere remains locked by
+# source hash because it intentionally does not come from the ASK-P submodule.
 sonkupik_assert_sha256("${SONKUPIK_ORB_SOURCE}"
     "f5ed2351fb9d22dfbc520b56c86e19091632c516d174cc83983d708d4eda7a04")
 
 file(READ "${ASKP_ENGINE_DIR}/arsonkupik_dsp.hpp" _askp_header)
-if(NOT _askp_header MATCHES "ASKP_DSP_HEADER_REVISION 2026072702")
-    message(FATAL_ERROR "Expected ArSonKuPik engine revision 2026072702 was not found")
+if(NOT _askp_header MATCHES "ASKP_DSP_HEADER_REVISION 2026073102")
+    message(FATAL_ERROR "Expected ArSonKuPik v0.5.23 engine revision 2026073102 was not found")
 endif()
 file(READ "${ASKP_PRESET_SOURCE}" _askp_presets)
 if(NOT _askp_presets MATCHES "profiles.reserve\\(13\\)")
-    message(FATAL_ERROR "Expected the reviewed 13-profile v0.5.19 platform")
+    message(FATAL_ERROR "Expected the reviewed 13-profile ASK-P platform")
 endif()
-message(STATUS "Sonkupik Live enhancer authority: embedded ArSonKuPik v0.5.19 / revision 2026072702")
+
+# ---------------------------------------------------------------------------
+# Deterministic headless processor variants
+# ---------------------------------------------------------------------------
+# ASK-P remains exact at the pinned commit. Configure-time generated copies only
+# remove the VST editor from the standalone rack; the Live variant additionally
+# changes the creative-control glide from 80 ms to 12 ms. The reference variant
+# retains 80 ms for parity renders.
+set(ASKP_GENERATED_DIR "${CMAKE_CURRENT_BINARY_DIR}/generated/askp-v0.5.23")
+file(MAKE_DIRECTORY "${ASKP_GENERATED_DIR}")
+
+file(READ "${ASKP_REFERENCE_PROCESSOR_HEADER}" _processor_header)
+set(_has_editor_anchor "bool hasEditor() const override { return true; }")
+string(FIND "${_processor_header}" "${_has_editor_anchor}" _has_editor_pos)
+if(_has_editor_pos EQUAL -1)
+    message(FATAL_ERROR "ASK-P v0.5.23 hasEditor anchor changed; re-audit the port")
+endif()
+string(REPLACE "${_has_editor_anchor}"
+               "bool hasEditor() const override { return false; }"
+               _headless_header "${_processor_header}")
+file(WRITE "${ASKP_GENERATED_DIR}/PluginProcessor.h" "${_headless_header}")
+
+file(READ "${ASKP_REFERENCE_PROCESSOR_SOURCE}" _processor_source)
+set(_editor_include_anchor "#include \"PluginEditor.h\"")
+string(FIND "${_processor_source}" "${_editor_include_anchor}" _editor_include_pos)
+if(_editor_include_pos EQUAL -1)
+    message(FATAL_ERROR "ASK-P v0.5.23 PluginEditor include anchor changed; re-audit the port")
+endif()
+string(REPLACE "${_editor_include_anchor}"
+               "// Sonkupik Live headless processor: ASK-P editor intentionally excluded."
+               _headless_source "${_processor_source}")
+
+set(_create_editor_anchor "juce::AudioProcessorEditor* Processor::createEditor()\n{\n    return new Editor(*this);\n}")
+string(FIND "${_headless_source}" "${_create_editor_anchor}" _create_editor_pos)
+if(_create_editor_pos EQUAL -1)
+    message(FATAL_ERROR "ASK-P v0.5.23 createEditor anchor changed; re-audit the port")
+endif()
+string(REPLACE "${_create_editor_anchor}"
+               "juce::AudioProcessorEditor* Processor::createEditor()\n{\n    return nullptr;\n}"
+               _reference_headless_source "${_headless_source}")
+file(WRITE "${ASKP_GENERATED_DIR}/PluginProcessor_Reference.cpp"
+     "${_reference_headless_source}")
+
+set(_ramp_anchor "const double ramp = 0.08; // 80 ms knob glide")
+string(FIND "${_reference_headless_source}" "${_ramp_anchor}" _ramp_pos)
+if(_ramp_pos EQUAL -1)
+    message(FATAL_ERROR "ASK-P v0.5.23 80 ms control-ramp anchor changed; re-audit the port")
+endif()
+string(REPLACE "${_ramp_anchor}"
+               "const double ramp = 0.012; // Sonkupik Live low-latency macro glide"
+               _live_headless_source "${_reference_headless_source}")
+file(WRITE "${ASKP_GENERATED_DIR}/PluginProcessor_Live.cpp"
+     "${_live_headless_source}")
+set(ASKP_LIVE_PROCESSOR_SOURCE "${ASKP_GENERATED_DIR}/PluginProcessor_Live.cpp")
+set(ASKP_HEADLESS_REFERENCE_SOURCE "${ASKP_GENERATED_DIR}/PluginProcessor_Reference.cpp")
+
+message(STATUS "Sonkupik Live enhancer authority: ArSonKuPik v0.5.23 @ ${SONKUPIK_ASKP_COMMIT}")
+message(STATUS "Sonkupik Live engine revision: 2026073102; profiles: 13; Live glide: 12 ms")
 message(STATUS "Sonkupik Live sphere authority: local approved v0.10.4 visual baseline")
 
 # Relaxed contraction stays confined to the DSP translation unit.
@@ -176,6 +251,7 @@ target_sources(SonkupikLive PRIVATE
 )
 
 target_include_directories(SonkupikLive PRIVATE
+    "${ASKP_GENERATED_DIR}"
     "${ASKP_PROCESSOR_DIR}"
     "${ASKP_ENGINE_DIR}"
     "${SONKUPIK_SPHERE_DIR}"
@@ -196,11 +272,11 @@ target_compile_definitions(SonkupikLive PRIVATE
     JucePlugin_ProducesMidiOutput=0
     JucePlugin_IsMidiEffect=0
     JucePlugin_EditorRequiresKeyboardFocus=0
-    JucePlugin_Version=0.5.19
-    JucePlugin_VersionCode=0x513
-    JucePlugin_VersionString="0.5.19"
-    ASKP_BUILD_CHANNEL="Sonkupik Live Embedded Engine v0.5.20"
-    SONKUPIK_ENGINE_REVISION=2026072702
+    JucePlugin_Version=0.5.23
+    JucePlugin_VersionCode=0x517
+    JucePlugin_VersionString="0.5.23"
+    ASKP_BUILD_CHANNEL="Sonkupik Live Embedded Authority v0.5.23"
+    SONKUPIK_ENGINE_REVISION=2026073102
     SONKUPIK_LICENSE_API_URL="https://masarray-license-api.masari.workers.dev"
     SONKUPIK_LICENSE_PRODUCT_ID="sonkupik-live"
     SONKUPIK_LICENSE_PRICE_IDR=249000
@@ -223,10 +299,10 @@ target_link_libraries(SonkupikLive PRIVATE
 # Optional preset-by-preset parity renderers
 # ---------------------------------------------------------------------------
 option(SONKUPIK_BUILD_PARITY_QA
-    "Build v0.5.19 reference and Sonkupik Live offline parity renderers" OFF)
+    "Build ASK-P v0.5.23 reference and Sonkupik Live offline parity renderers" OFF)
 
 if(SONKUPIK_BUILD_PARITY_QA)
-    function(sonkupik_add_parity_renderer target_name product_name processor_source processor_include variant_name)
+    function(sonkupik_add_parity_renderer target_name product_name processor_source variant_name)
         juce_add_console_app(${target_name} PRODUCT_NAME "${product_name}")
         target_sources(${target_name} PRIVATE
             qa/ParityRendererMain.cpp
@@ -236,7 +312,7 @@ if(SONKUPIK_BUILD_PARITY_QA)
             "${ASKP_LICENSE_SOURCE}"
         )
         target_include_directories(${target_name} PRIVATE
-            "${processor_include}"
+            "${ASKP_GENERATED_DIR}"
             "${ASKP_PROCESSOR_DIR}"
             "${ASKP_ENGINE_DIR}"
         )
@@ -249,9 +325,9 @@ if(SONKUPIK_BUILD_PARITY_QA)
             JucePlugin_IsSynth=0 JucePlugin_WantsMidiInput=0
             JucePlugin_ProducesMidiOutput=0 JucePlugin_IsMidiEffect=0
             JucePlugin_EditorRequiresKeyboardFocus=0
-            JucePlugin_Version=0.5.19 JucePlugin_VersionCode=0x513
-            JucePlugin_VersionString="0.5.19"
-            ASKP_BUILD_CHANNEL="Sonkupik Live v0.5.19 Parity"
+            JucePlugin_Version=0.5.23 JucePlugin_VersionCode=0x517
+            JucePlugin_VersionString="0.5.23"
+            ASKP_BUILD_CHANNEL="Sonkupik Live v0.5.23 Parity"
             SONKUPIK_PARITY_VARIANT="${variant_name}"
         )
         target_link_libraries(${target_name} PRIVATE
@@ -270,15 +346,13 @@ if(SONKUPIK_BUILD_PARITY_QA)
 
     sonkupik_add_parity_renderer(
         SonkupikParityReference
-        "Sonkupik v0.5.19 Reference Renderer"
-        "${ASKP_REFERENCE_PROCESSOR_SOURCE}"
-        "${ASKP_REFERENCE_DIR}"
-        "askp-v0.5.19-headless-80ms")
+        "ASK-P v0.5.23 Reference Renderer"
+        "${ASKP_HEADLESS_REFERENCE_SOURCE}"
+        "askp-v0.5.23-headless-80ms")
 
     sonkupik_add_parity_renderer(
         SonkupikParityLive
-        "Sonkupik v0.5.19 Live Renderer"
+        "Sonkupik v0.5.23 Live Renderer"
         "${ASKP_LIVE_PROCESSOR_SOURCE}"
-        "${ASKP_PROCESSOR_DIR}"
         "sonkupik-live-12ms")
 endif()

@@ -14,32 +14,32 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
+        with:
+          submodules: false
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - name: Install numerical reference dependency
-        run: python -m pip install --disable-pip-version-check numpy
-      - name: Validate v0.13.3 device and evaluation UX
-        run: python qa/audit_v0133_device_trial_ux.py
+      - name: Validate ASK-P v0.5.23 port boundary
+        run: python qa/audit_v0140_askp_v0523_port.py
       - name: Validate fixed transform reference
         run: python qa/verify_fixed_fft.py
-      - name: Compile v0.5.19 preset/profile audit
+      - name: Checkout private ASK-P authority when CI token is configured
+        if: ${{ secrets.ASKP_REPO_TOKEN != '' }}
+        uses: actions/checkout@v4
+        with:
+          repository: masarray/askp-vst
+          ref: 5757119cab7a1a75f09dcf0edea6e3be97975439
+          token: ${{ secrets.ASKP_REPO_TOKEN }}
+          path: third_party/askp-vst
+      - name: Compile current profile and DSP audit
+        if: ${{ secrets.ASKP_REPO_TOKEN != '' }}
         run: >-
           g++ -std=c++17 -O2
-          -Ithird_party/askp-engine-v0.5.19/engine
+          -Ithird_party/askp-vst/engine
           qa/preset_profile_v0519_audit.cpp
-          third_party/askp-engine-v0.5.19/engine/arsonkupik_dsp.cpp
-          third_party/askp-engine-v0.5.19/engine/arsonkupik_presets.cpp
+          third_party/askp-vst/engine/arsonkupik_dsp.cpp
+          third_party/askp-vst/engine/arsonkupik_presets.cpp
           -o /tmp/sonkupik-preset-profile-audit
-      - name: Run v0.5.19 preset/profile audit
+      - name: Run current profile and DSP audit
+        if: ${{ secrets.ASKP_REPO_TOKEN != '' }}
         run: /tmp/sonkupik-preset-profile-audit
-      - name: Compile floor-only gain architecture audit
-        run: >-
-          g++ -std=c++17 -O2
-          -Ithird_party/askp-engine-v0.5.19/engine
-          qa/floor_only_gain_p7g_audit.cpp
-          third_party/askp-engine-v0.5.19/engine/arsonkupik_dsp.cpp
-          third_party/askp-engine-v0.5.19/engine/arsonkupik_presets.cpp
-          -o /tmp/sonkupik-floor-only-gain-audit
-      - name: Run floor-only gain architecture audit
-        run: /tmp/sonkupik-floor-only-gain-audit

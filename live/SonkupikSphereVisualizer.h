@@ -1,6 +1,12 @@
 #pragma once
 
-#include "OrbVisualizer.h"
+// Use the approved Sonkupik sphere by an explicit repository-relative path.
+// Do not use a generic "OrbVisualizer.h" lookup here: ASK-P v0.5.23 also owns
+// a header with that name, and selecting it would pull the original VST
+// PluginProcessor.h into the same translation unit as the generated headless
+// Live processor header.
+#include "../third_party/sonkupik-sphere-v0.10.4/OrbVisualizer.h"
+
 #include <juce_gui_basics/juce_gui_basics.h>
 
 namespace askp::live {

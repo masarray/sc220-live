@@ -45,6 +45,7 @@ private:
 
     void timerCallback() override;
     void configureControls();
+    void refreshMonitorDevices();
     void showSettingsMenu();
     void showAudioSettings();
     void drawHeader (juce::Graphics&);
@@ -67,13 +68,17 @@ private:
     LucideIconButton closeButton { "Close", "x_svg", juce::Colours::white };
     LucideIconButton settingsButton { "Settings", "settings_svg", juce::Colours::white };
     LucideIconButton enhancerPowerButton { "Smart Enhancer", "power_svg", juce::Colours::white };
+    LucideIconButton monitorPowerButton { "Monitor On / Off", "headphones_svg", juce::Colours::white };
     juce::TextButton goLiveButton { "GO LIVE" };
 
     juce::ComboBox presetBox;
     juce::ComboBox outputBox;
+    juce::ComboBox monitorOutputBox;
     juce::TextButton stereoButton { "STEREO" };
     juce::TextButton dualMonoButton { "DUAL MONO" };
     juce::ComboBox pcSourceBox;
+    juce::TextButton programMonitorButton { "PROGRAM" };
+    juce::TextButton musicCueButton { "MUSIC CUE" };
 
     juce::Slider inputTrim;
     juce::Slider sc220Fader;

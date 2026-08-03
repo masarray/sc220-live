@@ -2,7 +2,10 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 cmake = (ROOT / "CMakeLists.txt").read_text(encoding="utf-8")
-generator = (ROOT / "cmake/GenerateSC220AlignedUi.cmake").read_text(encoding="utf-8")
+aligned = (ROOT / "cmake/GenerateSC220AlignedUi.cmake").read_text(encoding="utf-8")
+monitor = (ROOT / "cmake/GenerateSC220MonitorUi.cmake").read_text(encoding="utf-8")
+state = (ROOT / "cmake/GenerateSC220BroadcastState.cmake").read_text(encoding="utf-8")
+polish = (ROOT / "cmake/PolishSC220FinalUi.cmake").read_text(encoding="utf-8")
 bridge_h = (ROOT / "live/EnhancerEngineBridge.h").read_text(encoding="utf-8")
 bridge_cpp = (ROOT / "live/EnhancerEngineBridge.cpp").read_text(encoding="utf-8")
 main_cpp = (ROOT / "live/SC220MainComponent.cpp").read_text(encoding="utf-8")
@@ -14,120 +17,78 @@ def check(name: str, condition: bool) -> None:
     checks.append((name, bool(condition)))
 
 
-def cmake_bracket_value(name: str) -> str:
-    prefix = f"set({name} [=[\n"
-    start = generator.find(prefix)
-    if start < 0:
-        raise ValueError(f"missing CMake bracket value: {name}")
-    start += len(prefix)
-    end = generator.find("\n]=])", start)
-    if end < 0:
-        raise ValueError(f"unterminated CMake bracket value: {name}")
-    return generator[start:end]
-
-
-transformed = main_cpp
-transforms_ok = True
-for anchor_name, replacement_name in (
-    ("_input_layout_anchor", "_input_layout_replacement"),
-    ("_master_layout_anchor", "_master_layout_replacement"),
-    ("_stream_title_anchor", "_stream_title_replacement"),
-    ("_ui_active_anchor", "_ui_active_replacement"),
-):
-    try:
-        anchor = cmake_bracket_value(anchor_name)
-        replacement = cmake_bracket_value(replacement_name)
-    except ValueError:
-        transforms_ok = False
-        continue
-    if transformed.count(anchor) != 1:
-        transforms_ok = False
-        continue
-    transformed = transformed.replace(anchor, replacement, 1)
-
 check(
-    "CMake generates aligned production UI source",
+    "CMake generates the reviewed UI authority",
     all(
         token in cmake
         for token in (
             "SC220_UI_GENERATED_SOURCE",
             "GenerateSC220AlignedUi.cmake",
-            '"${SC220_UI_GENERATED_SOURCE}"',
+            'set(SC220_UI_SOURCE "${CMAKE_CURRENT_SOURCE_DIR}/live/SC220MainComponent.cpp")',
         )
     ),
 )
 check(
-    "original UI is an explicit generator input",
-    'set(SC220_UI_SOURCE "${CMAKE_CURRENT_SOURCE_DIR}/live/SC220MainComponent.cpp")'
-    in cmake,
+    "aligned and monitor generators are chained",
+    "GenerateSC220MonitorUi.cmake" in aligned
+    and "SC220_UI_MONITOR_GENERATED_SOURCE" in aligned,
 )
-check("all UI transformation anchors apply exactly once", transforms_ok)
 check(
-    "one console grid owns all fader dimensions",
+    "final polish runs after monitor generation",
+    'include("${CMAKE_CURRENT_LIST_DIR}/PolishSC220FinalUi.cmake")' in state,
+)
+check(
+    "one shared grid still owns SC220 PC and Stream geometry",
     all(
-        token in transformed
+        token in aligned
         for token in (
             "sharedFaderTop",
             "sharedFaderBottom",
             "sharedFaderHeight",
             "sharedMeterWidth",
             "sharedFaderWidth",
-        )
-    ),
-)
-check(
-    "SC220 PC and Stream meters share geometry",
-    all(
-        token in transformed
-        for token in (
             "sc220Meter->setBounds",
             "pcMeter->setBounds",
             "streamMeter->setBounds",
-            "sharedMeterWidth, sharedFaderHeight",
-        )
-    ),
-)
-check(
-    "SC220 PC and Stream faders share geometry",
-    all(
-        token in transformed
-        for token in (
             "sc220Fader.setBounds",
             "pcFader.setBounds",
             "streamFader.setBounds",
-            "sharedFaderWidth, sharedFaderHeight",
         )
     ),
 )
 check(
-    "System Mix and Stream Output use same source row",
+    "lower empty space is used by extended faders",
+    "inputArea.getBottom() - 96" in polish
+    and "juce::jmax (248, sharedFaderBottom - sharedFaderTop)" in polish,
+)
+check(
+    "master panel receives balanced desktop width",
+    "0.310f" in polish and "0.450f" in polish,
+)
+check(
+    "Stream and Monitor selectors use responsive separated columns",
     all(
-        token in transformed
+        token in polish
         for token in (
-            "pcSourceBox.setBounds",
+            "masterColumnGap = 12",
+            "masterColumnWidth",
+            "selectorWidth",
             "outputBox.setBounds",
-            "sourceSelectorY",
+            "monitorOutputBox.setBounds",
+            "programMonitorButton.setBounds",
+            "musicCueButton.setBounds",
         )
-    )
-    and transformed.count("sourceSelectorY, 164, 34") >= 2,
+    ),
 )
 check(
-    "old mismatched PC fader geometry is removed",
-    "pcStripArea.getY() + 214" not in transformed
-    and "pcStripArea.getHeight() - 300" not in transformed,
-)
-check(
-    "old bottom Stream Output selector is removed",
-    "masterArea.getBottom() - 108" not in transformed,
-)
-check(
-    "Stream title follows output selector",
-    'g.drawText ("STREAM", outputBox.getX(), outputBox.getY() - 47' in transformed,
+    "fixed colliding 164px monitor layout is replaced",
+    "responsive stream and monitor columns" in polish
+    and "juce::jmin (154" in polish,
 )
 check(
     "visual taps follow UI lifecycle",
     all(
-        token in transformed
+        token in aligned
         for token in (
             "getVoiceEnhancerBridge().setVisualTapEnabled (active)",
             "getMusicEnhancerBridge().setVisualTapEnabled (active)",
@@ -135,32 +96,52 @@ check(
     ),
 )
 check(
-    "bridge owns analyzer enable state",
-    "std::atomic<bool> visualTapEnabled_" in bridge_h
-    and "visualTapEnabled_.store" in bridge_h,
+    "bridge owns a dedicated analyzer tap",
+    all(
+        token in bridge_h
+        for token in (
+            "askp::ScopeTap analyzerTap_",
+            "analysisTap()",
+            "analyzerTap_.setEnabled (enabled)",
+            "std::atomic<bool> visualTapEnabled_",
+        )
+    ),
 )
 check(
-    "embedded publisher is disabled before DSP",
-    bridge_cpp.find("processor_.scopeTap.setEnabled (false);")
-    < bridge_cpp.find("processor_.processBlock (audio, midi);"),
+    "embedded ASK-P tap remains disabled",
+    "processor_.scopeTap.setEnabled (false);" in bridge_cpp
+    and "processor_.scopeTap.push" not in bridge_cpp,
 )
 check(
-    "post-Signature block is published explicitly",
+    "post-Signature audio publishes to the dedicated tap",
     all(
         token in bridge_cpp
         for token in (
             "processor_.processBlock (audio, midi);",
             "visualTapEnabled_.load",
-            "processor_.scopeTap.push (left, right, audio.getNumSamples());",
+            "analyzerTap_.push (left, right, audio.getNumSamples());",
         )
     )
-    and bridge_cpp.find("processor_.scopeTap.push")
+    and bridge_cpp.find("analyzerTap_.push")
     > bridge_cpp.find("processor_.processBlock"),
 )
 check(
-    "spectrum still consumes both live engine taps",
+    "UI reads both bridge-owned analyzer taps",
+    polish.count(".analysisTap()") == 2,
+)
+check(
+    "spectrum work is throttled to about 15 fps",
+    "spectrumDivider >= 2" in polish,
+)
+check(
+    "lightweight 1024-point FFT and 72 display bins are generated",
+    "fftOrder = 10" in polish
+    and "std::array<float, 72> smoothed" in polish,
+)
+check(
+    "spectrum implementation still consumes Voice and Music",
     all(
-        token in transformed
+        token in main_cpp
         for token in (
             "voiceTap.consumeLatest",
             "musicTap.consumeLatest",
@@ -168,9 +149,25 @@ check(
         )
     ),
 )
+check(
+    "old bottom Stream selector remains absent from aligned source",
+    "masterArea.getBottom() - 108" not in aligned,
+)
+check(
+    "monitor source controls remain part of final UI",
+    all(
+        token in monitor
+        for token in (
+            "monitorOutputBox",
+            "programMonitorButton",
+            "musicCueButton",
+            "selectMonitorOutputDevice",
+        )
+    ),
+)
 
 failed = [name for name, ok in checks if not ok]
-print("SC220 Live aligned console and analyzer bridge audit")
+print("SC220 Live responsive console and lightweight analyzer audit")
 for name, ok in checks:
     print(f"[ {'PASS' if ok else 'FAIL'} ] {name}")
 print(f"Checks: {len(checks)}  Passed: {len(checks) - len(failed)}  Failed: {len(failed)}")

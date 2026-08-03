@@ -39,6 +39,8 @@ jobs:
         run: python qa/audit_sc220_console_alignment.py
       - name: Validate independent physical Monitor Bus
         run: python qa/audit_sc220_monitor_bus.py
+      - name: Validate clean-build executable unlock order
+        run: python qa/audit_sc220_clean_build.py
       - name: Validate fixed transform reference
         run: python qa/verify_fixed_fft.py
       - name: Checkout private ASK-P authority when CI token is configured

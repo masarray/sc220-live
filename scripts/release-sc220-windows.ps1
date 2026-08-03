@@ -143,6 +143,7 @@ Copy-Item -LiteralPath (Join-Path $releaseRoot 'release-site\styles.css') -Desti
 Copy-Item -LiteralPath (Join-Path $releaseRoot 'release-site\README.md') -Destination $publicCheckout
 Copy-Item -LiteralPath (Join-Path $releaseRoot 'release-site\latest.json') -Destination $publicCheckout
 Copy-Item -LiteralPath (Join-Path $releaseRoot 'assets\ui\recording_tech_logo.png') -Destination (Join-Path $publicCheckout 'recording-tech-logo.png')
+Copy-Item -LiteralPath (Join-Path $releaseRoot 'docs\SC220_LIVE_UX_LOCKED.png') -Destination (Join-Path $publicCheckout 'sc220-live-console.png')
 Set-Content -LiteralPath (Join-Path $publicCheckout '.nojekyll') -Value '' -Encoding ASCII
 
 $zipName = [IO.Path]::GetFileName($package.Zip)

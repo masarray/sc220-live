@@ -74,5 +74,6 @@ Assert-Contains $release 'Public repository boundary violation' 'the public-repo
 Assert-Contains $release 'environment -ne ''production''' 'public release must reject a sandbox payment service.'
 Assert-Contains $release 'v1/products/sc220-live' 'public release must verify the deployed SC220 product catalogue.'
 Assert-Contains $release 'price_idr -ne 399000' 'public release must verify the deployed product price.'
+Assert-Contains $release 'sc220-live-console\.png' 'public landing must publish the approved real product visual.'
 
 Write-Host '[CONTRACT] SC220 proprietary, 365-day, checkout, safe-audio, and binary-only checks passed.' -ForegroundColor Green

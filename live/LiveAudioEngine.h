@@ -2,6 +2,7 @@
 
 #include "MusicalNoiseClean.h"
 #include "EnhancerEngineBridge.h"
+#include "MonitorOutputClient.h"
 #include "PcAudioLoopbackCapture.h"
 
 #include <juce_audio_devices/juce_audio_devices.h>
@@ -17,6 +18,12 @@ class LiveAudioEngine final : public juce::AudioIODeviceCallback,
                               private juce::ChangeListener
 {
 public:
+    enum class MonitorSource
+    {
+        program = 0,
+        musicCue = 1
+    };
+
     struct Status
     {
         bool running = false;
@@ -42,6 +49,11 @@ public:
         bool pcLoopbackRunning = false;
         int pcUnderflows = 0;
         int pcOverflows = 0;
+        bool monitorRunning = false;
+        bool monitorPrimed = false;
+        int monitorBufferedSamples = 0;
+        int monitorUnderflows = 0;
+        int monitorOverflows = 0;
         int dropouts = 0;
         unsigned int visualDrops = 0;
         int totalLatencySamples = 0;
@@ -49,6 +61,8 @@ public:
         int musicDspLatencySamples = 0;
         juce::String inputDevice;
         juce::String outputDevice;
+        juce::String monitorDevice;
+        juce::String monitorError;
         juce::String lastError;
     };
 
@@ -64,17 +78,20 @@ public:
     EnhancerEngineBridge& getEnhancerBridge() noexcept { return voiceEnhancerBridge; }
     EnhancerEngineBridge& getVoiceEnhancerBridge() noexcept { return voiceEnhancerBridge; }
     EnhancerEngineBridge& getMusicEnhancerBridge() noexcept { return musicEnhancerBridge; }
+    MonitorOutputClient& getMonitorOutputClient() noexcept { return monitorOutput; }
     askp::LicenseManager& getLicenseManager() noexcept { return voiceEnhancerBridge.licenseManager(); }
     const askp::LicenseManager& getLicenseManager() const noexcept { return voiceEnhancerBridge.licenseManager(); }
     bool fullFeaturesAllowed() const noexcept { return voiceEnhancerBridge.editingAllowed(); }
 
     juce::StringArray getInputDeviceNames();
     juce::StringArray getOutputDeviceNames();
+    juce::StringArray getMonitorOutputDeviceNames();
     juce::Array<double> getAvailableSampleRates() const;
     juce::Array<int> getAvailableBufferSizes() const;
 
     juce::String selectInputDevice (const juce::String& name);
     juce::String selectOutputDevice (const juce::String& name);
+    juce::String selectMonitorOutputDevice (const juce::String& name);
     juce::String setSampleRate (double value);
     juce::String setBufferSize (int value);
     void setInputChannelMode (int channels) noexcept { inputChannelMode.store (channels <= 1 ? 1 : 2); }
@@ -104,6 +121,13 @@ public:
     bool isDuckingEnabled() const noexcept { return duckingEnabled.load(); }
     void setDuckingDepthDb (float value) noexcept;
     float getDuckingDepthDb() const noexcept { return duckingDepthDb.load(); }
+
+    void setMonitorSource (MonitorSource value) noexcept { monitorSource.store (value); }
+    MonitorSource getMonitorSource() const noexcept { return monitorSource.load(); }
+    void setMonitorGainDb (float value) noexcept { monitorOutput.setGainDb (value); }
+    float getMonitorGainDb() const noexcept { return monitorOutput.getGainDb(); }
+    void setMonitorMuted (bool value) noexcept { monitorOutput.setMuted (value); }
+    bool isMonitorMuted() const noexcept { return monitorOutput.isMuted(); }
 
     void setEngineEnabled (bool value) noexcept { engineEnabled.store (value); }
     bool isEngineEnabled() const noexcept { return engineEnabled.load(); }
@@ -188,7 +212,8 @@ private:
     juce::AudioDeviceManager deviceManager;
     juce::AudioBuffer<float> processBuffer;   // Voice lane, then master mix bus.
     juce::AudioBuffer<float> detectorBuffer;  // Voice detector before fader.
-    juce::AudioBuffer<float> pcAudioBuffer;   // Independent enhanced music lane.
+    juce::AudioBuffer<float> pcAudioBuffer;   // Enhanced music, then program ducking.
+    juce::AudioBuffer<float> musicCueBuffer;  // Enhanced music fader, pre-ducking.
     juce::MidiBuffer voiceMidi;
     juce::MidiBuffer musicMidi;
 
@@ -197,6 +222,7 @@ private:
     EnhancerEngineBridge voiceEnhancerBridge;
     EnhancerEngineBridge musicEnhancerBridge;
     PcAudioLoopbackCapture pcLoopback;
+    MonitorOutputClient monitorOutput;
     juce::dsp::Limiter<float> masterLimiter;
 
     juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> inputGainLinear;
@@ -221,6 +247,7 @@ private:
     std::atomic<bool> duckingEnabled { true };
     std::atomic<float> duckingDepthDb { -12.0f };
     std::atomic<float> duckGainDb { 0.0f };
+    std::atomic<MonitorSource> monitorSource { MonitorSource::program };
     float duckGainLinear = 1.0f;
     std::array<juce::dsp::IIR::Filter<float>, 2> loudnessShelf;
     std::array<juce::dsp::IIR::Filter<float>, 2> loudnessHighPass;

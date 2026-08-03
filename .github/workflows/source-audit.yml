@@ -27,6 +27,8 @@ jobs:
         run: python qa/audit_v0140_askp_v0523_port.py
       - name: Validate SC220 dual-source broadcast bus
         run: python qa/audit_sc220_dual_source_bus.py
+      - name: Validate SC220 premium UX contract
+        run: python qa/audit_sc220_premium_ux.py
       - name: Validate fixed transform reference
         run: python qa/verify_fixed_fft.py
       - name: Checkout private ASK-P authority when CI token is configured

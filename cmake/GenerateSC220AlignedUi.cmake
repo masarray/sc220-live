@@ -152,3 +152,22 @@ get_filename_component(_generated_directory "${SC220_UI_GENERATED_SOURCE}" DIREC
 file(MAKE_DIRECTORY "${_generated_directory}")
 file(WRITE "${SC220_UI_GENERATED_SOURCE}" "${_sc220_ui_source}")
 message(STATUS "SC220 Live aligned UI source: ${SC220_UI_GENERATED_SOURCE}")
+
+# The target already exists at this include point. Generate the independent
+# monitor engine and final monitor-aware UI, then mark the intermediate sources
+# header-only so the later literal target_sources list cannot compile duplicates.
+set(SC220_ENGINE_SOURCE "${CMAKE_CURRENT_SOURCE_DIR}/live/LiveAudioEngine.cpp")
+set(SC220_ENGINE_GENERATED_SOURCE
+    "${CMAKE_CURRENT_BINARY_DIR}/generated/sc220-monitor/LiveAudioEngine_Monitor.cpp")
+include("${CMAKE_CURRENT_SOURCE_DIR}/cmake/GenerateSC220MonitorEngine.cmake")
+set_source_files_properties("${SC220_ENGINE_SOURCE}" PROPERTIES HEADER_FILE_ONLY TRUE)
+target_sources(SC220Live PRIVATE
+    "${SC220_ENGINE_GENERATED_SOURCE}"
+    "${CMAKE_CURRENT_SOURCE_DIR}/live/MonitorOutputClient.cpp")
+
+set(SC220_UI_MONITOR_SOURCE "${SC220_UI_GENERATED_SOURCE}")
+set(SC220_UI_MONITOR_GENERATED_SOURCE
+    "${CMAKE_CURRENT_BINARY_DIR}/generated/sc220-monitor/SC220MainComponent_Monitor.cpp")
+include("${CMAKE_CURRENT_SOURCE_DIR}/cmake/GenerateSC220MonitorUi.cmake")
+set_source_files_properties("${SC220_UI_GENERATED_SOURCE}" PROPERTIES HEADER_FILE_ONLY TRUE)
+target_sources(SC220Live PRIVATE "${SC220_UI_MONITOR_GENERATED_SOURCE}")

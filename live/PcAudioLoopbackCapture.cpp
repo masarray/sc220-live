@@ -7,8 +7,11 @@
 #if JUCE_WINDOWS
  #include <Windows.h>
  #include <audioclient.h>
+ #include <functiondiscoverykeys_devpkey.h>
  #include <ksmedia.h>
  #include <mmdeviceapi.h>
+ #include <propsys.h>
+ #include <propvarutil.h>
  #include <wrl/client.h>
 #endif
 
@@ -19,8 +22,68 @@ float peakToDb (float value) noexcept
     return juce::Decibels::gainToDecibels (juce::jmax (value, 1.0e-9f), -120.0f);
 }
 
+juce::String normaliseEndpointName (juce::String value)
+{
+    value = value.trim().toUpperCase();
+    value = value.replace ("SPEAKERS", "")
+                 .replace ("HEADPHONES", "")
+                 .replace ("DEFAULT", "")
+                 .replace ("WASAPI", "");
+    return value.retainCharacters ("ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789");
+}
+
 #if JUCE_WINDOWS
 using Microsoft::WRL::ComPtr;
+
+struct ScopedComInitialiser
+{
+    ScopedComInitialiser()
+    {
+        result = CoInitializeEx (nullptr, COINIT_MULTITHREADED);
+        shouldUninitialise = SUCCEEDED (result);
+    }
+
+    ~ScopedComInitialiser()
+    {
+        if (shouldUninitialise)
+            CoUninitialize();
+    }
+
+    bool usable() const noexcept
+    {
+        return SUCCEEDED (result) || result == RPC_E_CHANGED_MODE;
+    }
+
+    HRESULT result = E_FAIL;
+    bool shouldUninitialise = false;
+};
+
+juce::String getDeviceId (IMMDevice& device)
+{
+    LPWSTR id = nullptr;
+    juce::String result;
+    if (SUCCEEDED (device.GetId (&id)) && id != nullptr)
+        result = juce::String (id);
+    if (id != nullptr)
+        CoTaskMemFree (id);
+    return result;
+}
+
+juce::String getDeviceFriendlyName (IMMDevice& device)
+{
+    ComPtr<IPropertyStore> properties;
+    if (FAILED (device.OpenPropertyStore (STGM_READ, properties.GetAddressOf())))
+        return {};
+
+    PROPVARIANT value;
+    PropVariantInit (&value);
+    juce::String result;
+    if (SUCCEEDED (properties->GetValue (PKEY_Device_FriendlyName, &value))
+        && value.vt == VT_LPWSTR && value.pwszVal != nullptr)
+        result = juce::String (value.pwszVal);
+    PropVariantClear (&value);
+    return result;
+}
 
 bool isFloatFormat (const WAVEFORMATEX& format) noexcept
 {
@@ -116,6 +179,178 @@ void PcAudioLoopbackCapture::stop()
     captureSampleRate.store (0.0);
 }
 
+std::vector<PcAudioLoopbackCapture::EndpointInfo>
+PcAudioLoopbackCapture::availableEndpoints()
+{
+    std::vector<EndpointInfo> result;
+#if JUCE_WINDOWS
+    ScopedComInitialiser com;
+    if (! com.usable())
+        return result;
+
+    ComPtr<IMMDeviceEnumerator> enumerator;
+    if (FAILED (CoCreateInstance (__uuidof (MMDeviceEnumerator), nullptr, CLSCTX_ALL,
+                                  IID_PPV_ARGS (enumerator.GetAddressOf()))))
+        return result;
+
+    juce::String defaultId;
+    ComPtr<IMMDevice> defaultEndpoint;
+    if (SUCCEEDED (enumerator->GetDefaultAudioEndpoint (eRender, eConsole,
+                                                        defaultEndpoint.GetAddressOf()))
+        && defaultEndpoint != nullptr)
+        defaultId = getDeviceId (*defaultEndpoint);
+
+    ComPtr<IMMDeviceCollection> collection;
+    if (FAILED (enumerator->EnumAudioEndpoints (eRender, DEVICE_STATE_ACTIVE,
+                                                collection.GetAddressOf())))
+        return result;
+
+    UINT count = 0;
+    if (FAILED (collection->GetCount (&count)))
+        return result;
+
+    for (UINT index = 0; index < count; ++index)
+    {
+        ComPtr<IMMDevice> endpoint;
+        if (FAILED (collection->Item (index, endpoint.GetAddressOf())) || endpoint == nullptr)
+            continue;
+
+        EndpointInfo info;
+        info.id = getDeviceId (*endpoint);
+        info.name = getDeviceFriendlyName (*endpoint);
+        if (info.name.isEmpty())
+            info.name = info.id;
+        info.isDefault = info.id.isNotEmpty() && info.id == defaultId;
+        if (info.id.isNotEmpty() && info.name.isNotEmpty())
+            result.push_back (std::move (info));
+    }
+
+    std::sort (result.begin(), result.end(), [] (const EndpointInfo& a, const EndpointInfo& b)
+    {
+        if (a.isDefault != b.isDefault)
+            return a.isDefault;
+        return a.name.compareNatural (b.name) < 0;
+    });
+#endif
+    return result;
+}
+
+bool PcAudioLoopbackCapture::endpointNamesMatch (const juce::String& first,
+                                                  const juce::String& second) noexcept
+{
+    const auto a = normaliseEndpointName (first);
+    const auto b = normaliseEndpointName (second);
+    if (a.isEmpty() || b.isEmpty())
+        return false;
+    if (a == b)
+        return true;
+    return a.length() >= 8 && b.length() >= 8
+        && (a.contains (b) || b.contains (a));
+}
+
+bool PcAudioLoopbackCapture::isUnsafeVirtualEndpoint (const juce::String& name) noexcept
+{
+    return name.containsIgnoreCase ("VB-Audio")
+        || name.containsIgnoreCase ("VB-CABLE")
+        || name.containsIgnoreCase ("CABLE Input")
+        || name.containsIgnoreCase ("CABLE Output")
+        || name.containsIgnoreCase ("Virtual Cable")
+        || name.containsIgnoreCase ("VoiceMeeter");
+}
+
+bool PcAudioLoopbackCapture::endpointWouldConflict (const juce::String& requestedEndpoint,
+                                                     const juce::String& streamOutput)
+{
+    if (streamOutput.trim().isEmpty())
+        return false;
+
+    juce::String resolved = requestedEndpoint.trim();
+    const auto endpoints = availableEndpoints();
+    if (resolved.isEmpty() || resolved.equalsIgnoreCase (systemDefaultLabel))
+    {
+        for (const auto& endpoint : endpoints)
+            if (endpoint.isDefault)
+            {
+                resolved = endpoint.name;
+                break;
+            }
+    }
+    else
+    {
+        for (const auto& endpoint : endpoints)
+            if (endpoint.name.equalsIgnoreCase (resolved))
+            {
+                resolved = endpoint.name;
+                break;
+            }
+    }
+
+    if (resolved.isEmpty())
+        return false;
+
+    return endpointNamesMatch (resolved, streamOutput)
+        || (isUnsafeVirtualEndpoint (resolved)
+            && isUnsafeVirtualEndpoint (streamOutput));
+}
+
+juce::String PcAudioLoopbackCapture::selectEndpoint (const juce::String& name)
+{
+    const auto requested = name.trim();
+    if (requested.isEmpty() || requested.equalsIgnoreCase (systemDefaultLabel))
+    {
+        const juce::ScopedLock lock (endpointLock);
+        requestedEndpointId.clear();
+        requestedEndpointFriendlyName.clear();
+        activeEndpointId.clear();
+        activeEndpointFriendlyName.clear();
+        return {};
+    }
+
+    const auto endpoints = availableEndpoints();
+    for (const auto& endpoint : endpoints)
+    {
+        if (! endpoint.name.equalsIgnoreCase (requested))
+            continue;
+
+        const juce::ScopedLock lock (endpointLock);
+        requestedEndpointId = endpoint.id;
+        requestedEndpointFriendlyName = endpoint.name;
+        activeEndpointId.clear();
+        activeEndpointFriendlyName.clear();
+        return {};
+    }
+
+#if JUCE_WINDOWS
+    return "The selected PC Audio playback endpoint is no longer available.";
+#else
+    return "PC Audio endpoint selection is only available on Windows.";
+#endif
+}
+
+juce::String PcAudioLoopbackCapture::requestedEndpointName() const
+{
+    const juce::ScopedLock lock (endpointLock);
+    return requestedEndpointFriendlyName.isNotEmpty()
+        ? requestedEndpointFriendlyName
+        : juce::String (systemDefaultLabel);
+}
+
+juce::String PcAudioLoopbackCapture::selectedEndpointName() const
+{
+    const juce::ScopedLock lock (endpointLock);
+    if (activeEndpointFriendlyName.isNotEmpty())
+        return activeEndpointFriendlyName;
+    if (requestedEndpointFriendlyName.isNotEmpty())
+        return requestedEndpointFriendlyName;
+    return systemDefaultLabel;
+}
+
+juce::String PcAudioLoopbackCapture::selectedEndpointId() const
+{
+    const juce::ScopedLock lock (endpointLock);
+    return activeEndpointId.isNotEmpty() ? activeEndpointId : requestedEndpointId;
+}
+
 int PcAudioLoopbackCapture::read (juce::AudioBuffer<float>& destination,
                                   int numSamples) noexcept
 {
@@ -202,9 +437,8 @@ void PcAudioLoopbackCapture::push (const float* left, const float* right,
 void PcAudioLoopbackCapture::run()
 {
 #if JUCE_WINDOWS
-    const HRESULT comResult = CoInitializeEx (nullptr, COINIT_MULTITHREADED);
-    const bool shouldUninitialise = SUCCEEDED (comResult);
-    if (FAILED (comResult) && comResult != RPC_E_CHANGED_MODE)
+    ScopedComInitialiser com;
+    if (! com.usable())
     {
         setError ("Unable to initialise Windows audio COM services.");
         return;
@@ -224,8 +458,32 @@ void PcAudioLoopbackCapture::run()
 
     HRESULT hr = CoCreateInstance (__uuidof (MMDeviceEnumerator), nullptr, CLSCTX_ALL,
                                    IID_PPV_ARGS (enumerator.GetAddressOf()));
+
+    juce::String requestedId;
+    {
+        const juce::ScopedLock lock (endpointLock);
+        requestedId = requestedEndpointId;
+    }
+
     if (SUCCEEDED (hr))
-        hr = enumerator->GetDefaultAudioEndpoint (eRender, eConsole, endpoint.GetAddressOf());
+    {
+        if (requestedId.isNotEmpty())
+            hr = enumerator->GetDevice (requestedId.toWideCharPointer(), endpoint.GetAddressOf());
+        else
+            hr = enumerator->GetDefaultAudioEndpoint (eRender, eConsole, endpoint.GetAddressOf());
+    }
+
+    if (SUCCEEDED (hr) && endpoint != nullptr)
+    {
+        const auto endpointId = getDeviceId (*endpoint);
+        auto endpointName = getDeviceFriendlyName (*endpoint);
+        if (endpointName.isEmpty())
+            endpointName = endpointId;
+        const juce::ScopedLock lock (endpointLock);
+        activeEndpointId = endpointId;
+        activeEndpointFriendlyName = endpointName;
+    }
+
     if (SUCCEEDED (hr))
         hr = endpoint->Activate (__uuidof (IAudioClient), CLSCTX_ALL, nullptr,
                                  reinterpret_cast<void**> (client.GetAddressOf()));
@@ -234,9 +492,8 @@ void PcAudioLoopbackCapture::run()
 
     if (FAILED (hr) || format == nullptr)
     {
-        fail ("Unable to open the Windows System Mix endpoint", hr);
+        fail ("Unable to open the selected Windows playback endpoint", hr);
         if (format != nullptr) CoTaskMemFree (format);
-        if (shouldUninitialise) CoUninitialize();
         return;
     }
 
@@ -262,7 +519,6 @@ void PcAudioLoopbackCapture::run()
         fail ("Unable to start WASAPI loopback capture", hr);
         if (eventHandle != nullptr) CloseHandle (eventHandle);
         CoTaskMemFree (format);
-        if (shouldUninitialise) CoUninitialize();
         return;
     }
 
@@ -341,7 +597,6 @@ void PcAudioLoopbackCapture::run()
     running.store (false);
     if (eventHandle != nullptr) CloseHandle (eventHandle);
     CoTaskMemFree (format);
-    if (shouldUninitialise) CoUninitialize();
 #endif
 }
 

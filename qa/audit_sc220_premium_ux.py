@@ -39,12 +39,21 @@ check("voice and music visual taps are enabled", all(token in source for token i
     "getVoiceEnhancerBridge().setVisualTapEnabled (true)",
     "getMusicEnhancerBridge().setVisualTapEnabled (true)")))
 check("main surface uses native Windows premium typography", 'font.setTypefaceName ("Segoe UI Variable")' in source)
-check("hardware controls use calibrated ticks and metal layers", all(token in source for token in (
+check("hardware controls match approved dot-calibrated metal surface", all(token in source for token in (
     "for (int i = 0; i <= 20; ++i)",
+    "const auto dotSize",
+    "g.fillEllipse (dot.x - dotSize * 0.5f",
     "palette::metalHi",
     "palette::metalMid",
     "drawFaderScale",
     "capGradient.addColour",
+    "sliderPos - 34.0f, 40.0f, 68.0f",
+    "const auto accentStart = endAngle - 0.38f",
+)))
+check("macro controls preserve approved endpoint labels", all(token in source for token in (
+    'g.drawText ("0%"',
+    'g.drawText ("100%"',
+    "knob.setTextBoxStyle (juce::Slider::NoTextBox",
 )))
 check("SC220 device art uses a focused source crop", all(token in source for token in (
     "const int sourceY",

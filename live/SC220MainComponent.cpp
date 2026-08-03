@@ -54,7 +54,7 @@ void drawFaderScale (juce::Graphics& g, juce::Rectangle<int> sliderBounds)
     const auto height = static_cast<float> (sliderBounds.getHeight() - 36);
     const auto centreX = static_cast<float> (sliderBounds.getCentreX());
 
-    g.setFont (interFont (8.2f));
+    g.setFont (interFont (9.5f));
     for (const auto db : values)
     {
         const auto normal = (12.0f - static_cast<float> (db)) / 72.0f;
@@ -174,71 +174,96 @@ public:
                            float position, float startAngle, float endAngle,
                            juce::Slider& slider) override
     {
-        const float diameter = static_cast<float> (juce::jmin (width, height)) - 22.0f;
+        const float diameter = static_cast<float> (juce::jmin (width, height)) - 16.0f;
         const float radius = diameter * 0.5f;
         const auto centre = juce::Point<float> (static_cast<float> (x + width) * 0.5f,
                                                 static_cast<float> (y + height) * 0.5f);
         const auto knob = juce::Rectangle<float> (diameter, diameter).withCentre (centre);
         const float alpha = slider.isEnabled() ? 1.0f : 0.38f;
 
+        // The approved console uses instrument-style calibration dots rather
+        // than radial strokes. Major dots are only slightly larger so the ring
+        // stays quiet and precise.
         for (int i = 0; i <= 20; ++i)
         {
             const auto tickPosition = static_cast<float> (i) / 20.0f;
             const auto tickAngle = startAngle + tickPosition * (endAngle - startAngle);
-            const auto inner = centre.getPointOnCircumference (radius + 6.0f, tickAngle);
-            const auto outer = centre.getPointOnCircumference (
-                radius + (i % 5 == 0 ? 10.0f : 8.0f), tickAngle);
-            g.setColour (palette::graphite.withAlpha ((i % 5 == 0 ? 0.72f : 0.42f) * alpha));
-            g.drawLine ({ inner, outer }, i % 5 == 0 ? 1.1f : 0.75f);
+            const auto dot = centre.getPointOnCircumference (radius + 6.5f, tickAngle);
+            const auto dotSize = i % 5 == 0 ? 2.6f : 1.8f;
+            g.setColour (palette::graphite.withAlpha ((i % 5 == 0 ? 0.82f : 0.58f) * alpha));
+            g.fillEllipse (dot.x - dotSize * 0.5f, dot.y - dotSize * 0.5f, dotSize, dotSize);
         }
 
-        g.setColour (juce::Colours::black.withAlpha (0.22f * alpha));
-        g.fillEllipse (knob.expanded (3.0f).translated (0.0f, 5.0f));
+        g.setColour (juce::Colours::black.withAlpha (0.20f * alpha));
+        g.fillEllipse (knob.expanded (2.0f).translated (0.0f, 3.5f));
 
         juce::ColourGradient rim (palette::metalHi, knob.getCentreX(), knob.getY(),
                                   palette::metalLo, knob.getCentreX(), knob.getBottom(), false);
-        rim.addColour (0.34, juce::Colour (0xffd9dad6));
-        rim.addColour (0.68, juce::Colour (0xff8f928f));
+        rim.addColour (0.30, juce::Colour (0xffd9dad6));
+        rim.addColour (0.72, juce::Colour (0xff777b78));
         rim.multiplyOpacity (alpha);
         g.setGradientFill (rim);
         g.fillEllipse (knob);
         g.setColour (juce::Colours::black.withAlpha (0.42f * alpha));
         g.drawEllipse (knob, 1.0f);
 
-        const auto face = knob.reduced (5.0f);
+        // A thin bezel leaves the black face dominant, matching the physical
+        // surface in the approved proposal.
+        const auto face = knob.reduced (3.2f);
         juce::ColourGradient faceMetal (juce::Colour (0xff4a4d4c), face.getX(), face.getY(),
                                         juce::Colour (0xff090a0a), face.getRight(), face.getBottom(), false);
         faceMetal.addColour (0.46, juce::Colour (0xff262928));
         faceMetal.multiplyOpacity (alpha);
         g.setGradientFill (faceMetal);
         g.fillEllipse (face);
-        g.setColour (juce::Colours::white.withAlpha (0.18f * alpha));
-        g.drawEllipse (face.reduced (1.0f), 1.0f);
-        g.setColour (juce::Colours::black.withAlpha (0.50f * alpha));
-        g.drawEllipse (face.reduced (3.0f), 1.0f);
+
+        // Four extremely subtle satin facets keep the knob face dimensional
+        // without turning the clean console into a decorative illustration.
+        const float faceRadius = face.getWidth() * 0.5f;
+        for (int facet = 0; facet < 4; ++facet)
+        {
+            const auto facetStart = -juce::MathConstants<float>::halfPi
+                                  + static_cast<float> (facet) * juce::MathConstants<float>::halfPi;
+            const auto facetEnd = facetStart + juce::MathConstants<float>::halfPi;
+            juce::Path wedge;
+            wedge.startNewSubPath (centre);
+            wedge.lineTo (centre.getPointOnCircumference (faceRadius - 1.6f, facetStart));
+            wedge.addCentredArc (centre.x, centre.y, faceRadius - 1.6f, faceRadius - 1.6f,
+                                 0.0f, facetStart, facetEnd, false);
+            wedge.closeSubPath();
+            g.setColour ((facet == 0 || facet == 2 ? juce::Colours::white
+                                                   : juce::Colours::black)
+                             .withAlpha ((facet == 0 ? 0.055f : 0.040f) * alpha));
+            g.fillPath (wedge);
+        }
+        g.setColour (juce::Colours::white.withAlpha (0.14f * alpha));
+        g.drawEllipse (face.reduced (0.8f), 0.8f);
 
         juce::Path track;
-        track.addCentredArc (centre.x, centre.y, radius + 4.0f, radius + 4.0f, 0.0f,
+        track.addCentredArc (centre.x, centre.y, radius + 3.2f, radius + 3.2f, 0.0f,
                              startAngle, endAngle, true);
         g.setColour (palette::border.withAlpha (alpha));
-        g.strokePath (track, juce::PathStrokeType (2.2f, juce::PathStrokeType::curved,
+        g.strokePath (track, juce::PathStrokeType (1.6f, juce::PathStrokeType::curved,
                                                    juce::PathStrokeType::rounded));
 
+        // The pointer carries the value. The approved hardware surface uses a
+        // short, fixed orange signature mark on the right-hand side.
+        const auto accentStart = endAngle - 0.38f * (endAngle - startAngle);
         juce::Path arc;
-        arc.addCentredArc (centre.x, centre.y, radius + 4.0f, radius + 4.0f, 0.0f,
-                           startAngle, startAngle + position * (endAngle - startAngle), true);
+        arc.addCentredArc (centre.x, centre.y, radius + 3.2f, radius + 3.2f, 0.0f,
+                           accentStart, endAngle, true);
         g.setColour (palette::orange.withAlpha (alpha));
-        g.strokePath (arc, juce::PathStrokeType (2.5f, juce::PathStrokeType::curved,
+        g.strokePath (arc, juce::PathStrokeType (2.0f, juce::PathStrokeType::curved,
                                                  juce::PathStrokeType::rounded));
 
         const float angle = startAngle + position * (endAngle - startAngle);
-        const auto pointerStart = centre.getPointOnCircumference (radius * 0.20f, angle);
-        const auto pointerEnd = centre.getPointOnCircumference (radius * 0.70f, angle);
+        const auto pointerStart = centre.getPointOnCircumference (radius * 0.12f, angle);
+        const auto pointerEnd = centre.getPointOnCircumference (radius * 0.73f, angle);
         g.setColour (juce::Colours::black.withAlpha (0.62f * alpha));
-        g.drawLine ({ pointerStart.translated (0.8f, 1.0f),
-                      pointerEnd.translated (0.8f, 1.0f) }, 3.0f);
+        g.drawLine ({ pointerStart.translated (0.7f, 0.9f),
+                      pointerEnd.translated (0.7f, 0.9f) }, 2.8f);
         g.setColour (juce::Colours::white.withAlpha (0.94f * alpha));
-        g.drawLine ({ pointerStart, pointerEnd }, 2.0f);
+        g.drawLine ({ pointerStart, pointerEnd }, 2.2f);
     }
 
     void drawLinearSlider (juce::Graphics& g, int x, int y, int width, int height,
@@ -265,9 +290,15 @@ public:
         g.drawVerticalLine (juce::roundToInt (track.getCentreX()),
                             track.getY() + 3.0f, track.getBottom() - 3.0f);
 
-        const auto cap = juce::Rectangle<float> (centreX - 24.0f, sliderPos - 19.0f, 48.0f, 38.0f);
+        const auto cap = juce::Rectangle<float> (centreX - 20.0f, sliderPos - 34.0f, 40.0f, 68.0f);
         g.setColour (juce::Colours::black.withAlpha (0.28f * alpha));
-        g.fillRoundedRectangle (cap.translated (0.0f, 4.0f), 4.0f);
+        g.fillRoundedRectangle (cap.expanded (2.0f, 1.0f).translated (0.0f, 4.0f), 3.0f);
+
+        // Dark side cheeks give the cap the stepped depth of a physical mixer
+        // fader while keeping the aluminium face narrow and vertical.
+        g.setColour (juce::Colour (0xff313432).withAlpha (alpha));
+        g.fillRoundedRectangle (cap, 3.0f);
+        const auto capFace = cap.reduced (3.0f, 2.0f);
         juce::ColourGradient capGradient (palette::metalHi, cap.getCentreX(), cap.getY(),
                                           palette::metalLo, cap.getCentreX(), cap.getBottom(), false);
         capGradient.addColour (0.18, juce::Colour (0xffd8d9d5));
@@ -275,15 +306,18 @@ public:
         capGradient.addColour (0.72, juce::Colour (0xffeeeeea));
         capGradient.multiplyOpacity (alpha);
         g.setGradientFill (capGradient);
-        g.fillRoundedRectangle (cap, 4.0f);
+        g.fillRoundedRectangle (capFace, 2.0f);
         g.setColour (juce::Colour (0xff5b5e5c).withAlpha (alpha));
-        g.drawRoundedRectangle (cap, 4.0f, 1.0f);
-        for (int stripe = -11; stripe <= 11; stripe += 5)
+        g.drawRoundedRectangle (cap, 3.0f, 1.0f);
+        g.setColour (juce::Colours::white.withAlpha (0.42f * alpha));
+        g.drawHorizontalLine (juce::roundToInt (capFace.getY() + 2.0f),
+                              capFace.getX() + 2.0f, capFace.getRight() - 2.0f);
+        for (int stripe = -24; stripe <= 24; stripe += 6)
         {
-            g.setColour (stripe == 0 ? palette::orange.withAlpha (alpha)
-                                     : juce::Colours::black.withAlpha (0.13f * alpha));
+            g.setColour (stripe == 0 ? juce::Colour (0xff343735).withAlpha (alpha)
+                                     : juce::Colours::black.withAlpha (0.16f * alpha));
             g.drawHorizontalLine (juce::roundToInt (cap.getCentreY() + static_cast<float> (stripe)),
-                                  cap.getX() + 5.0f, cap.getRight() - 5.0f);
+                                  capFace.getX() + 3.0f, capFace.getRight() - 3.0f);
         }
     }
 };
@@ -715,7 +749,10 @@ void SC220MainComponent::configureControls()
     configureFader (pcFader);
     configureFader (streamFader);
     for (auto& knob : macroKnobs)
+    {
         configureKnob (knob, 0.0, 100.0, 0.1, "%");
+        knob.setTextBoxStyle (juce::Slider::NoTextBox, false, 0, 0);
+    }
 
     inputTrim.onValueChange = [this] { audioEngine.setInputTrimDb (static_cast<float> (inputTrim.getValue())); };
     sc220Fader.onValueChange = [this] { audioEngine.setSc220FaderDb (static_cast<float> (sc220Fader.getValue())); };
@@ -1049,12 +1086,18 @@ void SC220MainComponent::drawSignatureSurface (juce::Graphics& g)
     {
         const auto& knob = macroKnobs[i];
         g.setColour (palette::ink);
-        g.setFont (interFont (9.0f, true));
+        g.setFont (interFont (10.5f, true));
         g.drawText (names[i], knob.getX() - 16, knob.getY() - 25, knob.getWidth() + 32, 18,
                     juce::Justification::centred);
         g.setFont (interFont (14.0f));
         g.drawText (juce::String (knob.getValue(), 0) + "%", knob.getX(), knob.getY() - 6,
                     knob.getWidth(), 22, juce::Justification::centred);
+        g.setColour (palette::graphite);
+        g.setFont (interFont (10.0f));
+        g.drawText ("0%", knob.getX() - 9, knob.getBottom() - 16, 30, 16,
+                    juce::Justification::centredLeft);
+        g.drawText ("100%", knob.getRight() - 28, knob.getBottom() - 16, 38, 16,
+                    juce::Justification::centredRight);
     }
 
     g.setColour (palette::green);

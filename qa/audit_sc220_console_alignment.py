@@ -86,6 +86,11 @@ check(
     and "juce::jmin (154" in polish,
 )
 check(
+    "Stream selector stays on the shared source row",
+    "outputBox.setBounds (streamColumn.getCentreX() - selectorWidth / 2" in polish
+    and "sourceSelectorY, selectorWidth, 34" in polish,
+)
+check(
     "visual taps follow UI lifecycle",
     all(
         token in aligned
@@ -148,10 +153,6 @@ check(
             "performFrequencyOnlyForwardTransform",
         )
     ),
-)
-check(
-    "old bottom Stream selector remains absent from aligned source",
-    "masterArea.getBottom() - 108" not in aligned,
 )
 check(
     "monitor source controls remain part of final UI",

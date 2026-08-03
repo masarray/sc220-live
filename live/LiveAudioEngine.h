@@ -33,6 +33,9 @@ public:
         float outputPeakDbL = -120.0f;
         float outputPeakDbR = -120.0f;
         float gainReductionDb = 0.0f;
+        float voiceGainReductionDb = 0.0f;
+        float musicGainReductionDb = 0.0f;
+        float masterGainReductionDb = 0.0f;
         float expanderReductionDb = 0.0f;
         float duckGainDb = 0.0f;
         float loudnessLufs = -120.0f;
@@ -42,6 +45,8 @@ public:
         int dropouts = 0;
         unsigned int visualDrops = 0;
         int totalLatencySamples = 0;
+        int voiceLatencySamples = 0;
+        int musicDspLatencySamples = 0;
         juce::String inputDevice;
         juce::String outputDevice;
         juce::String lastError;
@@ -54,12 +59,14 @@ public:
     void shutdown();
 
     juce::AudioDeviceManager& getDeviceManager() noexcept { return deviceManager; }
-    askp::Processor& getAskpProcessor() noexcept { return enhancerBridge.processor(); }
-    const askp::Processor& getAskpProcessor() const noexcept { return enhancerBridge.processor(); }
-    EnhancerEngineBridge& getEnhancerBridge() noexcept { return enhancerBridge; }
-    askp::LicenseManager& getLicenseManager() noexcept { return enhancerBridge.licenseManager(); }
-    const askp::LicenseManager& getLicenseManager() const noexcept { return enhancerBridge.licenseManager(); }
-    bool fullFeaturesAllowed() const noexcept { return enhancerBridge.editingAllowed(); }
+    askp::Processor& getAskpProcessor() noexcept { return voiceEnhancerBridge.processor(); }
+    const askp::Processor& getAskpProcessor() const noexcept { return voiceEnhancerBridge.processor(); }
+    EnhancerEngineBridge& getEnhancerBridge() noexcept { return voiceEnhancerBridge; }
+    EnhancerEngineBridge& getVoiceEnhancerBridge() noexcept { return voiceEnhancerBridge; }
+    EnhancerEngineBridge& getMusicEnhancerBridge() noexcept { return musicEnhancerBridge; }
+    askp::LicenseManager& getLicenseManager() noexcept { return voiceEnhancerBridge.licenseManager(); }
+    const askp::LicenseManager& getLicenseManager() const noexcept { return voiceEnhancerBridge.licenseManager(); }
+    bool fullFeaturesAllowed() const noexcept { return voiceEnhancerBridge.editingAllowed(); }
 
     juce::StringArray getInputDeviceNames();
     juce::StringArray getOutputDeviceNames();
@@ -101,12 +108,17 @@ public:
     void setEngineEnabled (bool value) noexcept { engineEnabled.store (value); }
     bool isEngineEnabled() const noexcept { return engineEnabled.load(); }
     void setBypassed (bool value) noexcept;
-    bool isBypassed() const noexcept { return enhancerBypassed.load(); }
+    bool isBypassed() const noexcept { return voiceEnhancerBypassed.load() && musicEnhancerBypassed.load(); }
+    void setVoiceEnhancerBypassed (bool value) noexcept;
+    bool isVoiceEnhancerBypassed() const noexcept { return voiceEnhancerBypassed.load(); }
+    void setMusicEnhancerBypassed (bool value) noexcept;
+    bool isMusicEnhancerBypassed() const noexcept { return musicEnhancerBypassed.load(); }
     void setOutputMuted (bool value) noexcept { outputMuted.store (value); }
     bool isOutputMuted() const noexcept { return outputMuted.load(); }
     void restartAudio();
     void applyVstReferenceConditions() noexcept;
 
+    // Voice Signature Engine (kept under the original API for UI compatibility).
     void setPresetIndex (int index);
     int getPresetIndex() const noexcept;
     juce::StringArray getPresetNames() const;
@@ -123,6 +135,21 @@ public:
     float getVocalBody() const noexcept;
     float getStereoMagic() const noexcept;
 
+    // Independent Music Signature Engine. Music is enhanced before ducking.
+    void setMusicPresetIndex (int index);
+    int getMusicPresetIndex() const noexcept;
+    juce::StringArray getMusicPresetNames() const;
+    void setMusicEnhance (float value) noexcept;
+    void setMusicSmartBass (float value) noexcept;
+    void setMusicSmartTreble (float value) noexcept;
+    void setMusicVocalBody (float value) noexcept;
+    void setMusicStereoMagic (float value) noexcept;
+    float getMusicEnhance() const noexcept;
+    float getMusicSmartBass() const noexcept;
+    float getMusicSmartTreble() const noexcept;
+    float getMusicVocalBody() const noexcept;
+    float getMusicStereoMagic() const noexcept;
+
     MusicalNoiseClean& getNoiseClean() noexcept { return noiseClean; }
     SmoothDownwardExpander& getExpander() noexcept { return expander; }
 
@@ -131,7 +158,7 @@ public:
 
     void setVisualTapEnabled (bool enabled) noexcept
     {
-        enhancerBridge.setVisualTapEnabled (enabled);
+        voiceEnhancerBridge.setVisualTapEnabled (enabled);
     }
 
     // AudioIODeviceCallback
@@ -148,24 +175,29 @@ public:
 private:
     void changeListenerCallback (juce::ChangeBroadcaster*) override;
     void clearOutputs (float* const* outputChannelData, int channels, int samples) noexcept;
-    void updateMeters (const juce::AudioBuffer<float>& finalOutput) noexcept;
+    void updateMeters (const juce::AudioBuffer<float>& finalOutput,
+                       float preLimiterPeakDb) noexcept;
     void refreshDeviceStatus();
     juce::String applyDeviceSelection (const juce::String* inputName,
                                        const juce::String* outputName);
     void updateInputTrimRouting() noexcept;
     void updateOutputTrimRouting() noexcept;
     static bool looksLikeVirtualCable (const juce::String& name);
+    static float peakDb (const juce::AudioBuffer<float>& buffer) noexcept;
 
     juce::AudioDeviceManager deviceManager;
-    juce::AudioBuffer<float> processBuffer;
-    juce::AudioBuffer<float> detectorBuffer;
-    juce::AudioBuffer<float> pcAudioBuffer;
-    juce::MidiBuffer emptyMidi;
+    juce::AudioBuffer<float> processBuffer;   // Voice lane, then master mix bus.
+    juce::AudioBuffer<float> detectorBuffer;  // Voice detector before fader.
+    juce::AudioBuffer<float> pcAudioBuffer;   // Independent enhanced music lane.
+    juce::MidiBuffer voiceMidi;
+    juce::MidiBuffer musicMidi;
 
     MusicalNoiseClean noiseClean;
     SmoothDownwardExpander expander;
-    EnhancerEngineBridge enhancerBridge;
+    EnhancerEngineBridge voiceEnhancerBridge;
+    EnhancerEngineBridge musicEnhancerBridge;
     PcAudioLoopbackCapture pcLoopback;
+    juce::dsp::Limiter<float> masterLimiter;
 
     juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> inputGainLinear;
     juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> sc220MixGainLinear;
@@ -179,7 +211,8 @@ private:
     std::atomic<bool> inputTrimBypassed { false };
     std::atomic<bool> outputTrimBypassed { false };
     std::atomic<int> inputChannelMode { 2 };
-    std::atomic<bool> enhancerBypassed { false };
+    std::atomic<bool> voiceEnhancerBypassed { false };
+    std::atomic<bool> musicEnhancerBypassed { false };
     std::atomic<bool> outputMuted { true };
     std::atomic<bool> sc220Muted { false };
     std::atomic<bool> pcAudioEnabled { true };
@@ -207,8 +240,13 @@ private:
     std::atomic<float> outputPeakL { -120.0f };
     std::atomic<float> outputPeakR { -120.0f };
     std::atomic<float> gainReduction { 0.0f };
+    std::atomic<float> voiceGainReduction { 0.0f };
+    std::atomic<float> musicGainReduction { 0.0f };
+    std::atomic<float> masterGainReduction { 0.0f };
     std::atomic<int> dropoutCount { 0 };
     std::atomic<int> totalLatencySamples { 0 };
+    std::atomic<int> voiceLatencySamples { 0 };
+    std::atomic<int> musicDspLatencySamples { 0 };
 
     mutable juce::CriticalSection statusLock;
     juce::String currentInputName;

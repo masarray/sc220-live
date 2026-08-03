@@ -377,7 +377,8 @@ SC220MainComponent::SC220MainComponent (LiveAudioEngine& engine, WindowActions a
       pcMeter (std::make_unique<StereoMeter>()),
       streamMeter (std::make_unique<StereoMeter>()),
       signatureDisplay (std::make_unique<SignatureDisplay>()),
-      loudnessDisplay (std::make_unique<LoudnessDisplay>())
+      loudnessDisplay (std::make_unique<LoudnessDisplay>()),
+      licensePanel (std::make_unique<LiveLicensePanel> (engine.getEnhancerBridge()))
 {
     setOpaque (true);
     setLookAndFeel (lookAndFeel.get());
@@ -398,7 +399,7 @@ SC220MainComponent::~SC220MainComponent()
 void SC220MainComponent::configureControls()
 {
     for (auto* component : std::initializer_list<juce::Component*> {
-             &minimiseButton, &maximiseButton, &closeButton, &settingsButton, &goLiveButton,
+             &minimiseButton, &maximiseButton, &closeButton, &settingsButton, &licenseButton, &goLiveButton,
              &presetBox, &outputBox, &stereoButton, &dualMonoButton, &pcSourceBox, &inputTrim,
              &sc220Fader, &pcFader, &duckAmount, &streamFader, &monitorKnob, &sc220Mute,
              &streamMute, &detailsButton })
@@ -409,11 +410,19 @@ void SC220MainComponent::configureControls()
              sc220Meter.get(), pcMeter.get(), streamMeter.get(), signatureDisplay.get(),
              loudnessDisplay.get() })
         addAndMakeVisible (component);
+    addChildComponent (*licensePanel);
 
     minimiseButton.onClick = [this] { if (windowActions.minimise) windowActions.minimise(); };
     maximiseButton.onClick = [this] { if (windowActions.toggleMaximise) windowActions.toggleMaximise(); };
     closeButton.onClick = [this] { if (windowActions.hideToTray) windowActions.hideToTray(); };
     settingsButton.onClick = [this] { showAudioSettings(); };
+    licenseButton.onClick = [this]
+    {
+        licensePanel->setVisible (true);
+        licensePanel->toFront (true);
+    };
+    licensePanel->onClose = [this] { licensePanel->setVisible (false); };
+    licensePanel->onLicenseChanged = [this] { refreshAllControls(); };
 
     goLiveButton.setClickingTogglesState (true);
     goLiveButton.onClick = [this]
@@ -512,6 +521,22 @@ void SC220MainComponent::configureControls()
 
 void SC220MainComponent::refreshAllControls()
 {
+    auto& license = audioEngine.getLicenseManager();
+    license.refresh();
+    const bool creativeEditing = license.editingAllowed();
+    presetBox.setEnabled (creativeEditing);
+    for (auto& knob : macroKnobs)
+        knob.setEnabled (creativeEditing);
+
+    if (license.isLicensed())
+        licenseButton.setButtonText ("FULL VERSION");
+    else if (license.state() == askp::LicenseManager::State::ClockNeedsAttention)
+        licenseButton.setButtonText ("CHECK CLOCK");
+    else if (! creativeEditing)
+        licenseButton.setButtonText ("UNLOCK CONTROLS");
+    else
+        licenseButton.setButtonText ("FREE " + juce::String (license.daysRemaining()) + " DAYS");
+
     presetBox.setSelectedItemIndex (audioEngine.getPresetIndex(), juce::dontSendNotification);
     inputTrim.setValue (audioEngine.getInputTrimDb(), juce::dontSendNotification);
     sc220Fader.setValue (audioEngine.getSc220FaderDb(), juce::dontSendNotification);
@@ -544,6 +569,12 @@ void SC220MainComponent::setUiActive (bool active)
 
 void SC220MainComponent::timerCallback()
 {
+    static int licenceRefreshDivider = 0;
+    if (++licenceRefreshDivider >= 30)
+    {
+        licenceRefreshDivider = 0;
+        refreshAllControls();
+    }
     lastStatus = audioEngine.getStatus();
     sc220Meter->setLevels (lastStatus.inputPeakDbL, lastStatus.inputPeakDbR);
     pcMeter->setLevels (lastStatus.pcPeakDbL, lastStatus.pcPeakDbR);
@@ -777,6 +808,7 @@ void SC220MainComponent::resized()
     maximiseButton.setBounds (getWidth() - 238, 14, 42, 38);
     closeButton.setBounds (getWidth() - 192, 14, 42, 38);
     settingsButton.setBounds (getWidth() - 440, 14, 120, 38);
+    licenseButton.setBounds (getWidth() - 590, 14, 138, 38);
     goLiveButton.setBounds (getWidth() - 144, 10, 132, 46);
     presetBox.setBounds (338, 15, 178, 36);
 
@@ -829,6 +861,7 @@ void SC220MainComponent::resized()
     monitorKnob.setBounds (masterArea.getRight() - 164, masterLower.getY() + 52, 108, 108);
 
     outputBox.setBounds (masterArea.getRight() - 184, masterArea.getBottom() - 144, 154, 36);
+    licensePanel->setBounds (getLocalBounds());
 }
 
 } // namespace askp::live

@@ -67,7 +67,7 @@ release-sc220-windows.bat 0.1.1
 The release pipeline fails closed. It:
 
 1. confirms valid `gh` authentication and repository visibility;
-2. verifies the binary-only distribution approval gate;
+2. verifies proprietary EULA, 365-day continuation policy, and purchase terms;
 3. builds Release and packages only the executable, quick start, and third-party notices;
 4. rejects source, debug, secret, certificate, and compiler artifacts;
 5. commits and pushes source to the private `masarray/sc220-live` repository;
@@ -75,13 +75,9 @@ The release pipeline fails closed. It:
 7. pushes only the static download surface to the public repository;
 8. enables GitHub Pages and reads back the published release assets.
 
-Before the first binary-only public release, confirm that Recording Tech / MasArray has commercial or alternative distribution rights for JUCE and every included component. Then create the ignored local file `.release-license-approval.txt` containing exactly:
-
-```text
-I HAVE RIGHTS TO DISTRIBUTE SC220 LIVE AS BINARY ONLY
-```
-
-This is intentionally not committed. The existing GPL-3.0 notice must not be treated as permission to withhold corresponding source from binary recipients.
+SC220 Live is proprietary closed-source software. Public packages include the
+end-user agreement, optional purchase terms, and third-party notices, but never
+the application source, build system, DSP source, or debug symbols.
 
 ## Repository boundary
 

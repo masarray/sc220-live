@@ -9,7 +9,7 @@
 #endif
 
 #ifndef SONKUPIK_LICENSE_PRICE_IDR
- #define SONKUPIK_LICENSE_PRICE_IDR 249000
+ #define SONKUPIK_LICENSE_PRICE_IDR 399000
 #endif
 
 namespace askp {
@@ -67,7 +67,7 @@ LicenseCheckoutClient& LicenseCheckoutClient::shared(const juce::String& deviceR
 }
 
 LicenseCheckoutClient::LicenseCheckoutClient(juce::String deviceRequestId)
-    : juce::Thread("Sonkupik Live License Checkout"),
+    : juce::Thread("SC220 Live License Checkout"),
       deviceRequestId_(std::move(deviceRequestId))
 {
     pending_ = loadPendingOrder();
@@ -83,7 +83,7 @@ LicenseCheckoutClient::LicenseCheckoutClient(juce::String deviceRequestId)
         ensureThreadRunning();
         wake_.signal();
     } else {
-        state_.message = "Unlock Sonkupik Live Full Version once with QRIS, or use offline activation support.";
+        state_.message = "Unlock SC220 Live Full Version once with QRIS, or use offline activation support.";
     }
 }
 
@@ -362,7 +362,7 @@ void LicenseCheckoutClient::performCreateCheckout(juce::String customerName,
         || created.amountIdr != SONKUPIK_LICENSE_PRICE_IDR
         || created.expiresAt <= created.createdAt) {
         setState(Status::Failed,
-                 "Licence server returned an incomplete checkout or a price that does not match Rp249.000. No payment was opened.",
+                 "Licence server returned an incomplete checkout or a price that does not match Rp399.000. No payment was opened.",
                  false);
         autoPoll_.store(false, std::memory_order_release);
         return;
@@ -439,7 +439,7 @@ void LicenseCheckoutClient::performOrderRefresh()
 
     if (!response.transportOk) {
         setPendingState(Status::Offline,
-                        "Payment status is temporarily unavailable. Your order reference is saved. Do not pay again; Sonkupik Live will retry.",
+                        "Payment status is temporarily unavailable. Your order reference is saved. Do not pay again; SC220 Live will retry.",
                         false);
         return;
     }
@@ -541,7 +541,7 @@ void LicenseCheckoutClient::performOrderRefresh()
                         false);
     } else {
         setPendingState(Status::WaitingForPayment,
-                        "Waiting for QRIS payment. Pay on your phone; Sonkupik Live checks automatically with adaptive polling.",
+                        "Waiting for QRIS payment. Pay on your phone; SC220 Live checks automatically with adaptive polling.",
                         false);
     }
 }
@@ -558,7 +558,7 @@ LicenseCheckoutClient::HttpResult LicenseCheckoutClient::request(const juce::Str
     juce::String headers;
     headers << "Accept: application/json\r\n"
             << "Content-Type: application/json\r\n"
-            << "User-Agent: Sonkupik-Live/0.13.3\r\n";
+            << "User-Agent: SC220-Live/0.1.0\r\n";
     if (bearerToken.isNotEmpty())
         headers << "Authorization: Bearer " << bearerToken << "\r\n";
 
@@ -638,7 +638,7 @@ juce::File LicenseCheckoutClient::checkoutStateFile() const
 {
     auto dir = juce::File::getSpecialLocation(juce::File::userApplicationDataDirectory)
                    .getChildFile("MasArray")
-                   .getChildFile("Sonkupik Live");
+                   .getChildFile("SC220 Live");
     dir.createDirectory();
     return dir.getChildFile("checkout-state-v2.json");
 }

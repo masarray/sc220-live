@@ -17,16 +17,13 @@ The release script rejects C/C++ source, headers, CMake inputs, executables comm
 
 GitHub automatically offers source archives for the public release tag. Those archives contain only this public landing-page repository, never the private application repository.
 
-## Distribution-rights gate
+## Proprietary distribution contract
 
-This checkout currently carries GPL-3.0 licensing material. A binary-only release is blocked unless the operator explicitly confirms that commercial or alternative rights cover JUCE and all included components. The acknowledgement is local and ignored by Git:
-
-```text
-.release-license-approval.txt
-I HAVE RIGHTS TO DISTRIBUTE SC220 LIVE AS BINARY ONLY
-```
-
-The acknowledgement is a safety interlock, not legal advice or a substitute for the actual licences.
+SC220 Live application source is proprietary and remains private. Release
+preflight requires `LICENSE`, `EULA.txt`, and `PURCHASE_TERMS.txt` to declare the
+365-day free-control period, safe audio continuation, optional IDR 399,000
+one-time activation, and third-party rights. Public binary packages include
+those user-facing terms and notices.
 
 ## Publication invariants
 

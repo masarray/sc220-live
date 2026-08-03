@@ -9,7 +9,7 @@
 #include <array>
 
 #ifndef SONKUPIK_LICENSE_PRICE_IDR
- #define SONKUPIK_LICENSE_PRICE_IDR 249000
+ #define SONKUPIK_LICENSE_PRICE_IDR 399000
 #endif
 
 namespace askp::live {

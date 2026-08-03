@@ -13,8 +13,6 @@ $sourceUrl = 'https://github.com/masarray/sc220-live.git'
 $publicUrl = 'https://github.com/masarray/sc220-download.git'
 $releaseRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 $publicCheckout = Join-Path $releaseRoot '.release-public'
-$approvalFile = Join-Path $releaseRoot '.release-license-approval.txt'
-$approvalText = 'I HAVE RIGHTS TO DISTRIBUTE SC220 LIVE AS BINARY ONLY'
 
 function Invoke-Checked([string]$Label, [scriptblock]$Action) {
     Write-Host "==> $Label"
@@ -35,24 +33,49 @@ function Remove-ReleaseCheckout {
 
 Set-Location $releaseRoot
 
-foreach ($command in @('git.exe','gh.exe')) {
+foreach ($command in @('git.exe','gh.exe','curl.exe')) {
     if (-not (Get-Command $command -ErrorAction SilentlyContinue)) {
         throw "$command is required and was not found in PATH."
     }
 }
 
-if (-not (Test-Path $approvalFile)) {
-    throw @"
-Binary-only publication is locked because this checkout carries GPL-3.0 material.
-Only continue after confirming commercial/alternative distribution rights for JUCE
-and every included component. Then create this ignored local file:
-  $approvalFile
-with this exact single line:
-  $approvalText
-"@
+$licenceText = Get-Content -Raw -LiteralPath (Join-Path $releaseRoot 'LICENSE')
+$eulaText = Get-Content -Raw -LiteralPath (Join-Path $releaseRoot 'EULA.txt')
+$purchaseText = Get-Content -Raw -LiteralPath (Join-Path $releaseRoot 'PURCHASE_TERMS.txt')
+if ($licenceText -notmatch 'PROPRIETARY SOFTWARE' -or
+    $eulaText -notmatch '365-DAY' -or
+    $eulaText -notmatch 'Audio processing' -or
+    $eulaText -notmatch 'designed to continue' -or
+    $purchaseText -notmatch 'IDR 399,000' -or
+    $purchaseText -notmatch 'not a subscription') {
+    throw 'Proprietary licence, 365-day safe continuation, or purchase terms are incomplete.'
 }
-if ((Get-Content -Raw -LiteralPath $approvalFile).Trim() -ne $approvalText) {
-    throw 'The binary-only distribution approval file does not contain the exact required acknowledgement.'
+
+& (Join-Path $PSScriptRoot 'check-sc220-release-contract.ps1')
+
+$serviceBase = 'https://masarray-license-api.masari.workers.dev'
+$healthJson = (& curl.exe --silent --show-error --fail --max-time 20 "$serviceBase/health")
+if ($LASTEXITCODE -ne 0 -or -not $healthJson) {
+    throw 'Licence service health could not be verified.'
+}
+$health = $healthJson | ConvertFrom-Json
+if (-not $health.ok -or $health.environment -ne 'production') {
+    throw "Public release requires the production licence service; found environment '$($health.environment)'."
+}
+
+$productJson = (& curl.exe --silent --show-error --fail --max-time 20 "$serviceBase/v1/products/sc220-live")
+if ($LASTEXITCODE -ne 0 -or -not $productJson) {
+    throw 'Licence service product sc220-live is not available for purchase.'
+}
+$productEnvelope = $productJson | ConvertFrom-Json
+$product = $productEnvelope.product
+if (-not $productEnvelope.ok -or
+    $product.id -ne 'sc220-live' -or
+    [int]$product.price_idr -ne 399000 -or
+    $product.currency -ne 'IDR' -or
+    [int]$product.max_activations -ne 1 -or
+    $product.license_mode -ne 'perpetual') {
+    throw 'Licence service product contract does not match SC220 Live IDR 399,000 perpetual / one-computer terms.'
 }
 
 Invoke-Checked 'Checking GitHub authentication' { gh auth status }

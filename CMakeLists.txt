@@ -61,7 +61,8 @@ set(ASKP_DSP_SOURCE "${ASKP_ENGINE_DIR}/arsonkupik_dsp.cpp")
 set(ASKP_PRESET_SOURCE "${ASKP_ENGINE_DIR}/arsonkupik_presets.cpp")
 set(ASKP_REFERENCE_PROCESSOR_SOURCE "${ASKP_PROCESSOR_DIR}/PluginProcessor.cpp")
 set(ASKP_REFERENCE_PROCESSOR_HEADER "${ASKP_PROCESSOR_DIR}/PluginProcessor.h")
-set(ASKP_LICENSE_SOURCE "${ASKP_PROCESSOR_DIR}/LicenseManager.cpp")
+set(ASKP_REFERENCE_LICENSE_SOURCE "${ASKP_PROCESSOR_DIR}/LicenseManager.cpp")
+set(ASKP_REFERENCE_LICENSE_HEADER "${ASKP_PROCESSOR_DIR}/LicenseManager.h")
 set(SONKUPIK_LOOK_AND_FEEL_SOURCE "${SONKUPIK_SPHERE_DIR}/AskpLookAndFeel.cpp")
 set(SONKUPIK_ORB_SOURCE "${SONKUPIK_SPHERE_DIR}/OrbVisualizer.cpp")
 
@@ -100,6 +101,48 @@ endif()
 # retains 80 ms for parity renders.
 set(ASKP_GENERATED_DIR "${CMAKE_CURRENT_BINARY_DIR}/generated/askp-v0.5.23")
 file(MAKE_DIRECTORY "${ASKP_GENERATED_DIR}")
+
+# Keep the proven ASK-P 365-day state machine and RSA activation format, but
+# isolate SC220 Live's trial clock and activation from the VST product. The
+# ASKP-R1 request/ASKP-A1 activation transport stays compatible with the
+# existing MasArray payment service and signing key.
+file(READ "${ASKP_REFERENCE_LICENSE_HEADER}" _license_header)
+file(READ "${ASKP_REFERENCE_LICENSE_SOURCE}" _license_source)
+if(NOT _license_header MATCHES "betaDurationDays = 365")
+    message(FATAL_ERROR "ASK-P licence authority is no longer the reviewed 365-day implementation")
+endif()
+foreach(_anchor IN ITEMS
+        "ASKP-LOCAL-STATE-V1-84F6D183A7C24F96"
+        "HKEY_CURRENT_USER\\\\Software\\\\MasArray\\\\ArSonKuPik\\\\"
+        "ASKP-HARDWARE-FINGERPRINT-V1"
+        ".getChildFile(\"ArSonKuPik\")")
+    string(FIND "${_license_source}" "${_anchor}" _license_anchor_pos)
+    if(_license_anchor_pos EQUAL -1)
+        message(FATAL_ERROR "ASK-P licence isolation anchor changed: ${_anchor}")
+    endif()
+endforeach()
+string(REPLACE "ASKP-LOCAL-STATE-V1-84F6D183A7C24F96"
+               "SC220-LIVE-LOCAL-STATE-V1-2FA42A09B8454C50"
+               _license_source "${_license_source}")
+string(REPLACE "HKEY_CURRENT_USER\\\\Software\\\\MasArray\\\\ArSonKuPik\\\\"
+               "HKEY_CURRENT_USER\\\\Software\\\\MasArray\\\\SC220 Live\\\\"
+               _license_source "${_license_source}")
+string(REPLACE "ASKP-HARDWARE-FINGERPRINT-V1"
+               "SC220-LIVE-HARDWARE-FINGERPRINT-V1"
+               _license_source "${_license_source}")
+string(REPLACE ".getChildFile(\"ArSonKuPik\")"
+               ".getChildFile(\"SC220 Live\")"
+               _license_source "${_license_source}")
+string(REPLACE "ArSonKuPik Customer" "SC220 Live Customer"
+               _license_source "${_license_source}")
+string(REPLACE "Public Beta ended - Read-only mode"
+               "Free period ended - Creative controls are read-only"
+               _license_source "${_license_source}")
+string(REPLACE "Public Beta - " "SC220 Live Free - "
+               _license_source "${_license_source}")
+file(WRITE "${ASKP_GENERATED_DIR}/LicenseManager.h" "${_license_header}")
+file(WRITE "${ASKP_GENERATED_DIR}/LicenseManager.cpp" "${_license_source}")
+set(ASKP_LICENSE_SOURCE "${ASKP_GENERATED_DIR}/LicenseManager.cpp")
 
 file(READ "${ASKP_REFERENCE_PROCESSOR_HEADER}" _processor_header)
 set(_has_editor_anchor "bool hasEditor() const override { return true; }")
@@ -281,7 +324,7 @@ target_compile_definitions(SC220Live PRIVATE
     SONKUPIK_ENGINE_REVISION=2026073102
     SONKUPIK_LICENSE_API_URL="https://masarray-license-api.masari.workers.dev"
     SONKUPIK_LICENSE_PRODUCT_ID="sc220-live"
-    SONKUPIK_LICENSE_PRICE_IDR=249000
+    SONKUPIK_LICENSE_PRICE_IDR=399000
 )
 
 target_link_libraries(SC220Live PRIVATE

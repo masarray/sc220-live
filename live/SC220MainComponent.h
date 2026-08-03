@@ -1,6 +1,7 @@
 #pragma once
 
 #include "LiveAudioEngine.h"
+#include "LiveLicensePanel.h"
 
 #include <juce_gui_extra/juce_gui_extra.h>
 
@@ -57,6 +58,7 @@ private:
     juce::TextButton maximiseButton { "[]" };
     juce::TextButton closeButton { "X" };
     juce::TextButton settingsButton { "SETTINGS" };
+    juce::TextButton licenseButton { "FREE 365 DAYS" };
     juce::TextButton goLiveButton { "GO LIVE" };
 
     juce::ComboBox presetBox;
@@ -82,6 +84,7 @@ private:
     std::unique_ptr<StereoMeter> streamMeter;
     std::unique_ptr<SignatureDisplay> signatureDisplay;
     std::unique_ptr<LoudnessDisplay> loudnessDisplay;
+    std::unique_ptr<LiveLicensePanel> licensePanel;
 
     juce::Rectangle<int> headerArea;
     juce::Rectangle<int> inputArea;

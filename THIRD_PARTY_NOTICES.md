@@ -1,32 +1,29 @@
 # Third-party notices
 
+SC220 Live itself is proprietary. The following components retain their own
+licence terms and ownership.
+
+## JUCE 8.0.14
+
+SC220 Live is built with JUCE 8.0.14 under an applicable JUCE closed-source
+distribution licence. JUCE remains owned by Raw Material Software Limited. No
+right to use or redistribute JUCE separately is granted by SC220 Live.
+
 ## Plus Jakarta Sans
 
-Plus Jakarta Sans Regular and SemiBold are embedded in the Sonkupik Live user interface.
-They are distributed under the SIL Open Font License 1.1.
-
-The complete licence text is stored at `assets/fonts/OFL.txt`.
+Plus Jakarta Sans Regular and SemiBold are embedded in the user interface under
+the SIL Open Font License 1.1. The complete text is stored at
+`assets/fonts/OFL.txt` in the private source authority.
 
 ## Lucide Icons
 
-The Sonkupik Live interface embeds a focused subset of Lucide SVG icons.
-Lucide is distributed under the ISC licence.
+A focused subset of Lucide SVG icons is embedded under the ISC licence. The
+complete text is stored at `assets/icons/LUCIDE_LICENSE.txt` in the private
+source authority.
 
-The complete licence text is stored at `assets/icons/LUCIDE_LICENSE.txt`.
+## ASK-P Signature Engine v0.5.23
 
-## JUCE
-
-Sonkupik Live uses JUCE 8.0.14. The applicable JUCE licence must be satisfied for the
-intended distribution model. The repository's existing GPL direction must remain
-compatible with the selected JUCE licensing path.
-
-
-## ArSonKuPik Signature Engine v0.5.19
-
-The embedded enhancer engine is proprietary source supplied by and owned by
-Tutorial Mas Ari / MasArray. Its source licence notice is stored at
-`third_party/askp-engine-v0.5.19/LICENSE.txt`.
-
-Sonkupik Live v0.12.0 embeds only the DSP, profile bank, headless processor and
-licensing foundation required by the standalone application. The VST editor,
-QRIS checkout UI and updater are not included in this milestone.
+The embedded ASK-P Signature DSP, profile bank, headless processor, and local
+activation foundation are proprietary materials supplied by and owned by
+Tutorial Mas Ari / MasArray. SC220 Live pins the reviewed authority commit
+`5757119cab7a1a75f09dcf0edea6e3be97975439`.

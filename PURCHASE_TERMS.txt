@@ -1,0 +1,31 @@
+SC220 LIVE OPTIONAL COMMERCIAL ACTIVATION TERMS
+
+Effective date: 3 August 2026
+Copyright (C) 2026 Tutorial Mas Ari / MasArray and Recording Tech.
+
+1. SC220 Live provides 365 days of full creative control from first launch.
+   No card is required and no automatic charge occurs when that period ends.
+
+2. The standard perpetual creative-control activation is IDR 399,000 for one
+   active computer. It is a one-time payment, not a subscription, and has no
+   automatic renewal. The amount, taxes or fees, merchant, available methods,
+   and refund terms shown by Midtrans at checkout control the transaction.
+
+3. After verified payment, the MasArray licence service issues a signed local
+   activation bound to the Computer Request ID. Normal audio processing does
+   not require a permanent internet connection after activation.
+
+4. A saved order remains recoverable after the application or computer closes.
+   Do not pay twice because the service is temporarily unavailable. Retain the
+   Midtrans receipt and order reference and use CHECK PAYMENT or support.
+
+5. One purchase authorises one active computer. Approved reinstall, repair, or
+   replacement recovery supersedes the previous active-computer entitlement
+   and may require payment history, receipt email, and an anti-abuse review.
+
+6. Refund and chargeback handling follows the terms displayed at checkout and
+   mandatory Indonesian consumer law. A refund may terminate the related paid
+   activation entitlement to the extent permitted by law.
+
+Official downloads and support:
+https://github.com/masarray/sc220-download

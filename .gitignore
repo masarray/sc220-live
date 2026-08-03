@@ -158,7 +158,6 @@ ArSonKuPik-license-private-key*.txt
 *private-key*.txt
 *activation-secret*.txt
 build-key-activator/
-.release-license-approval.txt
 
 # OS metadata
 .DS_Store

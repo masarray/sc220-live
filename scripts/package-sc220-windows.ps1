@@ -32,6 +32,8 @@ New-Item -ItemType Directory -Force -Path $stage | Out-Null
 
 Copy-Item -LiteralPath $exe -Destination (Join-Path $stage 'SC220 Live.exe')
 Copy-Item -LiteralPath (Join-Path $root 'THIRD_PARTY_NOTICES.md') -Destination $stage
+Copy-Item -LiteralPath (Join-Path $root 'EULA.txt') -Destination $stage
+Copy-Item -LiteralPath (Join-Path $root 'PURCHASE_TERMS.txt') -Destination $stage
 
 $quickStart = @'
 SC220 LIVE - QUICK START

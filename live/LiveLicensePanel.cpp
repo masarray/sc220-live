@@ -32,9 +32,9 @@ LiveLicensePanel::LiveLicensePanel (EnhancerEngineBridge& engineToUse)
     };
 
     setLabel (title, 25.0f, true, colours::text, juce::Justification::centredLeft);
-    title.setText ("SONKUPIK LIVE FULL VERSION", juce::dontSendNotification);
+    title.setText ("SC220 LIVE FULL VERSION", juce::dontSendNotification);
     setLabel (subtitle, 13.5f, false, colours::textMuted, juce::Justification::centredLeft);
-    subtitle.setText ("All features are available during evaluation. Unlock permanently with one QRIS payment.",
+    subtitle.setText ("Full creative control is free for 365 days. Unlock permanently with one optional QRIS payment.",
                       juce::dontSendNotification);
     setLabel (trialBadge, 11.0f, true, colours::cyan, juce::Justification::centred);
     setLabel (price, 31.0f, true, colours::text, juce::Justification::centredLeft);
@@ -67,7 +67,7 @@ LiveLicensePanel::LiveLicensePanel (EnhancerEngineBridge& engineToUse)
     activationCode.setReturnKeyStartsNewLine (true);
 
     setLabel (privacyNote, 10.5f, false, colours::textMuted, juce::Justification::centredLeft);
-    privacyNote.setText ("Payment is hosted by Midtrans. Sonkupik sends only receipt details, the order capability and this computer request ID to the licence server. Audio is never uploaded.",
+    privacyNote.setText ("Payment is hosted by Midtrans. SC220 Live sends only receipt details, the order capability and this computer request ID to the licence server. Audio is never uploaded.",
                          juce::dontSendNotification);
 
     const std::array<juce::Component*, 21> components {{
@@ -235,7 +235,7 @@ void LiveLicensePanel::timerCallback()
         if (result.ok)
         {
             checkout.markActivated();
-            setStatus ("Payment verified. Sonkupik Live Full Version is activated.", colours::green);
+            setStatus ("Payment verified. SC220 Live Full Version is activated.", colours::green);
             if (onLicenseChanged)
                 onLicenseChanged();
         }
@@ -271,7 +271,7 @@ void LiveLicensePanel::refreshState()
         const bool expired = state == askp::LicenseManager::State::ReadOnly;
         const bool clockIssue = state == askp::LicenseManager::State::ClockNeedsAttention;
         trialBadge.setText (clockIssue ? "CHECK SYSTEM CLOCK"
-                                      : expired ? "TRIAL ENDED"
+                                      : expired ? "FREE PERIOD ENDED"
                                                 : "FULL FEATURES ACTIVE",
                             juce::dontSendNotification);
         trialBadge.setColour (juce::Label::textColourId,

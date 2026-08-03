@@ -23,6 +23,8 @@ if (-not (Test-Path (Join-Path $root 'third_party\askp-vst\engine\arsonkupik_dsp
     }
 }
 
+& (Join-Path $PSScriptRoot 'check-sc220-release-contract.ps1')
+
 $arguments = @{
     Configuration = $Configuration
     BuildDir = 'build-sc220'

@@ -1,0 +1,101 @@
+SC220 LIVE ONE-YEAR FREE-CONTROL END USER LICENCE AGREEMENT
+
+Effective date: 3 August 2026
+Copyright (C) 2026 Tutorial Mas Ari / MasArray and Recording Tech.
+All rights reserved.
+
+BY INSTALLING OR USING SC220 LIVE, YOU ACCEPT THIS AGREEMENT. IF YOU DO NOT
+ACCEPT IT, DO NOT INSTALL OR USE THE SOFTWARE.
+
+1. PRODUCT
+
+"SC220 Live" means the Windows application, DSP integration, presets,
+documentation, updates, and activation data supplied for use with Recording
+Tech audio interfaces. The Software is licensed, not sold.
+
+2. 365-DAY FREE FULL-CONTROL PERIOD
+
+For 365 days from first launch on a computer, you may use every available
+creative control without charge for personal or commercial audio production.
+No payment card is required. No payment is collected automatically when the
+free period ends.
+
+3. AFTER DAY 365
+
+The Software enters a safe control-limited mode. Audio processing, current and
+saved settings, meters, input/output routing, safety mute, and normal streaming
+operation are designed to continue. ASK-P preset selection and creative macro
+editing require a valid activation. The Software does not intentionally mute
+audio, inject noise, or force bypass because the free-control period ended.
+
+Payment is optional. Users may continue using the control-limited mode.
+
+4. OPTIONAL PERPETUAL ACTIVATION
+
+A paid or otherwise authorised activation restores creative editing for this
+major product generation. The standard offer for this release is a one-time
+IDR 399,000 activation for one active computer, with no subscription and no
+automatic renewal. Taxes, fees, merchant identity, refund information, and the
+final amount displayed by Midtrans at checkout govern the transaction.
+
+5. OWNERSHIP AND RESTRICTIONS
+
+The licensors retain all rights in the proprietary Software and confidential
+source code. Except where applicable law expressly provides otherwise, you may
+not redistribute, mirror, resell, rent, sublicense, bundle, reverse engineer,
+decompile, disassemble, bypass activation, extract protected source or presets,
+discover signing keys, or remove legal notices. Reasonable backup copies are
+permitted solely for your own licensed use.
+
+6. ACTIVATION AND ONE ACTIVE COMPUTER
+
+An activation is bound to one Computer Request ID and may not be shared or
+published. Reinstallation, repair, or approved computer replacement may require
+receipt, email, order, previous activation, and reasonable anti-abuse checks. A
+replacement activation supersedes the previous active-computer entitlement.
+
+7. PRIVACY AND NETWORK USE
+
+Normal audio processing does not require a permanent internet connection and
+audio is not uploaded. When the user chooses checkout or payment verification,
+SC220 Live may send receipt name, email, product ID, Computer Request ID, order
+ID, and an order-scoped capability to the authorised MasArray licence service.
+Payment is hosted by Midtrans. Pending-order data may be stored locally for
+payment recovery and to prevent duplicate payment.
+
+8. THIRD-PARTY COMPONENTS
+
+SC220 Live is built with JUCE 8 under an applicable JUCE licence and includes
+components governed by separate terms, including Plus Jakarta Sans and Lucide.
+Those notices are supplied in THIRD_PARTY_NOTICES.md. No right is granted to use
+those components separately from the Software.
+
+9. UPDATES AND COMPATIBILITY
+
+Future versions, major upgrades, features, prices, operating-system support,
+and licence terms may differ. The licensors do not guarantee compatibility with
+every driver, device, host, or future Windows release.
+
+10. WARRANTY AND LIABILITY
+
+THE SOFTWARE IS PROVIDED "AS IS" AND "AS AVAILABLE" WITHOUT WARRANTY TO THE
+MAXIMUM EXTENT PERMITTED BY LAW. VERIFY AUDIO BEFORE A BROADCAST AND KEEP
+BACKUPS. TO THE MAXIMUM EXTENT PERMITTED BY LAW, THE LICENSORS ARE NOT LIABLE
+FOR INDIRECT OR CONSEQUENTIAL LOSS, LOST DATA, LOST REVENUE, INTERRUPTION, OR
+MISSED OPPORTUNITY. LIABILITY THAT CANNOT BE EXCLUDED IS LIMITED TO THE AMOUNT
+PAID FOR THE SOFTWARE, SUBJECT TO MANDATORY CONSUMER RIGHTS.
+
+11. TERMINATION AND LAW
+
+This licence terminates upon material breach. Ownership, restrictions,
+warranty, liability, and third-party provisions survive. This agreement is
+governed by the laws of the Republic of Indonesia, subject to mandatory local
+consumer protections.
+
+12. COMPLETE AGREEMENT
+
+This EULA, PURCHASE_TERMS.txt, checkout terms, receipt terms, and supplied
+third-party notices form the complete agreement for this release.
+
+Official downloads and support:
+https://github.com/masarray/sc220-download

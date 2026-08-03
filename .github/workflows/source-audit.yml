@@ -23,6 +23,12 @@ jobs:
           python-version: '3.12'
       - name: Install source-audit dependencies
         run: python -m pip install --disable-pip-version-check numpy
+      - name: Generate aligned SC220 UI source
+        run: >-
+          cmake
+          -DSC220_UI_SOURCE=${{ github.workspace }}/live/SC220MainComponent.cpp
+          -DSC220_UI_GENERATED_SOURCE=${{ runner.temp }}/SC220MainComponent_Aligned.cpp
+          -P cmake/GenerateSC220AlignedUi.cmake
       - name: Validate ASK-P v0.5.23 port boundary
         run: python qa/audit_v0140_askp_v0523_port.py
       - name: Validate SC220 dual-source broadcast bus

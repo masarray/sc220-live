@@ -37,10 +37,13 @@ check(
     "if ($Clean)" in one_click
     and "prepare-sc220-clean-build.ps1" in one_click,
 )
+clean_invocation = "& (Join-Path $PSScriptRoot 'prepare-sc220-clean-build.ps1')"
+build_invocation = "& (Join-Path $PSScriptRoot 'build-live-windows.ps1')"
 check(
     "pre-clean executes before main build script",
-    one_click.find("prepare-sc220-clean-build.ps1")
-    < one_click.find("build-live-windows.ps1"),
+    one_click.find(clean_invocation) >= 0
+    and one_click.find(build_invocation) >= 0
+    and one_click.find(clean_invocation) < one_click.find(build_invocation),
 )
 check(
     "inner build does not receive a second Clean request",

@@ -2,18 +2,21 @@
 
 #include "BinaryData.h"
 
+#include <algorithm>
 #include <cmath>
 #include <initializer_list>
 
 namespace askp::live {
 namespace palette {
-const auto ivory = juce::Colour (0xfff3f0e9);
-const auto surface = juce::Colour (0xfffaf8f3);
-const auto ink = juce::Colour (0xff141516);
-const auto graphite = juce::Colour (0xff2a2d2e);
-const auto muted = juce::Colour (0xff6f716e);
-const auto border = juce::Colour (0xffc9c3b8);
-const auto orange = juce::Colour (0xffd86a18);
+const auto ivory = juce::Colour (0xfff4f1ea);
+const auto surface = juce::Colour (0xfffbfaf7);
+const auto surfaceAlt = juce::Colour (0xfff0ede6);
+const auto ink = juce::Colour (0xff121416);
+const auto graphite = juce::Colour (0xff2a2d2f);
+const auto muted = juce::Colour (0xff737672);
+const auto border = juce::Colour (0xffcbc6bb);
+const auto borderSoft = juce::Colour (0xffded9cf);
+const auto orange = juce::Colour (0xffdf6d14);
 const auto green = juce::Colour (0xff23834a);
 const auto amber = juce::Colour (0xffd99a22);
 const auto red = juce::Colour (0xffc94332);
@@ -28,17 +31,17 @@ juce::Image loadImage (const char* resourceName)
     return {};
 }
 
-juce::Typeface::Ptr loadTypeface (const char* resourceName)
+juce::Font interFont (float size, bool semibold = false)
 {
-    int bytes = 0;
-    if (const auto* data = BinaryData::getNamedResource (resourceName, bytes))
-        return juce::Typeface::createSystemTypefaceFor (data, static_cast<size_t> (bytes));
-    return {};
+    juce::Font font { juce::FontOptions { size } };
+    font.setTypefaceName ("Inter");
+    font.setBold (semibold);
+    return font;
 }
 
-juce::String valueWithUnit (double value, const juce::String& suffix, int decimals = 1)
+float normaliseDb (float db, float floor = -84.0f) noexcept
 {
-    return juce::String (value, decimals) + suffix;
+    return juce::jlimit (0.0f, 1.0f, (db - floor) / -floor);
 }
 } // namespace
 
@@ -46,8 +49,6 @@ class SC220MainComponent::SurfaceLookAndFeel final : public juce::LookAndFeel_V4
 {
 public:
     SurfaceLookAndFeel()
-        : regular (loadTypeface ("plus_jakarta_sans_regular_ttf")),
-          semibold (loadTypeface ("plus_jakarta_sans_semibold_ttf"))
     {
         setColour (juce::ComboBox::backgroundColourId, palette::surface);
         setColour (juce::ComboBox::textColourId, palette::ink);
@@ -59,67 +60,73 @@ public:
         setColour (juce::Slider::textBoxTextColourId, palette::ink);
         setColour (juce::Slider::textBoxOutlineColourId, juce::Colours::transparentBlack);
         setColour (juce::Slider::textBoxBackgroundColourId, juce::Colours::transparentBlack);
-    }
-
-    juce::Typeface::Ptr getTypefaceForFont (const juce::Font& font) override
-    {
-        if (font.isBold() && semibold != nullptr)
-            return semibold;
-        if (regular != nullptr)
-            return regular;
-        return juce::LookAndFeel_V4::getTypefaceForFont (font);
+        setColour (juce::Label::textColourId, palette::ink);
     }
 
     juce::Font getTextButtonFont (juce::TextButton&, int height) override
     {
-        return juce::Font (juce::FontOptions (juce::jlimit (10.0f, 13.0f, height * 0.34f),
-                                              juce::Font::bold));
+        return interFont (juce::jlimit (10.0f, 13.0f, height * 0.34f), true);
     }
 
     juce::Font getComboBoxFont (juce::ComboBox& box) override
     {
-        return juce::Font (juce::FontOptions (juce::jlimit (10.0f, 13.0f, box.getHeight() * 0.34f)));
+        return interFont (juce::jlimit (10.0f, 13.0f, box.getHeight() * 0.34f));
+    }
+
+    juce::Font getPopupMenuFont() override
+    {
+        return interFont (13.0f);
+    }
+
+    juce::Font getLabelFont (juce::Label&) override
+    {
+        return interFont (12.0f);
     }
 
     void drawButtonBackground (juce::Graphics& g, juce::Button& button,
                                const juce::Colour&, bool highlighted, bool down) override
     {
         const auto area = button.getLocalBounds().toFloat().reduced (0.7f);
+        const bool liveButton = button.getButtonText() == "GO LIVE" || button.getButtonText() == "LIVE";
         auto fill = button.getToggleState() ? palette::ink : palette::surface;
-        if (button.getButtonText() == "GO LIVE")
+        if (liveButton)
             fill = button.getToggleState() ? palette::green : palette::orange;
         if (highlighted)
-            fill = fill.interpolatedWith (juce::Colours::white, 0.08f);
+            fill = liveButton ? fill.brighter (0.08f) : fill.interpolatedWith (juce::Colours::white, 0.10f);
         if (down)
             fill = fill.darker (0.12f);
 
+        g.setColour (juce::Colours::black.withAlpha (0.10f));
+        g.fillRoundedRectangle (area.translated (0.0f, 1.5f), 5.0f);
         g.setColour (fill);
-        g.fillRoundedRectangle (area, 4.0f);
-        g.setColour (button.getToggleState() || button.getButtonText() == "GO LIVE"
-                         ? juce::Colours::transparentBlack : palette::border);
-        g.drawRoundedRectangle (area, 4.0f, 1.0f);
+        g.fillRoundedRectangle (area, 5.0f);
+        g.setColour (button.getToggleState() || liveButton ? juce::Colours::transparentBlack
+                                                           : palette::border);
+        g.drawRoundedRectangle (area, 5.0f, 1.0f);
     }
 
     void drawButtonText (juce::Graphics& g, juce::TextButton& button,
                          bool, bool) override
     {
-        const bool inverse = button.getToggleState() || button.getButtonText() == "GO LIVE";
+        const bool liveButton = button.getButtonText() == "GO LIVE" || button.getButtonText() == "LIVE";
+        const bool inverse = button.getToggleState() || liveButton;
         g.setColour (inverse ? juce::Colours::white : palette::ink);
         g.setFont (getTextButtonFont (button, button.getHeight()));
-        g.drawFittedText (button.getButtonText(), button.getLocalBounds().reduced (5, 2),
+        g.drawFittedText (button.getButtonText(), button.getLocalBounds().reduced (6, 2),
                           juce::Justification::centred, 1);
     }
 
     void drawComboBox (juce::Graphics& g, int width, int height, bool,
-                       int, int, int, int, juce::ComboBox&) override
+                       int, int, int, int, juce::ComboBox& box) override
     {
         const auto area = juce::Rectangle<float> (0.5f, 0.5f,
                                                    static_cast<float> (width - 1),
                                                    static_cast<float> (height - 1));
         g.setColour (palette::surface);
-        g.fillRoundedRectangle (area, 4.0f);
-        g.setColour (palette::border);
-        g.drawRoundedRectangle (area, 4.0f, 1.0f);
+        g.fillRoundedRectangle (area, 5.0f);
+        g.setColour (box.isMouseOverOrDragging() ? palette::orange.withAlpha (0.70f)
+                                                  : palette::border);
+        g.drawRoundedRectangle (area, 5.0f, 1.0f);
 
         juce::Path chevron;
         const float cx = static_cast<float> (width - 18);
@@ -133,42 +140,52 @@ public:
 
     void positionComboBoxText (juce::ComboBox& box, juce::Label& label) override
     {
-        label.setBounds (10, 1, box.getWidth() - 36, box.getHeight() - 2);
+        label.setBounds (11, 1, box.getWidth() - 38, box.getHeight() - 2);
         label.setFont (getComboBoxFont (box));
     }
 
     void drawRotarySlider (juce::Graphics& g, int x, int y, int width, int height,
                            float position, float startAngle, float endAngle,
-                           juce::Slider&) override
+                           juce::Slider& slider) override
     {
-        const float diameter = static_cast<float> (juce::jmin (width, height)) - 10.0f;
+        const float diameter = static_cast<float> (juce::jmin (width, height)) - 11.0f;
         const float radius = diameter * 0.5f;
         const auto centre = juce::Point<float> (static_cast<float> (x + width) * 0.5f,
                                                 static_cast<float> (y + height) * 0.5f);
         const auto knob = juce::Rectangle<float> (diameter, diameter).withCentre (centre);
+        const float alpha = slider.isEnabled() ? 1.0f : 0.38f;
 
-        g.setColour (juce::Colours::black.withAlpha (0.16f));
+        g.setColour (juce::Colours::black.withAlpha (0.14f * alpha));
         g.fillEllipse (knob.translated (0.0f, 3.0f));
-        g.setGradientFill (juce::ColourGradient (juce::Colour (0xff414445), knob.getTopLeft(),
-                                                 juce::Colour (0xff111213), knob.getBottomRight(), false));
+        juce::ColourGradient metal (juce::Colour (0xff45494a), knob.getTopLeft(),
+                                    juce::Colour (0xff151718), knob.getBottomRight(), false);
+        metal.multiplyOpacity (alpha);
+        g.setGradientFill (metal);
         g.fillEllipse (knob);
-        g.setColour (juce::Colour (0xff8a8c89));
-        g.drawEllipse (knob, 1.4f);
-        g.setColour (juce::Colour (0xff050606));
+        g.setColour (juce::Colour (0xff8a8c89).withAlpha (alpha));
+        g.drawEllipse (knob, 1.2f);
+        g.setColour (juce::Colour (0xff050606).withAlpha (alpha));
         g.drawEllipse (knob.reduced (4.0f), 1.0f);
+
+        juce::Path track;
+        track.addCentredArc (centre.x, centre.y, radius + 4.0f, radius + 4.0f, 0.0f,
+                             startAngle, endAngle, true);
+        g.setColour (palette::border.withAlpha (alpha));
+        g.strokePath (track, juce::PathStrokeType (2.2f, juce::PathStrokeType::curved,
+                                                   juce::PathStrokeType::rounded));
 
         juce::Path arc;
         arc.addCentredArc (centre.x, centre.y, radius + 4.0f, radius + 4.0f, 0.0f,
                            startAngle, startAngle + position * (endAngle - startAngle), true);
-        g.setColour (palette::orange);
-        g.strokePath (arc, juce::PathStrokeType (2.3f, juce::PathStrokeType::curved,
+        g.setColour (palette::orange.withAlpha (alpha));
+        g.strokePath (arc, juce::PathStrokeType (2.5f, juce::PathStrokeType::curved,
                                                  juce::PathStrokeType::rounded));
 
         const float angle = startAngle + position * (endAngle - startAngle);
-        const auto pointerStart = centre.getPointOnCircumference (radius * 0.22f, angle);
-        const auto pointerEnd = centre.getPointOnCircumference (radius * 0.72f, angle);
-        g.setColour (juce::Colours::white.withAlpha (0.92f));
-        g.drawLine ({ pointerStart, pointerEnd }, 2.2f);
+        const auto pointerStart = centre.getPointOnCircumference (radius * 0.20f, angle);
+        const auto pointerEnd = centre.getPointOnCircumference (radius * 0.70f, angle);
+        g.setColour (juce::Colours::white.withAlpha (0.90f * alpha));
+        g.drawLine ({ pointerStart, pointerEnd }, 2.1f);
     }
 
     void drawLinearSlider (juce::Graphics& g, int x, int y, int width, int height,
@@ -182,29 +199,28 @@ public:
             return;
         }
 
+        const float alpha = slider.isEnabled() ? 1.0f : 0.36f;
         const float centreX = static_cast<float> (x + width) * 0.5f;
         const auto track = juce::Rectangle<float> (centreX - 4.0f, static_cast<float> (y + 3),
                                                     8.0f, static_cast<float> (height - 6));
-        g.setColour (juce::Colour (0xff171919));
+        g.setColour (juce::Colour (0xff171919).withAlpha (alpha));
         g.fillRoundedRectangle (track, 3.0f);
-        g.setColour (juce::Colours::black.withAlpha (0.28f));
+        g.setColour (juce::Colours::black.withAlpha (0.25f * alpha));
         g.drawRoundedRectangle (track, 3.0f, 1.0f);
 
-        const auto cap = juce::Rectangle<float> (centreX - 22.0f, sliderPos - 16.0f, 44.0f, 32.0f);
-        g.setColour (juce::Colours::black.withAlpha (0.18f));
-        g.fillRoundedRectangle (cap.translated (0.0f, 3.0f), 3.0f);
-        g.setGradientFill (juce::ColourGradient (juce::Colour (0xfff5f5f2), cap.getTopLeft(),
-                                                 juce::Colour (0xff8f918e), cap.getBottomLeft(), false));
-        g.fillRoundedRectangle (cap, 3.0f);
-        g.setColour (juce::Colour (0xff626462));
-        g.drawRoundedRectangle (cap, 3.0f, 1.0f);
-        g.setColour (juce::Colour (0xff555755));
-        g.drawHorizontalLine (juce::roundToInt (sliderPos), cap.getX() + 3.0f, cap.getRight() - 3.0f);
+        const auto cap = juce::Rectangle<float> (centreX - 21.0f, sliderPos - 15.0f, 42.0f, 30.0f);
+        g.setColour (juce::Colours::black.withAlpha (0.16f * alpha));
+        g.fillRoundedRectangle (cap.translated (0.0f, 3.0f), 4.0f);
+        juce::ColourGradient capGradient (juce::Colour (0xfff5f5f2), cap.getTopLeft(),
+                                          juce::Colour (0xff8f918e), cap.getBottomLeft(), false);
+        capGradient.multiplyOpacity (alpha);
+        g.setGradientFill (capGradient);
+        g.fillRoundedRectangle (cap, 4.0f);
+        g.setColour (juce::Colour (0xff626462).withAlpha (alpha));
+        g.drawRoundedRectangle (cap, 4.0f, 1.0f);
+        g.setColour (palette::orange.withAlpha (alpha));
+        g.drawHorizontalLine (juce::roundToInt (sliderPos), cap.getX() + 4.0f, cap.getRight() - 4.0f);
     }
-
-private:
-    juce::Typeface::Ptr regular;
-    juce::Typeface::Ptr semibold;
 };
 
 class SC220MainComponent::StereoMeter final : public juce::Component
@@ -230,9 +246,9 @@ public:
 private:
     static void drawBar (juce::Graphics& g, juce::Rectangle<int> area, float db)
     {
-        g.setColour (juce::Colour (0xff222424));
-        g.fillRect (area);
-        constexpr int segments = 24;
+        g.setColour (juce::Colour (0xff232526));
+        g.fillRoundedRectangle (area.toFloat(), 2.0f);
+        constexpr int segments = 25;
         const float normal = juce::jlimit (0.0f, 1.0f, (db + 60.0f) / 66.0f);
         const int active = juce::roundToInt (normal * segments);
         const float segmentHeight = static_cast<float> (area.getHeight()) / segments;
@@ -240,8 +256,8 @@ private:
         {
             const bool lit = i < active;
             const float y = static_cast<float> (area.getBottom()) - (i + 1) * segmentHeight;
-            auto colour = i > 20 ? palette::red : i > 16 ? palette::amber : palette::green;
-            g.setColour (lit ? colour : colour.withAlpha (0.15f));
+            const auto colour = i > 21 ? palette::red : i > 17 ? palette::amber : palette::green;
+            g.setColour (lit ? colour : colour.withAlpha (0.13f));
             g.fillRect (static_cast<float> (area.getX() + 1), y + 1.0f,
                         static_cast<float> (area.getWidth() - 2), juce::jmax (1.0f, segmentHeight - 2.0f));
         }
@@ -251,12 +267,83 @@ private:
     float right = -120.0f;
 };
 
-class SC220MainComponent::SignatureDisplay final : public juce::Component
+class SC220MainComponent::LiveSpectrumDisplay final : public juce::Component
 {
 public:
-    void setValues (const std::array<float, 5>& next)
+    LiveSpectrumDisplay()
+        : fft (fftOrder), window (fftSize, juce::dsp::WindowingFunction<float>::hann, true)
     {
-        values = next;
+        smoothed.fill (0.0f);
+    }
+
+    void updateFromTaps (askp::ScopeTap& voiceTap, askp::ScopeTap& musicTap, double sampleRate)
+    {
+        std::array<float, fftSize> voiceL {}, voiceR {}, musicL {}, musicR {};
+        const int voiceCount = voiceTap.consumeLatest (voiceL.data(), voiceR.data(), fftSize);
+        const int musicCount = musicTap.consumeLatest (musicL.data(), musicR.data(), fftSize);
+        const int count = juce::jmax (voiceCount, musicCount);
+
+        if (count <= 0 || sampleRate <= 0.0)
+        {
+            for (auto& value : smoothed)
+                value *= 0.92f;
+            hasSignal = std::any_of (smoothed.begin(), smoothed.end(), [] (float v) { return v > 0.015f; });
+            repaint();
+            return;
+        }
+
+        fftData.fill (0.0f);
+        const int destinationStart = fftSize - count;
+        const int voiceOffset = count - voiceCount;
+        const int musicOffset = count - musicCount;
+        for (int i = 0; i < count; ++i)
+        {
+            float sum = 0.0f;
+            int contributors = 0;
+            if (i >= voiceOffset)
+            {
+                const int voiceIndex = i - voiceOffset;
+                sum += 0.5f * (voiceL[static_cast<size_t> (voiceIndex)]
+                             + voiceR[static_cast<size_t> (voiceIndex)]);
+                ++contributors;
+            }
+            if (i >= musicOffset)
+            {
+                const int musicIndex = i - musicOffset;
+                sum += 0.5f * (musicL[static_cast<size_t> (musicIndex)]
+                             + musicR[static_cast<size_t> (musicIndex)]);
+                ++contributors;
+            }
+            fftData[static_cast<size_t> (destinationStart + i)] = contributors > 0
+                ? sum / static_cast<float> (contributors) : 0.0f;
+        }
+
+        window.multiplyWithWindowingTable (fftData.data(), fftSize);
+        fft.performFrequencyOnlyForwardTransform (fftData.data());
+
+        constexpr float minFrequency = 20.0f;
+        constexpr float maxFrequency = 20000.0f;
+        const float safeRate = static_cast<float> (sampleRate);
+        for (size_t i = 0; i < smoothed.size(); ++i)
+        {
+            const float t0 = static_cast<float> (i) / static_cast<float> (smoothed.size());
+            const float t1 = static_cast<float> (i + 1) / static_cast<float> (smoothed.size());
+            const float frequency0 = minFrequency * std::pow (maxFrequency / minFrequency, t0);
+            const float frequency1 = minFrequency * std::pow (maxFrequency / minFrequency, t1);
+            const int bin0 = juce::jlimit (1, fftSize / 2 - 1,
+                juce::roundToInt (frequency0 * fftSize / safeRate));
+            const int bin1 = juce::jlimit (bin0 + 1, fftSize / 2,
+                juce::roundToInt (frequency1 * fftSize / safeRate));
+
+            float magnitude = 0.0f;
+            for (int bin = bin0; bin < bin1; ++bin)
+                magnitude = juce::jmax (magnitude, fftData[static_cast<size_t> (bin)]);
+
+            const float db = juce::Decibels::gainToDecibels (magnitude / static_cast<float> (fftSize), -96.0f);
+            const float next = normaliseDb (db, -84.0f);
+            smoothed[i] = next > smoothed[i] ? next : smoothed[i] * 0.86f + next * 0.14f;
+        }
+        hasSignal = true;
         repaint();
     }
 
@@ -264,12 +351,12 @@ public:
     {
         const auto area = getLocalBounds().toFloat().reduced (1.0f);
         g.setColour (palette::ink);
-        g.fillRoundedRectangle (area, 5.0f);
+        g.fillRoundedRectangle (area, 7.0f);
         g.setColour (juce::Colour (0xff3d4040));
-        g.drawRoundedRectangle (area, 5.0f, 1.0f);
+        g.drawRoundedRectangle (area, 7.0f, 1.0f);
 
-        auto graph = area.reduced (36.0f, 24.0f);
-        g.setColour (juce::Colours::white.withAlpha (0.08f));
+        auto graph = area.reduced (34.0f, 24.0f);
+        g.setColour (juce::Colours::white.withAlpha (0.065f));
         for (int i = 0; i <= 8; ++i)
         {
             const float x = graph.getX() + graph.getWidth() * static_cast<float> (i) / 8.0f;
@@ -281,39 +368,66 @@ public:
             g.drawHorizontalLine (juce::roundToInt (y), graph.getX(), graph.getRight());
         }
 
-        juce::Path curve;
-        const float bass = (values[1] - 50.0f) / 50.0f;
-        const float treble = (values[2] - 50.0f) / 50.0f;
-        const float body = (values[3] - 50.0f) / 50.0f;
-        for (int i = 0; i <= 120; ++i)
+        juce::Path line;
+        juce::Path fill;
+        for (size_t i = 0; i < smoothed.size(); ++i)
         {
-            const float t = static_cast<float> (i) / 120.0f;
-            const float low = bass * std::exp (-7.0f * t);
-            const float mid = body * std::exp (-std::pow ((t - 0.43f) / 0.22f, 2.0f));
-            const float high = treble * std::pow (t, 2.2f);
-            const float rolloff = t > 0.86f ? (t - 0.86f) * 3.5f : 0.0f;
-            const float response = low * 0.17f + mid * 0.12f + high * 0.15f - rolloff;
-            const float x = graph.getX() + t * graph.getWidth();
-            const float y = graph.getCentreY() - response * graph.getHeight();
-            if (i == 0) curve.startNewSubPath (x, y); else curve.lineTo (x, y);
+            const float x = graph.getX() + graph.getWidth()
+                          * static_cast<float> (i) / static_cast<float> (smoothed.size() - 1);
+            const float y = graph.getBottom() - smoothed[i] * graph.getHeight() * 0.94f;
+            if (i == 0)
+            {
+                line.startNewSubPath (x, y);
+                fill.startNewSubPath (x, graph.getBottom());
+                fill.lineTo (x, y);
+            }
+            else
+            {
+                line.lineTo (x, y);
+                fill.lineTo (x, y);
+            }
         }
-        g.setColour (juce::Colours::white.withAlpha (0.82f));
-        g.strokePath (curve, juce::PathStrokeType (1.6f, juce::PathStrokeType::curved,
-                                                   juce::PathStrokeType::rounded));
+        fill.lineTo (graph.getRight(), graph.getBottom());
+        fill.closeSubPath();
 
-        g.setColour (juce::Colours::white.withAlpha (0.58f));
-        g.setFont (10.0f);
+        juce::ColourGradient spectrumFill (palette::orange.withAlpha (0.48f), graph.getCentreX(), graph.getY(),
+                                            palette::orange.withAlpha (0.04f), graph.getCentreX(), graph.getBottom(), false);
+        g.setGradientFill (spectrumFill);
+        g.fillPath (fill);
+        g.setColour (palette::orange.withAlpha (0.96f));
+        g.strokePath (line, juce::PathStrokeType (1.8f, juce::PathStrokeType::curved,
+                                                  juce::PathStrokeType::rounded));
+
+        g.setColour (juce::Colours::white.withAlpha (0.56f));
+        g.setFont (interFont (9.5f));
         const auto labels = graph.toNearestInt();
-        g.drawText ("20", labels.getX(), labels.getBottom() + 4, 30, 16,
+        g.drawText ("20", labels.getX(), labels.getBottom() + 4, 32, 16,
                     juce::Justification::centredLeft);
-        g.drawText ("1k", labels.getCentreX() - 15, labels.getBottom() + 4, 30, 16,
+        g.drawText ("100", labels.getX() + labels.getWidth() / 4 - 18, labels.getBottom() + 4, 36, 16,
                     juce::Justification::centred);
-        g.drawText ("20k", labels.getRight() - 34, labels.getBottom() + 4, 34, 16,
+        g.drawText ("1k", labels.getCentreX() - 18, labels.getBottom() + 4, 36, 16,
+                    juce::Justification::centred);
+        g.drawText ("10k", labels.getX() + labels.getWidth() * 3 / 4 - 20, labels.getBottom() + 4, 40, 16,
+                    juce::Justification::centred);
+        g.drawText ("20k", labels.getRight() - 38, labels.getBottom() + 4, 38, 16,
                     juce::Justification::centredRight);
+
+        if (! hasSignal)
+        {
+            g.setColour (juce::Colours::white.withAlpha (0.42f));
+            g.setFont (interFont (11.0f, true));
+            g.drawText ("WAITING FOR AUDIO", graph.toNearestInt(), juce::Justification::centred);
+        }
     }
 
 private:
-    std::array<float, 5> values { 78.0f, 68.0f, 80.0f, 76.0f, 88.0f };
+    static constexpr int fftOrder = 11;
+    static constexpr int fftSize = 1 << fftOrder;
+    juce::dsp::FFT fft;
+    juce::dsp::WindowingFunction<float> window;
+    std::array<float, fftSize * 2> fftData {};
+    std::array<float, 96> smoothed {};
+    bool hasSignal = false;
 };
 
 class SC220MainComponent::LoudnessDisplay final : public juce::Component
@@ -334,7 +448,7 @@ public:
         g.setColour (palette::ink);
         g.fillEllipse (dial);
         g.setColour (palette::border);
-        g.drawEllipse (dial, 1.5f);
+        g.drawEllipse (dial, 1.3f);
 
         constexpr float start = juce::MathConstants<float>::pi * 0.72f;
         constexpr float end = juce::MathConstants<float>::pi * 2.28f;
@@ -345,21 +459,22 @@ public:
         {
             const float t = static_cast<float> (i) / 31.0f;
             const float angle = start + t * (end - start);
-            auto colour = t > 0.83f ? palette::red : t > 0.62f ? palette::amber : palette::green;
-            g.setColour (i <= juce::roundToInt (normal * 31.0f) ? colour : colour.withAlpha (0.18f));
+            const auto colour = t > 0.83f ? palette::red : t > 0.62f ? palette::amber : palette::green;
+            g.setColour (i <= juce::roundToInt (normal * 31.0f) ? colour : colour.withAlpha (0.16f));
             g.drawLine ({ centre.getPointOnCircumference (radius * 0.83f, angle),
                           centre.getPointOnCircumference (radius, angle) }, 4.0f);
         }
 
         g.setColour (juce::Colours::white);
-        g.setFont (juce::FontOptions (dial.getWidth() * 0.20f));
+        g.setFont (interFont (dial.getWidth() * 0.20f, true));
         g.drawText (lufs <= -100.0f ? "--" : juce::String (lufs, 1),
                     dial.withTrimmedTop (dial.getHeight() * 0.28f).withHeight (dial.getHeight() * 0.25f),
                     juce::Justification::centred);
-        g.setFont (juce::FontOptions (dial.getWidth() * 0.075f));
+        g.setFont (interFont (dial.getWidth() * 0.070f, true));
         g.drawText ("LUFS", dial.withTrimmedTop (dial.getHeight() * 0.52f).withHeight (22.0f),
                     juce::Justification::centred);
-        g.setColour (juce::Colours::white.withAlpha (0.75f));
+        g.setColour (juce::Colours::white.withAlpha (0.74f));
+        g.setFont (interFont (dial.getWidth() * 0.058f));
         g.drawText (juce::String (peak, 1) + " dBFS",
                     dial.withTrimmedTop (dial.getHeight() * 0.67f).withHeight (20.0f),
                     juce::Justification::centred);
@@ -376,7 +491,7 @@ SC220MainComponent::SC220MainComponent (LiveAudioEngine& engine, WindowActions a
       sc220Meter (std::make_unique<StereoMeter>()),
       pcMeter (std::make_unique<StereoMeter>()),
       streamMeter (std::make_unique<StereoMeter>()),
-      signatureDisplay (std::make_unique<SignatureDisplay>()),
+      spectrumDisplay (std::make_unique<LiveSpectrumDisplay>()),
       loudnessDisplay (std::make_unique<LoudnessDisplay>()),
       licensePanel (std::make_unique<LiveLicensePanel> (engine.getEnhancerBridge()))
 {
@@ -384,6 +499,9 @@ SC220MainComponent::SC220MainComponent (LiveAudioEngine& engine, WindowActions a
     setLookAndFeel (lookAndFeel.get());
     recordingTechLogo = loadImage ("recording_tech_logo_png");
     sc220Image = loadImage ("sc220_mkii_device_png");
+
+    audioEngine.getVoiceEnhancerBridge().setVisualTapEnabled (true);
+    audioEngine.getMusicEnhancerBridge().setVisualTapEnabled (true);
 
     configureControls();
     refreshAllControls();
@@ -393,36 +511,52 @@ SC220MainComponent::SC220MainComponent (LiveAudioEngine& engine, WindowActions a
 SC220MainComponent::~SC220MainComponent()
 {
     stopTimer();
+    audioEngine.getVoiceEnhancerBridge().setVisualTapEnabled (false);
+    audioEngine.getMusicEnhancerBridge().setVisualTapEnabled (false);
     setLookAndFeel (nullptr);
 }
 
 void SC220MainComponent::configureControls()
 {
     for (auto* component : std::initializer_list<juce::Component*> {
-             &minimiseButton, &maximiseButton, &closeButton, &settingsButton, &licenseButton, &goLiveButton,
-             &presetBox, &outputBox, &stereoButton, &dualMonoButton, &pcSourceBox, &inputTrim,
-             &sc220Fader, &pcFader, &duckAmount, &streamFader, &monitorKnob, &sc220Mute,
-             &streamMute, &detailsButton })
+             &minimiseButton, &maximiseButton, &closeButton, &settingsButton,
+             &enhancerPowerButton, &goLiveButton, &presetBox, &outputBox,
+             &stereoButton, &dualMonoButton, &pcSourceBox, &inputTrim,
+             &sc220Fader, &pcFader, &duckAmount, &streamFader, &monitorKnob,
+             &sc220Mute, &streamMute })
         addAndMakeVisible (component);
+
     for (auto& knob : macroKnobs)
         addAndMakeVisible (knob);
+
     for (auto* component : std::initializer_list<juce::Component*> {
-             sc220Meter.get(), pcMeter.get(), streamMeter.get(), signatureDisplay.get(),
+             sc220Meter.get(), pcMeter.get(), streamMeter.get(), spectrumDisplay.get(),
              loudnessDisplay.get() })
         addAndMakeVisible (component);
     addChildComponent (*licensePanel);
 
+    minimiseButton.setTooltip ("Minimise");
+    maximiseButton.setTooltip ("Maximise / Restore");
+    closeButton.setTooltip ("Close to tray");
+    settingsButton.setTooltip ("Settings");
+    enhancerPowerButton.setTooltip ("Smart Enhancer On / Bypass");
+    enhancerPowerButton.setIconColour (palette::orange);
+    enhancerPowerButton.setOffColour (palette::muted);
+
     minimiseButton.onClick = [this] { if (windowActions.minimise) windowActions.minimise(); };
     maximiseButton.onClick = [this] { if (windowActions.toggleMaximise) windowActions.toggleMaximise(); };
     closeButton.onClick = [this] { if (windowActions.hideToTray) windowActions.hideToTray(); };
-    settingsButton.onClick = [this] { showAudioSettings(); };
-    licenseButton.onClick = [this]
-    {
-        licensePanel->setVisible (true);
-        licensePanel->toFront (true);
-    };
+    settingsButton.onClick = [this] { showSettingsMenu(); };
+
     licensePanel->onClose = [this] { licensePanel->setVisible (false); };
     licensePanel->onLicenseChanged = [this] { refreshAllControls(); };
+
+    enhancerPowerButton.setClickingTogglesState (true);
+    enhancerPowerButton.onClick = [this]
+    {
+        audioEngine.setBypassed (! enhancerPowerButton.getToggleState());
+        repaint (signatureArea);
+    };
 
     goLiveButton.setClickingTogglesState (true);
     goLiveButton.onClick = [this]
@@ -465,9 +599,9 @@ void SC220MainComponent::configureControls()
     {
         slider.setSliderStyle (juce::Slider::RotaryHorizontalVerticalDrag);
         slider.setRange (minimum, maximum, interval);
-        slider.setTextBoxStyle (juce::Slider::TextBoxBelow, false, 62, 18);
+        slider.setTextBoxStyle (juce::Slider::TextBoxBelow, false, 64, 18);
         slider.setTextValueSuffix (suffix);
-        slider.setDoubleClickReturnValue (true, minimum == 0.0 ? 0.0 : 0.0);
+        slider.setDoubleClickReturnValue (true, 0.0);
         slider.setMouseDragSensitivity (180);
     };
     auto configureFader = [] (juce::Slider& slider)
@@ -509,14 +643,7 @@ void SC220MainComponent::configureControls()
     streamMute.onClick = [this] { audioEngine.setOutputMuted (streamMute.getToggleState()); };
 
     monitorKnob.setEnabled (false);
-    monitorKnob.setTooltip ("Monitor output activates after a physical monitor endpoint is configured.");
-    detailsButton.onClick = [this]
-    {
-        juce::AlertWindow::showMessageBoxAsync (
-            juce::MessageBoxIconType::InfoIcon,
-            "SC220 Live Details",
-            "Advanced ducking, device policy, gain-match and recovery controls will remain outside the Live surface.\n\nThe active path is SC220 + System Mix -> ASK-P Signature -> VB-CABLE.");
-    };
+    monitorKnob.setTooltip ("Physical monitor output is not active yet.");
 }
 
 void SC220MainComponent::refreshAllControls()
@@ -527,15 +654,6 @@ void SC220MainComponent::refreshAllControls()
     presetBox.setEnabled (creativeEditing);
     for (auto& knob : macroKnobs)
         knob.setEnabled (creativeEditing);
-
-    if (license.isLicensed())
-        licenseButton.setButtonText ("FULL VERSION");
-    else if (license.state() == askp::LicenseManager::State::ClockNeedsAttention)
-        licenseButton.setButtonText ("CHECK CLOCK");
-    else if (! creativeEditing)
-        licenseButton.setButtonText ("UNLOCK CONTROLS");
-    else
-        licenseButton.setButtonText ("FREE " + juce::String (license.daysRemaining()) + " DAYS");
 
     presetBox.setSelectedItemIndex (audioEngine.getPresetIndex(), juce::dontSendNotification);
     inputTrim.setValue (audioEngine.getInputTrimDb(), juce::dontSendNotification);
@@ -548,13 +666,16 @@ void SC220MainComponent::refreshAllControls()
     macroKnobs[2].setValue (audioEngine.getSmartTreble(), juce::dontSendNotification);
     macroKnobs[3].setValue (audioEngine.getVocalBody(), juce::dontSendNotification);
     macroKnobs[4].setValue (audioEngine.getStereoMagic(), juce::dontSendNotification);
+
     const bool stereo = audioEngine.getInputChannelMode() == 2;
     stereoButton.setToggleState (stereo, juce::dontSendNotification);
     dualMonoButton.setToggleState (! stereo, juce::dontSendNotification);
     sc220Mute.setToggleState (audioEngine.isSc220Muted(), juce::dontSendNotification);
     streamMute.setToggleState (audioEngine.isOutputMuted(), juce::dontSendNotification);
+    enhancerPowerButton.setToggleState (! audioEngine.isBypassed(), juce::dontSendNotification);
     goLiveButton.setToggleState (! audioEngine.isOutputMuted(), juce::dontSendNotification);
     goLiveButton.setButtonText (audioEngine.isOutputMuted() ? "GO LIVE" : "LIVE");
+
     const auto status = audioEngine.getStatus();
     const auto outputIndex = audioEngine.getOutputDeviceNames().indexOf (status.outputDevice);
     if (outputIndex >= 0)
@@ -575,16 +696,35 @@ void SC220MainComponent::timerCallback()
         licenceRefreshDivider = 0;
         refreshAllControls();
     }
+
     lastStatus = audioEngine.getStatus();
     sc220Meter->setLevels (lastStatus.inputPeakDbL, lastStatus.inputPeakDbR);
     pcMeter->setLevels (lastStatus.pcPeakDbL, lastStatus.pcPeakDbR);
     streamMeter->setLevels (lastStatus.outputPeakDbL, lastStatus.outputPeakDbR);
     loudnessDisplay->setReading (lastStatus.loudnessLufs,
                                  juce::jmax (lastStatus.outputPeakDbL, lastStatus.outputPeakDbR));
-    signatureDisplay->setValues ({ audioEngine.getEnhance(), audioEngine.getSmartBass(),
-                                   audioEngine.getSmartTreble(), audioEngine.getVocalBody(),
-                                   audioEngine.getStereoMagic() });
+    spectrumDisplay->updateFromTaps (audioEngine.getVoiceEnhancerBridge().processor().scopeTap,
+                                     audioEngine.getMusicEnhancerBridge().processor().scopeTap,
+                                     lastStatus.sampleRate);
     repaint();
+}
+
+void SC220MainComponent::showSettingsMenu()
+{
+    juce::PopupMenu menu;
+    menu.addItem (1, "Audio Setup");
+    menu.addItem (2, "License & Activation");
+    menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&settingsButton),
+                        [this] (int result)
+                        {
+                            if (result == 1)
+                                showAudioSettings();
+                            else if (result == 2)
+                            {
+                                licensePanel->setVisible (true);
+                                licensePanel->toFront (true);
+                            }
+                        });
 }
 
 void SC220MainComponent::showAudioSettings()
@@ -601,6 +741,55 @@ void SC220MainComponent::showAudioSettings()
     options.useNativeTitleBar = true;
     options.resizable = true;
     options.launchAsync();
+}
+
+bool SC220MainComponent::looksLikeSc220Input (const juce::String& name) noexcept
+{
+    const auto normalised = name.trim().toUpperCase();
+    return normalised == "MIXER"
+        || normalised.startsWith ("MIXER (")
+        || normalised.contains ("SC220")
+        || normalised.contains ("RECORDING TECH");
+}
+
+bool SC220MainComponent::headerDragAllowedAt (juce::Point<int> point) const noexcept
+{
+    if (! headerArea.contains (point))
+        return false;
+
+    for (const auto* control : std::initializer_list<const juce::Component*> {
+             &presetBox, &settingsButton, &minimiseButton, &maximiseButton,
+             &closeButton, &goLiveButton })
+        if (control->getBounds().contains (point))
+            return false;
+
+    return true;
+}
+
+void SC220MainComponent::mouseDown (const juce::MouseEvent& event)
+{
+    draggingWindow = headerDragAllowedAt (event.getPosition());
+    if (draggingWindow)
+        if (auto* top = getTopLevelComponent())
+            windowDragger.startDraggingComponent (top, event);
+}
+
+void SC220MainComponent::mouseDrag (const juce::MouseEvent& event)
+{
+    if (draggingWindow)
+        if (auto* top = getTopLevelComponent())
+            windowDragger.dragComponent (top, event, nullptr);
+}
+
+void SC220MainComponent::mouseUp (const juce::MouseEvent&)
+{
+    draggingWindow = false;
+}
+
+void SC220MainComponent::mouseDoubleClick (const juce::MouseEvent& event)
+{
+    if (headerDragAllowedAt (event.getPosition()) && windowActions.toggleMaximise)
+        windowActions.toggleMaximise();
 }
 
 void SC220MainComponent::paint (juce::Graphics& g)
@@ -623,28 +812,29 @@ void SC220MainComponent::drawHeader (juce::Graphics& g)
                            145, 38, juce::RectanglePlacement::centred, false);
 
     g.setColour (juce::Colours::white);
-    g.setFont (juce::FontOptions (18.0f, juce::Font::bold));
+    g.setFont (interFont (18.0f, true));
     g.drawText ("SC220", 176, 0, 70, headerArea.getHeight(), juce::Justification::centredLeft);
     g.setColour (palette::orange);
     g.drawText ("LIVE", 244, 0, 52, headerArea.getHeight(), juce::Justification::centredLeft);
 
-    g.setColour (juce::Colours::white.withAlpha (0.16f));
-    for (int x : { 164, 320, 522, 690 })
+    g.setColour (juce::Colours::white.withAlpha (0.15f));
+    for (int x : { 164, 320, 548, 716 })
         g.drawVerticalLine (x, 14.0f, static_cast<float> (headerArea.getBottom() - 14));
 
     g.setColour (juce::Colours::white.withAlpha (0.88f));
-    g.setFont (juce::FontOptions (12.0f));
+    g.setFont (interFont (11.5f));
     g.drawText (juce::String (lastStatus.sampleRate > 0.0 ? lastStatus.sampleRate / 1000.0 : 48.0, 0) + " kHz",
-                540, 0, 72, headerArea.getHeight(), juce::Justification::centred);
+                562, 0, 72, headerArea.getHeight(), juce::Justification::centred);
     g.drawText (juce::String (lastStatus.bufferSize > 0 ? lastStatus.bufferSize : 128) + " samples",
-                610, 0, 92, headerArea.getHeight(), juce::Justification::centred);
+                630, 0, 92, headerArea.getHeight(), juce::Justification::centred);
 
-    const bool stable = lastStatus.deviceOpen && lastStatus.outputIsVirtualCable
+    const bool sc220Detected = looksLikeSc220Input (lastStatus.inputDevice);
+    const bool stable = sc220Detected && lastStatus.deviceOpen && lastStatus.outputIsVirtualCable
                      && lastStatus.pcLoopbackRunning && lastStatus.lastError.isEmpty();
     g.setColour (stable ? palette::green : palette::amber);
-    g.fillEllipse (720.0f, 29.0f, 9.0f, 9.0f);
-    g.setFont (juce::FontOptions (12.0f, juce::Font::bold));
-    g.drawText (stable ? "STABLE" : "SETUP", 735, 0, 68, headerArea.getHeight(),
+    g.fillEllipse (746.0f, 29.0f, 8.0f, 8.0f);
+    g.setFont (interFont (11.5f, true));
+    g.drawText (stable ? "STABLE" : "SETUP", 760, 0, 70, headerArea.getHeight(),
                 juce::Justification::centredLeft);
 }
 
@@ -657,39 +847,54 @@ void SC220MainComponent::drawInputSurface (juce::Graphics& g)
                         static_cast<float> (inputArea.getBottom()));
 
     g.setColour (palette::ink);
-    g.setFont (juce::FontOptions (16.0f, juce::Font::bold));
+    g.setFont (interFont (15.0f, true));
     g.drawText ("INPUT MIX", inputArea.withHeight (50), juce::Justification::centred);
-    g.setColour (palette::border);
+    g.setColour (palette::borderSoft);
     g.drawVerticalLine (sc220StripArea.getRight(), static_cast<float> (sc220StripArea.getY() + 10),
                         static_cast<float> (sc220StripArea.getBottom() - 10));
 
+    const bool sc220Detected = looksLikeSc220Input (lastStatus.inputDevice);
     if (sc220Image.isValid())
-        g.drawImageWithin (sc220Image, sc220StripArea.getCentreX() - 64, sc220StripArea.getY() + 12,
-                           128, 82, juce::RectanglePlacement::centred, false);
+    {
+        g.setOpacity (sc220Detected ? 1.0f : 0.32f);
+        g.drawImageWithin (sc220Image, sc220StripArea.getCentreX() - 54, sc220StripArea.getY() + 15,
+                           108, 62, juce::RectanglePlacement::centred, false);
+        g.setOpacity (1.0f);
+    }
 
-    g.setColour (palette::green);
-    g.fillEllipse (static_cast<float> (sc220StripArea.getCentreX() - 78),
-                   static_cast<float> (sc220StripArea.getY() + 101), 9.0f, 9.0f);
+    g.setColour (sc220Detected ? palette::green : palette::red);
+    g.fillEllipse (static_cast<float> (sc220StripArea.getCentreX() - 80),
+                   static_cast<float> (sc220StripArea.getY() + 91), 8.0f, 8.0f);
     g.setColour (palette::ink);
-    g.setFont (juce::FontOptions (10.5f, juce::Font::bold));
-    g.drawText ("SC220 CONNECTED", sc220StripArea.getCentreX() - 64, sc220StripArea.getY() + 94,
-                145, 24, juce::Justification::centredLeft);
+    g.setFont (interFont (10.0f, true));
+    g.drawText (sc220Detected ? "SC220 CONNECTED" : "SC220 NOT DETECTED",
+                sc220StripArea.getCentreX() - 66, sc220StripArea.getY() + 84,
+                150, 22, juce::Justification::centredLeft);
+    if (! sc220Detected && lastStatus.inputDevice.isNotEmpty())
+    {
+        g.setColour (palette::muted);
+        g.setFont (interFont (8.5f));
+        g.drawFittedText ("ACTIVE: " + lastStatus.inputDevice,
+                          sc220StripArea.getX() + 18, sc220StripArea.getY() + 105,
+                          sc220StripArea.getWidth() - 36, 18,
+                          juce::Justification::centred, 1);
+    }
 
     g.setColour (palette::graphite);
-    g.setFont (juce::FontOptions (12.0f, juce::Font::bold));
-    g.drawText ("PC AUDIO", pcStripArea.getX(), pcStripArea.getY() + 32,
+    g.setFont (interFont (11.5f, true));
+    g.drawText ("PC AUDIO", pcStripArea.getX(), pcStripArea.getY() + 27,
                 pcStripArea.getWidth(), 24, juce::Justification::centred);
     g.setColour (lastStatus.pcLoopbackRunning ? palette::green : palette::amber);
     g.fillEllipse (static_cast<float> (pcStripArea.getCentreX() - 73),
-                   static_cast<float> (pcStripArea.getY() + 74), 9.0f, 9.0f);
+                   static_cast<float> (pcStripArea.getY() + 70), 8.0f, 8.0f);
     g.setColour (palette::ink);
-    g.setFont (juce::FontOptions (10.5f, juce::Font::bold));
+    g.setFont (interFont (9.8f, true));
     g.drawText (lastStatus.pcLoopbackRunning ? "LOOPBACK ACTIVE" : "LOOPBACK STARTING",
-                pcStripArea.getCentreX() - 58, pcStripArea.getY() + 67, 140, 24,
+                pcStripArea.getCentreX() - 58, pcStripArea.getY() + 63, 142, 22,
                 juce::Justification::centredLeft);
 
     g.setColour (palette::muted);
-    g.setFont (juce::FontOptions (9.5f, juce::Font::bold));
+    g.setFont (interFont (9.0f, true));
     g.drawText ("INPUT TRIM", inputTrim.getX() - 14, inputTrim.getY() - 22,
                 inputTrim.getWidth() + 28, 18, juce::Justification::centred);
     g.drawText ("SC220", sc220Fader.getX() - 15, sc220Fader.getBottom() + 2,
@@ -704,7 +909,7 @@ void SC220MainComponent::drawInputSurface (juce::Graphics& g)
     g.fillEllipse (static_cast<float> (duckAmount.getRight() + 8),
                    static_cast<float> (duckAmount.getBounds().getCentreY() - 4), 8.0f, 8.0f);
     g.setColour (palette::ink);
-    g.setFont (juce::FontOptions (9.0f, juce::Font::bold));
+    g.setFont (interFont (8.8f, true));
     g.drawText ("KEY: SC220", duckAmount.getRight() + 20, duckAmount.getY(),
                 82, duckAmount.getHeight(), juce::Justification::centredLeft);
 }
@@ -714,9 +919,22 @@ void SC220MainComponent::drawSignatureSurface (juce::Graphics& g)
     g.setColour (palette::ivory);
     g.fillRect (signatureArea);
     g.setColour (palette::ink);
-    g.setFont (juce::FontOptions (17.0f, juce::Font::bold));
-    g.drawText ("MAS ARI SIGNATURE", signatureArea.getX(), signatureArea.getY() + 24,
-                signatureArea.getWidth(), 28, juce::Justification::centred);
+    g.setFont (interFont (16.0f, true));
+    g.drawText ("SMART ENHANCER", signatureArea.getX(), signatureArea.getY() + 20,
+                signatureArea.getWidth(), 24, juce::Justification::centred);
+    g.setColour (palette::muted);
+    g.setFont (interFont (9.5f, true));
+    g.drawText ("MAS ARI SIGNATURE ENGINE", signatureArea.getX(), signatureArea.getY() + 42,
+                signatureArea.getWidth(), 18, juce::Justification::centred);
+
+    const bool active = ! audioEngine.isBypassed();
+    g.setColour (active ? palette::green : palette::amber);
+    g.fillEllipse (static_cast<float> (enhancerPowerButton.getX() - 56),
+                   static_cast<float> (enhancerPowerButton.getBounds().getCentreY() - 4), 8.0f, 8.0f);
+    g.setFont (interFont (9.0f, true));
+    g.drawText (active ? "ON" : "BYPASS", enhancerPowerButton.getX() - 44,
+                enhancerPowerButton.getY(), 42, enhancerPowerButton.getHeight(),
+                juce::Justification::centredLeft);
 
     static constexpr const char* names[] = {
         "ENHANCE", "SMART BASS", "SMART TREBLE", "VOCAL BODY", "STEREO MAGIC"
@@ -725,20 +943,20 @@ void SC220MainComponent::drawSignatureSurface (juce::Graphics& g)
     {
         const auto& knob = macroKnobs[i];
         g.setColour (palette::ink);
-        g.setFont (juce::FontOptions (9.5f, juce::Font::bold));
+        g.setFont (interFont (9.0f, true));
         g.drawText (names[i], knob.getX() - 16, knob.getY() - 25, knob.getWidth() + 32, 18,
                     juce::Justification::centred);
-        g.setFont (juce::FontOptions (16.0f));
+        g.setFont (interFont (14.0f));
         g.drawText (juce::String (knob.getValue(), 0) + "%", knob.getX(), knob.getY() - 6,
                     knob.getWidth(), 22, juce::Justification::centred);
     }
 
     g.setColour (palette::green);
-    g.fillEllipse (static_cast<float> (signatureArea.getCentreX() - 96),
-                   static_cast<float> (signatureArea.getBottom() - 50), 8.0f, 8.0f);
-    g.setFont (juce::FontOptions (10.0f, juce::Font::bold));
-    g.drawText ("SMART PROTECT  /  ON", signatureArea.getCentreX() - 82,
-                signatureArea.getBottom() - 60, 170, 28, juce::Justification::centredLeft);
+    g.fillEllipse (static_cast<float> (signatureArea.getCentreX() - 94),
+                   static_cast<float> (signatureArea.getBottom() - 42), 8.0f, 8.0f);
+    g.setFont (interFont (9.5f, true));
+    g.drawText ("SMART PROTECT  /  ON", signatureArea.getCentreX() - 80,
+                signatureArea.getBottom() - 52, 170, 28, juce::Justification::centredLeft);
 }
 
 void SC220MainComponent::drawMasterSurface (juce::Graphics& g)
@@ -749,7 +967,7 @@ void SC220MainComponent::drawMasterSurface (juce::Graphics& g)
     g.drawVerticalLine (masterArea.getX(), static_cast<float> (masterArea.getY()),
                         static_cast<float> (masterArea.getBottom()));
     g.setColour (palette::ink);
-    g.setFont (juce::FontOptions (12.0f, juce::Font::bold));
+    g.setFont (interFont (11.5f, true));
     g.drawText ("LOUDNESS", masterArea.getX(), masterArea.getY() + 20,
                 masterArea.getWidth(), 22, juce::Justification::centred);
     g.drawText ("STREAM", streamFader.getX() - 25, streamFader.getY() - 28,
@@ -757,16 +975,9 @@ void SC220MainComponent::drawMasterSurface (juce::Graphics& g)
     g.drawText ("MONITOR", monitorKnob.getX() - 16, monitorKnob.getY() - 24,
                 monitorKnob.getWidth() + 32, 22, juce::Justification::centred);
     g.setColour (palette::muted);
-    g.setFont (juce::FontOptions (9.5f, juce::Font::bold));
-    g.drawText ("OUTPUT", masterArea.getRight() - 174, masterArea.getBottom() - 168,
-                138, 18, juce::Justification::centred);
-    g.setColour (lastStatus.outputIsVirtualCable ? palette::green : palette::amber);
-    g.fillEllipse (static_cast<float> (masterArea.getRight() - 150),
-                   static_cast<float> (masterArea.getBottom() - 62), 9.0f, 9.0f);
-    g.setFont (juce::FontOptions (10.0f, juce::Font::bold));
-    g.drawText (lastStatus.outputIsVirtualCable ? "READY" : "SELECT VB-CABLE",
-                masterArea.getRight() - 133, masterArea.getBottom() - 71, 112, 28,
-                juce::Justification::centredLeft);
+    g.setFont (interFont (9.0f, true));
+    g.drawText ("STREAM OUTPUT", outputBox.getX(), outputBox.getY() - 21,
+                outputBox.getWidth(), 18, juce::Justification::centred);
 }
 
 void SC220MainComponent::drawFooter (juce::Graphics& g)
@@ -776,10 +987,10 @@ void SC220MainComponent::drawFooter (juce::Graphics& g)
     g.setColour (palette::border);
     g.drawHorizontalLine (footerArea.getY(), 0.0f, static_cast<float> (getWidth()));
     g.setColour (palette::ink);
-    g.setFont (juce::FontOptions (11.0f, juce::Font::bold));
+    g.setFont (interFont (10.5f, true));
 
-    const auto pathText = "SC220 + PC AUDIO    >    SIGNATURE    >    VB-CABLE";
-    g.drawText (pathText, footerArea.getX() + 48, footerArea.getY(), 470,
+    const auto pathText = "SC220 + PC AUDIO    >    VOICE / MUSIC SIGNATURE    >    VB-CABLE";
+    g.drawText (pathText, footerArea.getX() + 42, footerArea.getY(), 560,
                 footerArea.getHeight(), juce::Justification::centredLeft);
 
     const float latencyMs = lastStatus.sampleRate > 0.0
@@ -789,7 +1000,7 @@ void SC220MainComponent::drawFooter (juce::Graphics& g)
                               + "DROP  " + juce::String (lastStatus.dropouts) + "      "
                               + "LATENCY  " + juce::String (latencyMs, 1) + " ms";
     g.drawText (health, footerArea.getCentreX(), footerArea.getY(),
-                footerArea.getWidth() / 2 - 48, footerArea.getHeight(),
+                footerArea.getWidth() / 2 - 42, footerArea.getHeight(),
                 juce::Justification::centredRight);
 }
 
@@ -797,60 +1008,59 @@ void SC220MainComponent::resized()
 {
     auto area = getLocalBounds();
     headerArea = area.removeFromTop (66);
-    footerArea = area.removeFromBottom (70);
+    footerArea = area.removeFromBottom (58);
     const int inputWidth = juce::roundToInt (area.getWidth() * 0.325f);
     const int signatureWidth = juce::roundToInt (area.getWidth() * 0.455f);
     inputArea = area.removeFromLeft (inputWidth);
     signatureArea = area.removeFromLeft (signatureWidth);
     masterArea = area;
 
-    minimiseButton.setBounds (getWidth() - 284, 14, 42, 38);
-    maximiseButton.setBounds (getWidth() - 238, 14, 42, 38);
-    closeButton.setBounds (getWidth() - 192, 14, 42, 38);
-    settingsButton.setBounds (getWidth() - 440, 14, 120, 38);
-    licenseButton.setBounds (getWidth() - 590, 14, 138, 38);
-    goLiveButton.setBounds (getWidth() - 144, 10, 132, 46);
-    presetBox.setBounds (338, 15, 178, 36);
+    closeButton.setBounds (getWidth() - 48, 13, 38, 38);
+    maximiseButton.setBounds (getWidth() - 90, 13, 38, 38);
+    minimiseButton.setBounds (getWidth() - 132, 13, 38, 38);
+    settingsButton.setBounds (getWidth() - 184, 13, 38, 38);
+    goLiveButton.setBounds (getWidth() - 322, 10, 126, 46);
+    presetBox.setBounds (338, 15, 192, 36);
 
     auto inputContent = inputArea.reduced (18, 48);
     sc220StripArea = inputContent.removeFromLeft (inputContent.getWidth() / 2);
     pcStripArea = inputContent;
 
-    stereoButton.setBounds (sc220StripArea.getX() + 10, sc220StripArea.getY() + 122,
+    stereoButton.setBounds (sc220StripArea.getX() + 10, sc220StripArea.getY() + 126,
                             sc220StripArea.getWidth() / 2 - 10, 31);
     dualMonoButton.setBounds (stereoButton.getRight(), stereoButton.getY(),
                               sc220StripArea.getWidth() / 2 - 10, 31);
-    inputTrim.setBounds (sc220StripArea.getCentreX() - 48, sc220StripArea.getY() + 184, 96, 96);
-    sc220Meter->setBounds (sc220StripArea.getX() + 18, sc220StripArea.getY() + 304,
-                           30, sc220StripArea.getHeight() - 390);
-    sc220Fader.setBounds (sc220StripArea.getCentreX() - 35, sc220StripArea.getY() + 300,
-                          70, sc220StripArea.getHeight() - 386);
+    inputTrim.setBounds (sc220StripArea.getCentreX() - 46, sc220StripArea.getY() + 186, 92, 92);
+    sc220Meter->setBounds (sc220StripArea.getX() + 18, sc220StripArea.getY() + 306,
+                           30, sc220StripArea.getHeight() - 392);
+    sc220Fader.setBounds (sc220StripArea.getCentreX() - 34, sc220StripArea.getY() + 302,
+                          68, sc220StripArea.getHeight() - 388);
     sc220Mute.setBounds (sc220StripArea.getCentreX() - 36, sc220StripArea.getBottom() - 42, 72, 31);
 
     pcSourceBox.setBounds (pcStripArea.getX() + 30, pcStripArea.getY() + 104,
                            pcStripArea.getWidth() - 60, 34);
     pcMeter->setBounds (pcStripArea.getX() + 18, pcStripArea.getY() + 218,
                         30, pcStripArea.getHeight() - 304);
-    pcFader.setBounds (pcStripArea.getCentreX() - 35, pcStripArea.getY() + 214,
-                       70, pcStripArea.getHeight() - 300);
+    pcFader.setBounds (pcStripArea.getCentreX() - 34, pcStripArea.getY() + 214,
+                       68, pcStripArea.getHeight() - 300);
     duckAmount.setBounds (pcStripArea.getX() + 24, pcStripArea.getBottom() - 82, 70, 70);
 
-    presetBox.setBounds (signatureArea.getCentreX() - 96, signatureArea.getY() + 60, 192, 36);
-    signatureDisplay->setBounds (signatureArea.reduced (34, 0).withTop (signatureArea.getY() + 128)
-                                 .withBottom (signatureArea.getY() + juce::roundToInt (signatureArea.getHeight() * 0.56f)));
+    presetBox.setBounds (signatureArea.getCentreX() - 102, signatureArea.getY() + 72, 204, 36);
+    enhancerPowerButton.setBounds (signatureArea.getRight() - 54, signatureArea.getY() + 20, 36, 36);
+    spectrumDisplay->setBounds (signatureArea.reduced (34, 0).withTop (signatureArea.getY() + 128)
+                                .withBottom (signatureArea.getY() + juce::roundToInt (signatureArea.getHeight() * 0.56f)));
 
     auto macroRow = signatureArea.reduced (24, 0);
-    macroRow.setTop (signatureDisplay->getBottom() + 54);
-    macroRow.setBottom (signatureArea.getBottom() - 72);
+    macroRow.setTop (spectrumDisplay->getBottom() + 52);
+    macroRow.setBottom (signatureArea.getBottom() - 62);
     const int macroWidth = macroRow.getWidth() / static_cast<int> (macroKnobs.size());
     for (auto& knob : macroKnobs)
     {
         auto slot = macroRow.removeFromLeft (macroWidth);
         knob.setBounds (slot.reduced (12, 2));
     }
-    detailsButton.setBounds (signatureArea.getRight() - 112, signatureArea.getBottom() - 54, 88, 32);
 
-    loudnessDisplay->setBounds (masterArea.getCentreX() - 103, masterArea.getY() + 48, 206, 206);
+    loudnessDisplay->setBounds (masterArea.getCentreX() - 100, masterArea.getY() + 48, 200, 200);
     auto masterLower = masterArea.reduced (24, 0);
     masterLower.setTop (masterArea.getY() + 300);
     streamMeter->setBounds (masterLower.getX(), masterLower.getY() + 42, 32,
@@ -859,8 +1069,8 @@ void SC220MainComponent::resized()
                            masterLower.getHeight() - 134);
     streamMute.setBounds (streamFader.getBounds().getCentreX() - 36, masterArea.getBottom() - 44, 72, 31);
     monitorKnob.setBounds (masterArea.getRight() - 164, masterLower.getY() + 52, 108, 108);
+    outputBox.setBounds (masterArea.getRight() - 184, masterArea.getBottom() - 108, 154, 36);
 
-    outputBox.setBounds (masterArea.getRight() - 184, masterArea.getBottom() - 144, 154, 36);
     licensePanel->setBounds (getLocalBounds());
 }
 

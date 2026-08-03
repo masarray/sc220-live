@@ -4,6 +4,7 @@
 #include "EnhancerEngineBridge.h"
 #include "MonitorOutputClient.h"
 #include "PcAudioLoopbackCapture.h"
+#include "ProgrammeLoudnessIntegrator.h"
 
 #include <juce_audio_devices/juce_audio_devices.h>
 #include <juce_dsp/juce_dsp.h>
@@ -46,6 +47,9 @@ public:
         float expanderReductionDb = 0.0f;
         float duckGainDb = 0.0f;
         float loudnessLufs = -120.0f;
+        float truePeakDbtp = -120.0f;
+        float loudnessElapsedSeconds = 0.0f;
+        bool loudnessReady = false;
         bool pcLoopbackRunning = false;
         bool pcAudioLoopBlocked = false;
         int pcUnderflows = 0;
@@ -82,6 +86,15 @@ public:
     EnhancerEngineBridge& getEnhancerBridge() noexcept { return voiceEnhancerBridge; }
     EnhancerEngineBridge& getVoiceEnhancerBridge() noexcept { return voiceEnhancerBridge; }
     EnhancerEngineBridge& getMusicEnhancerBridge() noexcept { return musicEnhancerBridge; }
+    askp::ScopeTap& programmeAnalyzerTap() noexcept { return programmeAnalyzer; }
+    void setProgrammeAnalyzerEnabled (bool enabled) noexcept
+    {
+        programmeAnalyzer.setEnabled (enabled);
+    }
+    void resetProgrammeLoudness() noexcept
+    {
+        loudnessResetRequested.store (true, std::memory_order_release);
+    }
     MonitorOutputClient& getMonitorOutputClient() noexcept { return monitorOutput; }
     askp::LicenseManager& getLicenseManager() noexcept { return voiceEnhancerBridge.licenseManager(); }
     const askp::LicenseManager& getLicenseManager() const noexcept { return voiceEnhancerBridge.licenseManager(); }
@@ -228,6 +241,7 @@ private:
     SmoothDownwardExpander expander;
     EnhancerEngineBridge voiceEnhancerBridge;
     EnhancerEngineBridge musicEnhancerBridge;
+    askp::ScopeTap programmeAnalyzer;
     PcAudioLoopbackCapture pcLoopback;
     MonitorOutputClient monitorOutput;
     juce::dsp::Limiter<float> masterLimiter;
@@ -259,8 +273,16 @@ private:
     float duckGainLinear = 1.0f;
     std::array<juce::dsp::IIR::Filter<float>, 2> loudnessShelf;
     std::array<juce::dsp::IIR::Filter<float>, 2> loudnessHighPass;
-    double loudnessMeanSquare = 0.0;
+    ProgrammeLoudnessIntegrator loudnessIntegrator;
+    juce::dsp::Oversampling<float> truePeakOversampler {
+        2, 2, juce::dsp::Oversampling<float>::filterHalfBandPolyphaseIIR, true, false
+    };
+    float truePeakMaximumLinear = 0.0f;
     std::atomic<float> loudnessLufs { -120.0f };
+    std::atomic<float> truePeakDbtp { -120.0f };
+    std::atomic<float> loudnessElapsedSeconds { 0.0f };
+    std::atomic<bool> loudnessReady { false };
+    std::atomic<bool> loudnessResetRequested { false };
 
     std::atomic<bool> callbackRegistered { false };
     std::atomic<bool> running { false };

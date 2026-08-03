@@ -29,12 +29,12 @@ check("Smart Enhancer power icon exists", all(token in header + source for token
     'LucideIconButton enhancerPowerButton { "Smart Enhancer", "power_svg"',
     "enhancerPowerButton.setClickingTogglesState",
     "audioEngine.setBypassed (! enhancerPowerButton.getToggleState())")))
-check("spectrum consumes real voice and music taps", all(token in source for token in (
+check("post-master analyzer renders lightweight real-audio bars", all(token in source for token in (
     "class SC220MainComponent::LiveSpectrumDisplay",
-    "voiceTap.consumeLatest",
-    "musicTap.consumeLatest",
+    "programmeTap.consumeLatest",
     "performFrequencyOnlyForwardTransform",
-    "updateFromTaps")))
+    "updateFromTap",
+    '"32 BAND  /  15 FPS"')))
 check("voice and music visual taps are enabled", all(token in source for token in (
     "getVoiceEnhancerBridge().setVisualTapEnabled (true)",
     "getMusicEnhancerBridge().setVisualTapEnabled (true)")))

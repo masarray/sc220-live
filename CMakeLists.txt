@@ -2,6 +2,8 @@ cmake_minimum_required(VERSION 3.22)
 
 project(SC220Live VERSION 0.1.0 LANGUAGES C CXX)
 
+include(CTest)
+
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
@@ -199,6 +201,10 @@ set_property(SOURCE "${ASKP_DSP_SOURCE}" APPEND PROPERTY COMPILE_OPTIONS
     "$<$<AND:$<CONFIG:Release>,$<NOT:$<CXX_COMPILER_ID:MSVC>>>:-fno-trapping-math>"
     "$<$<AND:$<CONFIG:Release>,$<NOT:$<CXX_COMPILER_ID:MSVC>>>:-ffp-contract=fast>"
 )
+
+add_executable(SC220LoudnessAudit qa/ProgrammeLoudnessAudit.cpp)
+target_include_directories(SC220LoudnessAudit PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
+add_test(NAME SC220LoudnessAudit COMMAND SC220LoudnessAudit)
 
 # ---------------------------------------------------------------------------
 # JUCE

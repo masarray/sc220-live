@@ -381,12 +381,10 @@ public:
         smoothed.fill (0.0f);
     }
 
-    void updateFromTaps (askp::ScopeTap& voiceTap, askp::ScopeTap& musicTap, double sampleRate)
+    void updateFromTap (askp::ScopeTap& programmeTap, double sampleRate)
     {
-        std::array<float, fftSize> voiceL {}, voiceR {}, musicL {}, musicR {};
-        const int voiceCount = voiceTap.consumeLatest (voiceL.data(), voiceR.data(), fftSize);
-        const int musicCount = musicTap.consumeLatest (musicL.data(), musicR.data(), fftSize);
-        const int count = juce::jmax (voiceCount, musicCount);
+        std::array<float, fftSize> left {}, right {};
+        const int count = programmeTap.consumeLatest (left.data(), right.data(), fftSize);
 
         if (count <= 0 || sampleRate <= 0.0)
         {
@@ -399,29 +397,9 @@ public:
 
         fftData.fill (0.0f);
         const int destinationStart = fftSize - count;
-        const int voiceOffset = count - voiceCount;
-        const int musicOffset = count - musicCount;
         for (int i = 0; i < count; ++i)
-        {
-            float sum = 0.0f;
-            int contributors = 0;
-            if (i >= voiceOffset)
-            {
-                const int voiceIndex = i - voiceOffset;
-                sum += 0.5f * (voiceL[static_cast<size_t> (voiceIndex)]
-                             + voiceR[static_cast<size_t> (voiceIndex)]);
-                ++contributors;
-            }
-            if (i >= musicOffset)
-            {
-                const int musicIndex = i - musicOffset;
-                sum += 0.5f * (musicL[static_cast<size_t> (musicIndex)]
-                             + musicR[static_cast<size_t> (musicIndex)]);
-                ++contributors;
-            }
-            fftData[static_cast<size_t> (destinationStart + i)] = contributors > 0
-                ? sum / static_cast<float> (contributors) : 0.0f;
-        }
+            fftData[static_cast<size_t> (destinationStart + i)] = 0.5f
+                * (left[static_cast<size_t> (i)] + right[static_cast<size_t> (i)]);
 
         window.multiplyWithWindowingTable (fftData.data(), fftSize);
         fft.performFrequencyOnlyForwardTransform (fftData.data());
@@ -448,7 +426,8 @@ public:
             const float next = normaliseDb (db, -84.0f);
             smoothed[i] = next > smoothed[i] ? next : smoothed[i] * 0.86f + next * 0.14f;
         }
-        hasSignal = true;
+        hasSignal = std::any_of (smoothed.begin(), smoothed.end(),
+                                 [] (float value) { return value > 0.015f; });
         repaint();
     }
 
@@ -461,6 +440,7 @@ public:
         g.drawRoundedRectangle (area, 7.0f, 1.0f);
 
         auto graph = area.reduced (34.0f, 24.0f);
+        const auto labels = graph.toNearestInt();
         g.setColour (juce::Colours::white.withAlpha (0.065f));
         for (int i = 0; i <= 8; ++i)
         {
@@ -473,39 +453,36 @@ public:
             g.drawHorizontalLine (juce::roundToInt (y), graph.getX(), graph.getRight());
         }
 
-        juce::Path line;
-        juce::Path fill;
+        const float gap = 3.0f;
+        const float barWidth = (graph.getWidth() - gap * static_cast<float> (smoothed.size() - 1))
+                             / static_cast<float> (smoothed.size());
         for (size_t i = 0; i < smoothed.size(); ++i)
         {
-            const float x = graph.getX() + graph.getWidth()
-                          * static_cast<float> (i) / static_cast<float> (smoothed.size() - 1);
-            const float y = graph.getBottom() - smoothed[i] * graph.getHeight() * 0.94f;
-            if (i == 0)
-            {
-                line.startNewSubPath (x, y);
-                fill.startNewSubPath (x, graph.getBottom());
-                fill.lineTo (x, y);
-            }
-            else
-            {
-                line.lineTo (x, y);
-                fill.lineTo (x, y);
-            }
+            const float x = graph.getX() + static_cast<float> (i) * (barWidth + gap);
+            const float activeHeight = juce::jmax (2.0f, smoothed[i] * graph.getHeight() * 0.94f);
+            const auto inactive = juce::Rectangle<float> (
+                x, graph.getY(), barWidth, graph.getHeight());
+            const auto active = juce::Rectangle<float> (
+                x, graph.getBottom() - activeHeight, barWidth, activeHeight);
+            g.setColour (juce::Colours::white.withAlpha (0.055f));
+            g.fillRoundedRectangle (inactive, juce::jmin (2.0f, barWidth * 0.35f));
+            const float highBand = static_cast<float> (i) / static_cast<float> (smoothed.size() - 1);
+            g.setColour (highBand > 0.78f ? palette::amber : palette::orange);
+            g.fillRoundedRectangle (active, juce::jmin (2.0f, barWidth * 0.35f));
         }
-        fill.lineTo (graph.getRight(), graph.getBottom());
-        fill.closeSubPath();
 
-        juce::ColourGradient spectrumFill (palette::orange.withAlpha (0.48f), graph.getCentreX(), graph.getY(),
-                                            palette::orange.withAlpha (0.04f), graph.getCentreX(), graph.getBottom(), false);
-        g.setGradientFill (spectrumFill);
-        g.fillPath (fill);
-        g.setColour (palette::orange.withAlpha (0.96f));
-        g.strokePath (line, juce::PathStrokeType (1.8f, juce::PathStrokeType::curved,
-                                                  juce::PathStrokeType::rounded));
+        g.setColour (juce::Colours::white.withAlpha (0.66f));
+        g.setFont (interFont (9.5f, true));
+        g.drawText ("POST-MASTER ANALYZER", labels.getX(), juce::roundToInt (area.getY() + 6.0f),
+                    180, 16, juce::Justification::centredLeft);
+        g.setColour (juce::Colours::white.withAlpha (0.40f));
+        g.setFont (interFont (8.5f));
+        g.drawText ("32 BAND  /  15 FPS", labels.getRight() - 150,
+                    juce::roundToInt (area.getY() + 6.0f), 150, 16,
+                    juce::Justification::centredRight);
 
         g.setColour (juce::Colours::white.withAlpha (0.56f));
         g.setFont (interFont (9.5f));
-        const auto labels = graph.toNearestInt();
         g.drawText ("20", labels.getX(), labels.getBottom() + 4, 32, 16,
                     juce::Justification::centredLeft);
         g.drawText ("100", labels.getX() + labels.getWidth() / 4 - 18, labels.getBottom() + 4, 36, 16,
@@ -521,27 +498,30 @@ public:
         {
             g.setColour (juce::Colours::white.withAlpha (0.42f));
             g.setFont (interFont (11.0f, true));
-            g.drawText ("WAITING FOR AUDIO", graph.toNearestInt(), juce::Justification::centred);
+            g.drawText ("NO PROGRAM AUDIO", graph.toNearestInt(), juce::Justification::centred);
         }
     }
 
 private:
-    static constexpr int fftOrder = 11;
+    static constexpr int fftOrder = 10;
     static constexpr int fftSize = 1 << fftOrder;
     juce::dsp::FFT fft;
     juce::dsp::WindowingFunction<float> window;
     std::array<float, fftSize * 2> fftData {};
-    std::array<float, 96> smoothed {};
+    std::array<float, 32> smoothed {};
     bool hasSignal = false;
 };
 
 class SC220MainComponent::LoudnessDisplay final : public juce::Component
 {
 public:
-    void setReading (float nextLufs, float nextPeak)
+    void setReading (float nextLufs, float nextTruePeak, float nextElapsedSeconds,
+                     bool nextReady)
     {
         lufs = nextLufs;
-        peak = nextPeak;
+        truePeak = nextTruePeak;
+        elapsedSeconds = nextElapsedSeconds;
+        ready = nextReady;
         repaint();
     }
 
@@ -570,7 +550,8 @@ public:
 
         constexpr float start = juce::MathConstants<float>::pi * 0.72f;
         constexpr float end = juce::MathConstants<float>::pi * 2.28f;
-        const float normal = juce::jlimit (0.0f, 1.0f, (lufs + 36.0f) / 30.0f);
+        const float displayLufs = ready ? lufs : -36.0f;
+        const float normal = juce::jlimit (0.0f, 1.0f, (displayLufs + 36.0f) / 30.0f);
         const float radius = face.getWidth() * 0.44f;
         const auto centre = dial.getCentre();
         for (int i = 0; i < 32; ++i)
@@ -594,22 +575,42 @@ public:
 
         g.setColour (juce::Colours::white);
         g.setFont (interFont (dial.getWidth() * 0.20f, true));
-        g.drawText (lufs <= -100.0f ? "--" : juce::String (lufs, 1),
+        g.drawText (! ready || lufs <= -100.0f ? "--" : juce::String (lufs, 1),
                     dial.withTrimmedTop (dial.getHeight() * 0.28f).withHeight (dial.getHeight() * 0.25f),
                     juce::Justification::centred);
         g.setFont (interFont (dial.getWidth() * 0.070f, true));
-        g.drawText ("LUFS", dial.withTrimmedTop (dial.getHeight() * 0.52f).withHeight (22.0f),
+        g.drawText ("LUFS-I", dial.withTrimmedTop (dial.getHeight() * 0.52f).withHeight (22.0f),
                     juce::Justification::centred);
         g.setColour (juce::Colours::white.withAlpha (0.74f));
         g.setFont (interFont (dial.getWidth() * 0.058f));
-        g.drawText (juce::String (peak, 1) + " dBFS",
+        const auto truePeakText = truePeak <= -100.0f
+            ? juce::String ("-- dBTP") : juce::String (truePeak, 1) + " dBTP MAX";
+        g.drawText (truePeakText,
                     dial.withTrimmedTop (dial.getHeight() * 0.67f).withHeight (20.0f),
                     juce::Justification::centred);
+        g.setColour (palette::orange.withAlpha (0.92f));
+        g.setFont (interFont (dial.getWidth() * 0.050f, true));
+        g.drawText ("YT / TIKTOK  -14  |  TP <= -1",
+                    dial.withTrimmedTop (dial.getHeight() * 0.14f).withHeight (18.0f),
+                    juce::Justification::centred);
+        if (! ready)
+        {
+            g.setColour (juce::Colours::white.withAlpha (0.58f));
+            g.setFont (interFont (dial.getWidth() * 0.050f));
+            const auto readinessText = elapsedSeconds < 3.0f
+                ? "CALIBRATING  " + juce::String (elapsedSeconds, 1) + " / 3.0s"
+                : juce::String ("WAITING FOR PROGRAM");
+            g.drawText (readinessText,
+                        dial.withTrimmedTop (dial.getHeight() * 0.78f).withHeight (18.0f),
+                        juce::Justification::centred);
+        }
     }
 
 private:
     float lufs = -120.0f;
-    float peak = -120.0f;
+    float truePeak = -120.0f;
+    float elapsedSeconds = 0.0f;
+    bool ready = false;
 };
 
 SC220MainComponent::SC220MainComponent (LiveAudioEngine& engine, WindowActions actions)
@@ -691,6 +692,8 @@ void SC220MainComponent::configureControls()
     goLiveButton.setClickingTogglesState (true);
     goLiveButton.onClick = [this]
     {
+        if (goLiveButton.getToggleState())
+            audioEngine.resetProgrammeLoudness();
         audioEngine.setOutputMuted (! goLiveButton.getToggleState());
         goLiveButton.setButtonText (goLiveButton.getToggleState() ? "LIVE" : "GO LIVE");
     };
@@ -834,11 +837,11 @@ void SC220MainComponent::timerCallback()
     sc220Meter->setLevels (lastStatus.inputPeakDbL, lastStatus.inputPeakDbR);
     pcMeter->setLevels (lastStatus.pcPeakDbL, lastStatus.pcPeakDbR);
     streamMeter->setLevels (lastStatus.outputPeakDbL, lastStatus.outputPeakDbR);
-    loudnessDisplay->setReading (lastStatus.loudnessLufs,
-                                 juce::jmax (lastStatus.outputPeakDbL, lastStatus.outputPeakDbR));
-    spectrumDisplay->updateFromTaps (audioEngine.getVoiceEnhancerBridge().processor().scopeTap,
-                                     audioEngine.getMusicEnhancerBridge().processor().scopeTap,
-                                     lastStatus.sampleRate);
+    loudnessDisplay->setReading (lastStatus.loudnessLufs, lastStatus.truePeakDbtp,
+                                 lastStatus.loudnessElapsedSeconds,
+                                 lastStatus.loudnessReady);
+    spectrumDisplay->updateFromTap (audioEngine.getVoiceEnhancerBridge().analysisTap(),
+                                    lastStatus.sampleRate);
     repaint();
 }
 

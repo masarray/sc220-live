@@ -158,13 +158,12 @@ check(
         token in generated_engine
         for token in (
             "masterLimiter.process (masterContext);",
-            "programmeSpectrumTap = voiceEnhancerBridge.analysisTap()",
-            "programmeSpectrumTap.push",
+            "programmeAnalyzer.push",
             "voiceBlock.getReadPointer (0)",
             "voiceBlock.getReadPointer (1)",
         )
     )
-    and generated_engine.find("programmeSpectrumTap.push")
+    and generated_engine.find("programmeAnalyzer.push")
     > generated_engine.find("masterLimiter.process (masterContext);"),
 )
 check(
@@ -174,14 +173,15 @@ check(
 )
 check(
     "UI consumes the one programme tap",
-    "auto& programmeTap = audioEngine.getVoiceEnhancerBridge().analysisTap()" in generated_ui
-    and "programmeTap.setEnabled (uiActive)" in generated_ui,
+    "audioEngine.programmeAnalyzerTap()" in generated_ui
+    and "setProgrammeAnalyzerEnabled (uiActive)" in generated_ui,
 )
 check(
     "spectrum work remains lightweight",
     "spectrumDivider >= 2" in generated_ui
     and "fftOrder = 10" in generated_ui
-    and "std::array<float, 72> smoothed" in generated_ui,
+    and "std::array<float, 32> smoothed" in generated_ui
+    and "32 BAND  /  15 FPS" in generated_ui,
 )
 check(
     "FFT implementation remains real audio analysis",

@@ -300,7 +300,7 @@ set(_constructor_taps_anchor [=[
 set(_constructor_taps_replacement [=[
     audioEngine.getVoiceEnhancerBridge().setVisualTapEnabled (false);
     audioEngine.getMusicEnhancerBridge().setVisualTapEnabled (false);
-    audioEngine.getVoiceEnhancerBridge().analysisTap().setEnabled (true);
+    audioEngine.setProgrammeAnalyzerEnabled (true);
 ]=])
 sc220_polish_replace_once(_ui "programme analyzer constructor state"
     "${_constructor_taps_anchor}" "${_constructor_taps_replacement}")
@@ -329,7 +329,7 @@ set(_destructor_block_replacement [=[
 SC220MainComponent::~SC220MainComponent()
 {
     stopTimer();
-    audioEngine.getVoiceEnhancerBridge().analysisTap().setEnabled (false);
+    audioEngine.setProgrammeAnalyzerEnabled (false);
     audioEngine.getVoiceEnhancerBridge().setVisualTapEnabled (false);
     audioEngine.getMusicEnhancerBridge().setVisualTapEnabled (false);
     setLookAndFeel (nullptr);
@@ -345,64 +345,50 @@ set(_ui_active_taps_anchor [=[
 set(_ui_active_taps_replacement [=[
     audioEngine.getVoiceEnhancerBridge().setVisualTapEnabled (false);
     audioEngine.getMusicEnhancerBridge().setVisualTapEnabled (false);
-    audioEngine.getVoiceEnhancerBridge().analysisTap().setEnabled (active);
+    audioEngine.setProgrammeAnalyzerEnabled (active);
 ]=])
 sc220_polish_replace_once(_ui "programme analyzer UI lifecycle"
     "${_ui_active_taps_anchor}" "${_ui_active_taps_replacement}")
 
 set(_spectrum_update_anchor [=[
-    spectrumDisplay->updateFromTaps (audioEngine.getVoiceEnhancerBridge().processor().scopeTap,
-                                     audioEngine.getMusicEnhancerBridge().processor().scopeTap,
-                                     lastStatus.sampleRate);
+    spectrumDisplay->updateFromTap (audioEngine.getVoiceEnhancerBridge().analysisTap(),
+                                    lastStatus.sampleRate);
 ]=])
 set(_spectrum_update_replacement [=[
     static int spectrumDivider = 0;
     if (++spectrumDivider >= 2)
     {
         spectrumDivider = 0;
-        auto& programmeTap = audioEngine.getVoiceEnhancerBridge().analysisTap();
-        programmeTap.setEnabled (uiActive);
-        spectrumDisplay->updateFromTaps (
-            programmeTap,
-            audioEngine.getMusicEnhancerBridge().analysisTap(),
-            lastStatus.sampleRate);
+        audioEngine.setProgrammeAnalyzerEnabled (uiActive);
+        spectrumDisplay->updateFromTap (audioEngine.programmeAnalyzerTap(),
+                                        lastStatus.sampleRate);
     }
 ]=])
 sc220_polish_replace_once(_ui "post-master programme spectrum"
     "${_spectrum_update_anchor}" "${_spectrum_update_replacement}")
 
-# 1024-point FFT at roughly 15 visual frames per second is sufficient for a
-# broadcast overview and keeps message-thread overhead negligible.
-set(_fft_order_anchor "    static constexpr int fftOrder = 11;")
-set(_fft_order_replacement "    static constexpr int fftOrder = 10;")
-sc220_polish_replace_once(_ui "lightweight FFT size"
-    "${_fft_order_anchor}" "${_fft_order_replacement}")
+# The reviewed engine now owns its post-master analyzer and metering directly.
+# Keep configure-time generation fail-closed if either authority disappears.
+foreach(_required_ui_token IN ITEMS
+        "static constexpr int fftOrder = 10;"
+        "std::array<float, 32> smoothed {};"
+        "POST-MASTER ANALYZER"
+        "audioEngine.programmeAnalyzerTap()")
+    string(FIND "${_ui}" "${_required_ui_token}" _required_ui_position)
+    if(_required_ui_position EQUAL -1)
+        message(FATAL_ERROR "SC220 final analyzer UI authority missing: ${_required_ui_token}")
+    endif()
+endforeach()
 
-set(_spectrum_bins_anchor "    std::array<float, 96> smoothed {};")
-set(_spectrum_bins_replacement "    std::array<float, 72> smoothed {};")
-sc220_polish_replace_once(_ui "lightweight display bins"
-    "${_spectrum_bins_anchor}" "${_spectrum_bins_replacement}")
-
-# Publish the exact protected programme bus after the final limiter. This is the
-# same audio represented by the Stream meter and Program Monitor, so a moving
-# output meter guarantees analyzer samples are available.
-set(_master_tap_anchor [=[
-    masterLimiter.process (masterContext);
-
-    double weightedEnergy = 0.0;
-]=])
-set(_master_tap_replacement [=[
-    masterLimiter.process (masterContext);
-
-    auto& programmeSpectrumTap = voiceEnhancerBridge.analysisTap();
-    programmeSpectrumTap.push (voiceBlock.getReadPointer (0),
-                               voiceBlock.getReadPointer (1),
-                               numSamples);
-
-    double weightedEnergy = 0.0;
-]=])
-sc220_polish_replace_once(_engine "post-master analyzer publication"
-    "${_master_tap_anchor}" "${_master_tap_replacement}")
+foreach(_required_engine_token IN ITEMS
+        "programmeAnalyzer.push"
+        "loudnessIntegrator.processFrame"
+        "truePeakOversampler.processSamplesUp")
+    string(FIND "${_engine}" "${_required_engine_token}" _required_engine_position)
+    if(_required_engine_position EQUAL -1)
+        message(FATAL_ERROR "SC220 final programme meter authority missing: ${_required_engine_token}")
+    endif()
+endforeach()
 
 # Recover the intended SC220 -> VB-CABLE routing even when an older settings file
 # persisted headphones as the primary stream output.

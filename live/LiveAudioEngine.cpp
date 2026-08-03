@@ -361,6 +361,9 @@ LiveAudioEngine::Status LiveAudioEngine::getStatus() const
     status.expanderReductionDb = expander.getGainReductionDb();
     status.duckGainDb = duckGainDb.load();
     status.loudnessLufs = loudnessLufs.load();
+    status.truePeakDbtp = truePeakDbtp.load();
+    status.loudnessElapsedSeconds = loudnessElapsedSeconds.load();
+    status.loudnessReady = loudnessReady.load();
     status.pcLoopbackRunning = pcLoopback.isRunning();
     status.pcUnderflows = pcLoopback.underflows();
     status.pcOverflows = pcLoopback.overflows();
@@ -407,6 +410,19 @@ void LiveAudioEngine::audioDeviceIOCallbackWithContext (
                                             processingChannels, numSamples);
     juce::AudioBuffer<float> musicBlock (pcAudioBuffer.getArrayOfWritePointers(),
                                          processingChannels, numSamples);
+
+    if (loudnessResetRequested.exchange (false, std::memory_order_acq_rel))
+    {
+        loudnessIntegrator.reset();
+        truePeakMaximumLinear = 0.0f;
+        truePeakDbtp.store (-120.0f);
+        loudnessLufs.store (-120.0f);
+        loudnessElapsedSeconds.store (0.0f);
+        loudnessReady.store (false);
+        truePeakOversampler.reset();
+        for (auto& filter : loudnessShelf) filter.reset();
+        for (auto& filter : loudnessHighPass) filter.reset();
+    }
 
     // Stereo keeps channels 1/2 as L/R. Dual Mono also preserves channels 1/2;
     // its independent per-channel faders/pan are a UI/transport follow-up. The
@@ -508,26 +524,35 @@ void LiveAudioEngine::audioDeviceIOCallbackWithContext (
     juce::dsp::ProcessContextReplacing<float> masterContext (masterBlock);
     masterLimiter.process (masterContext);
 
-    double weightedEnergy = 0.0;
+    programmeAnalyzer.push (voiceBlock.getReadPointer (0),
+                            voiceBlock.getReadPointer (1), numSamples);
+
+    const auto& truePeakBuffer = static_cast<const juce::AudioBuffer<float>&> (voiceBlock);
+    const auto truePeakInput = juce::dsp::AudioBlock<const float> (truePeakBuffer);
+    const auto oversampled = truePeakOversampler.processSamplesUp (truePeakInput);
+    float blockTruePeak = 0.0f;
+    for (int channel = 0; channel < static_cast<int> (oversampled.getNumChannels()); ++channel)
+        for (int sample = 0; sample < static_cast<int> (oversampled.getNumSamples()); ++sample)
+            blockTruePeak = juce::jmax (blockTruePeak,
+                std::abs (oversampled.getSample (channel, sample)));
+    truePeakMaximumLinear = juce::jmax (truePeakMaximumLinear, blockTruePeak);
+    truePeakDbtp.store (dbFromPeak (truePeakMaximumLinear));
+
     for (int sample = 0; sample < numSamples; ++sample)
     {
+        double weightedFrameEnergy = 0.0;
         for (int channel = 0; channel < processingChannels; ++channel)
         {
             float value = voiceBlock.getSample (channel, sample);
             value = loudnessShelf[static_cast<size_t> (channel)].processSample (value);
             value = loudnessHighPass[static_cast<size_t> (channel)].processSample (value);
-            weightedEnergy += static_cast<double> (value) * static_cast<double> (value);
+            weightedFrameEnergy += static_cast<double> (value) * static_cast<double> (value);
         }
+        loudnessIntegrator.processFrame (weightedFrameEnergy);
     }
-    const double blockMeanSquare = weightedEnergy / juce::jmax (1, numSamples);
-    const double blockSeconds = static_cast<double> (numSamples)
-                              / juce::jmax (1.0, currentSampleRate.load());
-    const double loudnessCoefficient = std::exp (-blockSeconds / 0.400);
-    loudnessMeanSquare = loudnessCoefficient * loudnessMeanSquare
-                       + (1.0 - loudnessCoefficient) * blockMeanSquare;
-    loudnessLufs.store (loudnessMeanSquare > 1.0e-12
-        ? static_cast<float> (-0.691 + 10.0 * std::log10 (loudnessMeanSquare))
-        : -120.0f);
+    loudnessLufs.store (loudnessIntegrator.integratedLufs());
+    loudnessElapsedSeconds.store (static_cast<float> (loudnessIntegrator.elapsedSeconds()));
+    loudnessReady.store (loudnessIntegrator.ready());
 
     updateMeters (voiceBlock, preLimiterPeakDb);
 
@@ -605,8 +630,14 @@ void LiveAudioEngine::audioDeviceAboutToStart (juce::AudioIODevice* device)
     pcGainLinear.setCurrentAndTargetValue (juce::Decibels::decibelsToGain (pcAudioGainDb.load()));
     duckGainLinear = 1.0f;
     duckGainDb.store (0.0f);
-    loudnessMeanSquare = 0.0;
+    loudnessIntegrator.prepare (sampleRate);
     loudnessLufs.store (-120.0f);
+    loudnessElapsedSeconds.store (0.0f);
+    loudnessReady.store (false);
+    truePeakMaximumLinear = 0.0f;
+    truePeakDbtp.store (-120.0f);
+    truePeakOversampler.initProcessing (static_cast<std::size_t> (blockSize));
+    truePeakOversampler.reset();
 
     const auto shelfCoefficients = juce::dsp::IIR::Coefficients<float>::makeHighShelf (
         static_cast<float> (sampleRate), 1681.9745f, 0.70717525f,

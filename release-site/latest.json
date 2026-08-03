@@ -1,0 +1,9 @@
+{
+  "product": "SC220 Live",
+  "version": "{{VERSION}}",
+  "published": "{{DATE}}",
+  "platform": "windows-x64",
+  "download": "{{DOWNLOAD_URL}}",
+  "sha256": "{{SHA256}}",
+  "checksum": "{{HASH_URL}}"
+}

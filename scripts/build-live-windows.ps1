@@ -142,7 +142,43 @@ function Import-VsDeveloperEnvironment([string]$vsInstallPath) {
     }
 
     if (-not (Get-Command cl.exe -ErrorAction SilentlyContinue)) {
+        # Some locked-down PowerShell hosts do not refresh command discovery
+        # after importing the environment block. Resolve the newest x64 tool
+        # directory explicitly before reporting a missing workload.
+        $toolRoot = Join-Path $vsInstallPath 'VC\Tools\MSVC'
+        $cl = Get-ChildItem $toolRoot -Directory -ErrorAction SilentlyContinue |
+            Sort-Object Name -Descending |
+            ForEach-Object { Join-Path $_.FullName 'bin\Hostx64\x64\cl.exe' } |
+            Where-Object { Test-Path $_ } |
+            Select-Object -First 1
+        if ($cl) {
+            $env:Path = "$(Split-Path -Parent $cl);$env:Path"
+        }
+    }
+
+    if (-not (Get-Command cl.exe -ErrorAction SilentlyContinue)) {
         throw 'MSVC cl.exe is not available after running VsDevCmd.bat. Repair the C++ workload.'
+    }
+
+    if (-not (Get-Command rc.exe -ErrorAction SilentlyContinue) -or
+        -not (Get-Command mt.exe -ErrorAction SilentlyContinue)) {
+        $kitsRoot = Join-Path ${env:ProgramFiles(x86)} 'Windows Kits\10\bin'
+        $sdkBin = Get-ChildItem $kitsRoot -Directory -ErrorAction SilentlyContinue |
+            Sort-Object Name -Descending |
+            ForEach-Object { Join-Path $_.FullName 'x64' } |
+            Where-Object {
+                (Test-Path (Join-Path $_ 'rc.exe')) -and
+                (Test-Path (Join-Path $_ 'mt.exe'))
+            } |
+            Select-Object -First 1
+        if ($sdkBin) {
+            $env:Path = "$sdkBin;$env:Path"
+        }
+    }
+
+    if (-not (Get-Command rc.exe -ErrorAction SilentlyContinue) -or
+        -not (Get-Command mt.exe -ErrorAction SilentlyContinue)) {
+        throw 'Windows SDK tools rc.exe/mt.exe are unavailable after VsDevCmd. Repair the Windows SDK component.'
     }
 }
 
@@ -157,29 +193,29 @@ function Find-Ninja([string]$vsInstallPath) {
     return $null
 }
 
-function Stop-SonkupikLiveProcesses {
+function Stop-SC220LiveProcesses {
     $stopped = 0
     try {
-        $processes = Get-CimInstance Win32_Process -Filter "Name='Sonkupik Live.exe'" -ErrorAction SilentlyContinue
+        $processes = Get-CimInstance Win32_Process -Filter "Name='SC220 Live.exe'" -ErrorAction SilentlyContinue
         foreach ($process in $processes) {
             try {
-                Write-Host "==> Closing running Sonkupik Live process (PID $($process.ProcessId))" -ForegroundColor Yellow
+                Write-Host "==> Closing running SC220 Live process (PID $($process.ProcessId))" -ForegroundColor Yellow
                 Stop-Process -Id ([int]$process.ProcessId) -Force -ErrorAction Stop
                 $stopped++
             } catch {
-                Write-Warning "Unable to close Sonkupik Live PID $($process.ProcessId): $($_.Exception.Message)"
+                Write-Warning "Unable to close SC220 Live PID $($process.ProcessId): $($_.Exception.Message)"
             }
         }
     } catch {
         # CIM can be unavailable on stripped-down Windows environments. Fall
         # back to Get-Process, whose ProcessName omits the .exe suffix.
-        Get-Process -Name 'Sonkupik Live' -ErrorAction SilentlyContinue | ForEach-Object {
+        Get-Process -Name 'SC220 Live' -ErrorAction SilentlyContinue | ForEach-Object {
             try {
-                Write-Host "==> Closing running Sonkupik Live process (PID $($_.Id))" -ForegroundColor Yellow
+                Write-Host "==> Closing running SC220 Live process (PID $($_.Id))" -ForegroundColor Yellow
                 Stop-Process -Id $_.Id -Force -ErrorAction Stop
                 $stopped++
             } catch {
-                Write-Warning "Unable to close Sonkupik Live PID $($_.Id): $($_.Exception.Message)"
+                Write-Warning "Unable to close SC220 Live PID $($_.Id): $($_.Exception.Message)"
             }
         }
     }
@@ -192,10 +228,10 @@ function Stop-SonkupikLiveProcesses {
 
 function Get-SonkupikOutputCandidates([string]$buildPath, [string]$configuration) {
     return @(
-        (Join-Path $buildPath "SonkupikLive_artefacts\$configuration\Sonkupik Live.exe"),
-        (Join-Path $buildPath "SonkupikLive_artefacts\$configuration\SonkupikLive.exe"),
-        (Join-Path $buildPath 'SonkupikLive_artefacts\Sonkupik Live.exe'),
-        (Join-Path $buildPath 'SonkupikLive_artefacts\SonkupikLive.exe')
+        (Join-Path $buildPath "SC220Live_artefacts\$configuration\SC220 Live.exe"),
+        (Join-Path $buildPath "SC220Live_artefacts\$configuration\SC220Live.exe"),
+        (Join-Path $buildPath 'SC220Live_artefacts\SC220 Live.exe'),
+        (Join-Path $buildPath 'SC220Live_artefacts\SC220Live.exe')
     )
 }
 
@@ -215,10 +251,10 @@ function Remove-StaleSonkupikOutputs([string]$buildPath, [string]$configuration)
                     Start-Sleep -Milliseconds (350 * $attempt)
                 } else {
                     throw @"
-The previous Sonkupik Live executable is still locked:
+The previous SC220 Live executable is still locked:
   $candidate
 
-Close Sonkupik Live, disable any Explorer preview for this file, and allow the
+Close SC220 Live, disable any Explorer preview for this file, and allow the
 build folder in antivirus/Windows Security if it is being scanned continuously.
 Then run:
   build-live-windows.bat clean
@@ -364,17 +400,17 @@ if ($JuceSourceDir) {
 }
 
 Write-Host "==> Generator: $selectedGenerator"
-Write-Host '==> Configuring Sonkupik Live'
+Write-Host '==> Configuring SC220 Live'
 & $cmake.Path @cmakeArgs
 if ($LASTEXITCODE -ne 0) { throw "CMake configure failed with exit code $LASTEXITCODE" }
 
 # The linker cannot replace an executable that is still running. Close any
 # previous preview instance and remove the stale output before invoking MSBuild.
-Stop-SonkupikLiveProcesses | Out-Null
+Stop-SC220LiveProcesses | Out-Null
 Remove-StaleSonkupikOutputs $build $Configuration
 
-Write-Host "==> Building Sonkupik Live ($Configuration)"
-$buildTargets = @('SonkupikLive')
+Write-Host "==> Building SC220 Live ($Configuration)"
+$buildTargets = @('SC220Live')
 if ($ParityQa) { $buildTargets += @('SonkupikParityReference', 'SonkupikParityLive') }
 $buildArgs = @('--build', $build, '--target') + $buildTargets + @('--parallel')
 if ($useMultiConfig) { $buildArgs += @('--config', $Configuration) }
@@ -391,8 +427,8 @@ if ($firstBuildExitCode -ne 0) {
         throw "Build failed with exit code $firstBuildExitCode. This is a compile/source error; linker-lock retry was skipped."
     }
 
-    Write-Host '==> Linker reported a locked Sonkupik Live executable. Releasing it and retrying once.' -ForegroundColor Yellow
-    Stop-SonkupikLiveProcesses | Out-Null
+    Write-Host '==> Linker reported a locked SC220 Live executable. Releasing it and retrying once.' -ForegroundColor Yellow
+    Stop-SC220LiveProcesses | Out-Null
     Remove-StaleSonkupikOutputs $build $Configuration
     Start-Sleep -Milliseconds 900
     & $cmake.Path @buildArgs 2>&1 | Tee-Object -FilePath $buildLog
@@ -408,6 +444,6 @@ if (-not $exe) {
         Where-Object { $_.Name -match '(Sonkupik.*Live)' -and $_.Name -notmatch '(Parity|Renderer)' } |
         Select-Object -First 1 -ExpandProperty FullName
 }
-if (-not $exe) { throw 'Build completed but Sonkupik Live executable was not found.' }
+if (-not $exe) { throw 'Build completed but SC220 Live executable was not found.' }
 
 Write-Host "`nSUCCESS: $exe" -ForegroundColor Green

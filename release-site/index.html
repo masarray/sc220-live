@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="Unduh SC220 Live untuk Recording Tech SC220. Mixer audio Windows dengan ASK-P Signature, PC Audio loopback, ducking, dan output VB-CABLE.">
+  <title>SC220 Live — Recording Tech</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <img src="recording-tech-logo.png" alt="Recording Tech" width="216" height="58">
+    <span class="product">SC220 <b>LIVE</b></span>
+    <a class="quiet-link" href="https://github.com/masarray/sc220-download/releases">Semua rilis</a>
+  </header>
+
+  <main>
+    <section class="hero">
+      <div class="eyebrow"><span></span> WINDOWS AUDIO CONSOLE</div>
+      <h1>Suara SC220 yang lebih hidup,<br>rapi, dan siap siaran.</h1>
+      <p class="lead">Satukan input Recording Tech SC220 dan audio PC, beri karakter melalui ASK-P Signature, lalu kirim hasilnya ke OBS atau TikTok Live Studio lewat VB-CABLE.</p>
+      <div class="actions">
+        <a class="primary" href="{{DOWNLOAD_URL}}">Unduh SC220 Live v{{VERSION}}</a>
+        <a class="secondary" href="#setup">Lihat cara pasang</a>
+      </div>
+      <div class="release-meta">
+        <span>Windows 10/11 x64</span><span>Portable</span><span>{{SIZE}}</span><span>SHA-256 tersedia</span>
+      </div>
+    </section>
+
+    <section class="signal" aria-label="Signal flow">
+      <article><small>INPUT 01</small><strong>SC220</strong><p>Mic atau stereo line input</p></article>
+      <i>+</i>
+      <article><small>INPUT 02</small><strong>PC AUDIO</strong><p>Game, browser, dan musik</p></article>
+      <i>→</i>
+      <article class="accent"><small>DSP</small><strong>ASK-P SIGNATURE</strong><p>Enhance dan smart protection</p></article>
+      <i>→</i>
+      <article><small>STREAM OUT</small><strong>VB-CABLE</strong><p>Untuk OBS dan TikTok Studio</p></article>
+    </section>
+
+    <section class="details" id="setup">
+      <div>
+        <div class="eyebrow"><span></span> QUICK SETUP</div>
+        <h2>Siap dipakai dalam empat langkah.</h2>
+      </div>
+      <ol>
+        <li><b>Pasang VB-CABLE</b><span>Gunakan installer resmi VB-Audio.</span></li>
+        <li><b>Pilih SC220 sebagai input</b><span>Buka Settings di SC220 Live.</span></li>
+        <li><b>Pilih CABLE Input sebagai output</b><span>Atur level, lalu tekan Go Live.</span></li>
+        <li><b>Pilih CABLE Output di aplikasi siaran</b><span>Audio hasil DSP siap digunakan.</span></li>
+      </ol>
+    </section>
+
+    <section class="integrity">
+      <div><small>RELEASE</small><strong>v{{VERSION}}</strong></div>
+      <div><small>PUBLISHED</small><strong>{{DATE}}</strong></div>
+      <div class="hash"><small>SHA-256</small><code>{{SHA256}}</code></div>
+      <a href="{{HASH_URL}}">Unduh checksum</a>
+    </section>
+  </main>
+
+  <footer>
+    <span>© Recording Tech / MasArray</span>
+    <span>SC220 Live tidak menyertakan driver VB-CABLE.</span>
+  </footer>
+</body>
+</html>

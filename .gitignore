@@ -1,5 +1,5 @@
 # ---------------------------------------------------------------------------
-# Sonkupik Live repository hygiene
+# SC220 Live repository hygiene
 # Keep source, documentation, scripts and intentional assets in Git.
 # Keep every generated build, package, cache, credential and local dependency out.
 # ---------------------------------------------------------------------------
@@ -19,6 +19,10 @@
 /Testing/
 /_deps/
 /generated/
+/.codex-prd-render/
+/.release-public/
+/.release-work/
+/.release-stage/
 
 # Nested generator output
 **/CMakeFiles/
@@ -154,6 +158,7 @@ ArSonKuPik-license-private-key*.txt
 *private-key*.txt
 *activation-secret*.txt
 build-key-activator/
+.release-license-approval.txt
 
 # OS metadata
 .DS_Store

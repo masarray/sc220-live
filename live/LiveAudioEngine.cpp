@@ -57,6 +57,7 @@ bool LiveAudioEngine::initialise (const juce::XmlElement* savedDeviceState)
 
 void LiveAudioEngine::shutdown()
 {
+    pcLoopback.stop();
     if (callbackRegistered.exchange (false))
         deviceManager.removeAudioCallback (this);
     deviceManager.closeAudioDevice();
@@ -232,6 +233,11 @@ void LiveAudioEngine::setInputTrimDb (float value) noexcept
     updateInputTrimRouting();
 }
 
+void LiveAudioEngine::setSc220FaderDb (float value) noexcept
+{
+    sc220FaderDb.store (juce::jlimit (-60.0f, 12.0f, value));
+}
+
 void LiveAudioEngine::setOutputTrimDb (float value) noexcept
 {
     if (! fullFeaturesAllowed()) return;
@@ -251,6 +257,16 @@ void LiveAudioEngine::setOutputTrimBypassed (bool value) noexcept
     if (! fullFeaturesAllowed()) return;
     outputTrimBypassed.store (value);
     updateOutputTrimRouting();
+}
+
+void LiveAudioEngine::setPcAudioGainDb (float value) noexcept
+{
+    pcAudioGainDb.store (juce::jlimit (-60.0f, 12.0f, value));
+}
+
+void LiveAudioEngine::setDuckingDepthDb (float value) noexcept
+{
+    duckingDepthDb.store (juce::jlimit (-24.0f, 0.0f, value));
 }
 
 void LiveAudioEngine::setBypassed (bool value) noexcept
@@ -331,10 +347,17 @@ LiveAudioEngine::Status LiveAudioEngine::getStatus() const
     status.callbackPeakPercent = callbackPeakPercent.load();
     status.inputPeakDbL = inputPeakL.load();
     status.inputPeakDbR = inputPeakR.load();
+    status.pcPeakDbL = pcLoopback.peakDbL();
+    status.pcPeakDbR = pcLoopback.peakDbR();
     status.outputPeakDbL = outputPeakL.load();
     status.outputPeakDbR = outputPeakR.load();
     status.gainReductionDb = gainReduction.load();
     status.expanderReductionDb = expander.getGainReductionDb();
+    status.duckGainDb = duckGainDb.load();
+    status.loudnessLufs = loudnessLufs.load();
+    status.pcLoopbackRunning = pcLoopback.isRunning();
+    status.pcUnderflows = pcLoopback.underflows();
+    status.pcOverflows = pcLoopback.overflows();
     status.dropouts = dropoutCount.load();
     status.totalLatencySamples = totalLatencySamples.load();
 
@@ -361,7 +384,7 @@ void LiveAudioEngine::audioDeviceIOCallbackWithContext (
     if (! running.load() || ! engineEnabled.load() || numOutputChannels <= 0)
         return;
 
-    const int processingChannels = juce::jlimit (1, 2, juce::jmax (numOutputChannels, numInputChannels));
+    constexpr int processingChannels = 2;
     if (processBuffer.getNumSamples() < numSamples || processBuffer.getNumChannels() < processingChannels)
     {
         ++dropoutCount;
@@ -392,13 +415,63 @@ void LiveAudioEngine::audioDeviceIOCallbackWithContext (
     for (int channel = 0; channel < processingChannels; ++channel)
         detectorBuffer.copyFrom (channel, 0, processBuffer, channel, 0, numSamples);
 
-    emptyMidi.clear();
-    enhancerBridge.process (processBuffer, emptyMidi);
+    float sc220PeakL = 0.0f;
+    float sc220PeakR = 0.0f;
+    for (int sample = 0; sample < numSamples; ++sample)
+    {
+        sc220PeakL = juce::jmax (sc220PeakL, std::abs (detectorBuffer.getSample (0, sample)));
+        sc220PeakR = juce::jmax (sc220PeakR, std::abs (detectorBuffer.getSample (1, sample)));
+    }
+    const float meterReleaseDb = static_cast<float> (26.0 * static_cast<double> (numSamples)
+                                                     / juce::jmax (1.0, currentSampleRate.load()));
+    inputPeakL.store (juce::jmax (dbFromPeak (sc220PeakL), inputPeakL.load() - meterReleaseDb));
+    inputPeakR.store (juce::jmax (dbFromPeak (sc220PeakR), inputPeakR.load() - meterReleaseDb));
 
+    // Source conditioning remains confined to the SC220 lane. Program audio
+    // must not be gated or denoised before the two sources meet at the final
+    // ASK-P Signature bus.
     expander.setNoiseFloorDb (noiseClean.hasProfile()
                               ? noiseClean.getEstimatedNoiseFloorDb()
                               : -72.0f);
     expander.process (processBuffer, detectorBuffer);
+
+    sc220MixGainLinear.setTargetValue (juce::Decibels::decibelsToGain (sc220FaderDb.load()));
+    const float sc220MuteGain = sc220Muted.load() ? 0.0f : 1.0f;
+    const float sc220GainStart = sc220MixGainLinear.getCurrentValue() * sc220MuteGain;
+    const float sc220GainEnd = sc220MixGainLinear.skip (numSamples) * sc220MuteGain;
+    processBuffer.applyGainRamp (0, numSamples, sc220GainStart, sc220GainEnd);
+
+    pcLoopback.read (pcAudioBuffer, numSamples);
+    if (! pcAudioEnabled.load() || pcAudioMuted.load())
+    {
+        pcAudioBuffer.clear();
+    }
+    else
+    {
+        const float keyPeak = juce::jmax (sc220PeakL, sc220PeakR);
+        const bool voicePresent = dbFromPeak (keyPeak) > -36.0f;
+        const float targetDuck = duckingEnabled.load() && voicePresent
+                               ? juce::Decibels::decibelsToGain (duckingDepthDb.load())
+                               : 1.0f;
+        const double seconds = targetDuck < duckGainLinear ? 0.020 : 0.400;
+        const float coefficient = static_cast<float> (std::exp (
+            -static_cast<double> (numSamples)
+            / (juce::jmax (1.0, currentSampleRate.load()) * seconds)));
+        const float nextDuck = targetDuck + coefficient * (duckGainLinear - targetDuck);
+
+        pcGainLinear.setTargetValue (juce::Decibels::decibelsToGain (pcAudioGainDb.load()));
+        const float pcGainStart = pcGainLinear.getCurrentValue() * duckGainLinear;
+        const float pcGainEnd = pcGainLinear.skip (numSamples) * nextDuck;
+        pcAudioBuffer.applyGainRamp (0, numSamples, pcGainStart, pcGainEnd);
+        duckGainLinear = nextDuck;
+        duckGainDb.store (juce::Decibels::gainToDecibels (juce::jmax (nextDuck, 1.0e-6f), -120.0f));
+    }
+
+    for (int channel = 0; channel < processingChannels; ++channel)
+        processBuffer.addFrom (channel, 0, pcAudioBuffer, channel, 0, numSamples);
+
+    emptyMidi.clear();
+    enhancerBridge.process (processBuffer, emptyMidi);
 
     const float outputTargetDb = outputTrimBypassed.load() ? 0.0f
                                                           : juce::jmin (0.0f, outputTrimDb.load() + 12.0f);
@@ -407,6 +480,27 @@ void LiveAudioEngine::audioDeviceIOCallbackWithContext (
     const float outputEnd = outputGainLinear.skip (numSamples);
     if (std::abs (outputStart - 1.0f) > 0.00001f || std::abs (outputEnd - 1.0f) > 0.00001f)
         processBuffer.applyGainRamp (0, numSamples, outputStart, outputEnd);
+
+    double weightedEnergy = 0.0;
+    for (int sample = 0; sample < numSamples; ++sample)
+    {
+        for (int channel = 0; channel < processingChannels; ++channel)
+        {
+            float value = processBuffer.getSample (channel, sample);
+            value = loudnessShelf[static_cast<size_t> (channel)].processSample (value);
+            value = loudnessHighPass[static_cast<size_t> (channel)].processSample (value);
+            weightedEnergy += static_cast<double> (value) * static_cast<double> (value);
+        }
+    }
+    const double blockMeanSquare = weightedEnergy / juce::jmax (1, numSamples);
+    const double blockSeconds = static_cast<double> (numSamples)
+                              / juce::jmax (1.0, currentSampleRate.load());
+    const double loudnessCoefficient = std::exp (-blockSeconds / 0.400);
+    loudnessMeanSquare = loudnessCoefficient * loudnessMeanSquare
+                       + (1.0 - loudnessCoefficient) * blockMeanSquare;
+    loudnessLufs.store (loudnessMeanSquare > 1.0e-12
+        ? static_cast<float> (-0.691 + 10.0 * std::log10 (loudnessMeanSquare))
+        : -120.0f);
 
     updateMeters (processBuffer);
 
@@ -445,8 +539,10 @@ void LiveAudioEngine::audioDeviceAboutToStart (juce::AudioIODevice* device)
 
     processBuffer.setSize (channels, blockSize, false, true, false);
     detectorBuffer.setSize (channels, blockSize, false, true, false);
+    pcAudioBuffer.setSize (channels, blockSize, false, true, false);
     processBuffer.clear();
     detectorBuffer.clear();
+    pcAudioBuffer.clear();
 
     noiseClean.prepare (sampleRate, blockSize, channels);
     expander.prepare (sampleRate);
@@ -458,11 +554,36 @@ void LiveAudioEngine::audioDeviceAboutToStart (juce::AudioIODevice* device)
     enhancerBridge.setGainMatchEnabled (false);
 
     inputGainLinear.reset (sampleRate, 0.020);
+    sc220MixGainLinear.reset (sampleRate, 0.020);
     outputGainLinear.reset (sampleRate, 0.020);
+    pcGainLinear.reset (sampleRate, 0.020);
     inputGainLinear.setCurrentAndTargetValue (juce::Decibels::decibelsToGain (
         inputTrimBypassed.load() ? 0.0f : juce::jmin (0.0f, inputTrimDb.load() + 12.0f)));
+    sc220MixGainLinear.setCurrentAndTargetValue (
+        juce::Decibels::decibelsToGain (sc220FaderDb.load()));
     outputGainLinear.setCurrentAndTargetValue (juce::Decibels::decibelsToGain (
         outputTrimBypassed.load() ? 0.0f : juce::jmin (0.0f, outputTrimDb.load() + 12.0f)));
+    pcGainLinear.setCurrentAndTargetValue (juce::Decibels::decibelsToGain (pcAudioGainDb.load()));
+    duckGainLinear = 1.0f;
+    duckGainDb.store (0.0f);
+    loudnessMeanSquare = 0.0;
+    loudnessLufs.store (-120.0f);
+
+    const auto shelfCoefficients = juce::dsp::IIR::Coefficients<float>::makeHighShelf (
+        static_cast<float> (sampleRate), 1681.9745f, 0.70717525f,
+        juce::Decibels::decibelsToGain (4.0f));
+    const auto highPassCoefficients = juce::dsp::IIR::Coefficients<float>::makeHighPass (
+        static_cast<float> (sampleRate), 38.13547f, 0.50032705f);
+    for (int channel = 0; channel < channels; ++channel)
+    {
+        loudnessShelf[static_cast<size_t> (channel)].coefficients = shelfCoefficients;
+        loudnessHighPass[static_cast<size_t> (channel)].coefficients = highPassCoefficients;
+        loudnessShelf[static_cast<size_t> (channel)].reset();
+        loudnessHighPass[static_cast<size_t> (channel)].reset();
+    }
+
+    pcLoopback.prepare (sampleRate);
+    pcLoopback.start();
 
     currentSampleRate.store (sampleRate);
     currentBufferSize.store (blockSize);
@@ -479,6 +600,7 @@ void LiveAudioEngine::audioDeviceAboutToStart (juce::AudioIODevice* device)
 
 void LiveAudioEngine::audioDeviceStopped()
 {
+    pcLoopback.stop();
     enhancerBridge.release();
     running.store (false);
     deviceOpen.store (false);
@@ -507,8 +629,6 @@ void LiveAudioEngine::clearOutputs (float* const* outputChannelData,
 void LiveAudioEngine::updateMeters (const juce::AudioBuffer<float>& finalOutput) noexcept
 {
     const auto engineMeters = enhancerBridge.meters();
-    inputPeakL.store (engineMeters.inputPeakDbL);
-    inputPeakR.store (engineMeters.inputPeakDbR);
 
     const int samples = finalOutput.getNumSamples();
     const int right = juce::jmin (1, finalOutput.getNumChannels() - 1);

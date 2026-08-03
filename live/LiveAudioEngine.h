@@ -2,10 +2,13 @@
 
 #include "MusicalNoiseClean.h"
 #include "EnhancerEngineBridge.h"
+#include "PcAudioLoopbackCapture.h"
 
 #include <juce_audio_devices/juce_audio_devices.h>
+#include <juce_dsp/juce_dsp.h>
 
 #include <atomic>
+#include <array>
 #include <memory>
 
 namespace askp::live {
@@ -25,10 +28,17 @@ public:
         float callbackPeakPercent = 0.0f;
         float inputPeakDbL = -120.0f;
         float inputPeakDbR = -120.0f;
+        float pcPeakDbL = -120.0f;
+        float pcPeakDbR = -120.0f;
         float outputPeakDbL = -120.0f;
         float outputPeakDbR = -120.0f;
         float gainReductionDb = 0.0f;
         float expanderReductionDb = 0.0f;
+        float duckGainDb = 0.0f;
+        float loudnessLufs = -120.0f;
+        bool pcLoopbackRunning = false;
+        int pcUnderflows = 0;
+        int pcOverflows = 0;
         int dropouts = 0;
         unsigned int visualDrops = 0;
         int totalLatencySamples = 0;
@@ -66,12 +76,27 @@ public:
 
     void setInputTrimDb (float value) noexcept;
     float getInputTrimDb() const noexcept { return inputTrimDb.load(); }
+    void setSc220FaderDb (float value) noexcept;
+    float getSc220FaderDb() const noexcept { return sc220FaderDb.load(); }
+    void setSc220Muted (bool value) noexcept { sc220Muted.store (value); }
+    bool isSc220Muted() const noexcept { return sc220Muted.load(); }
     void setOutputTrimDb (float value) noexcept;
     float getOutputTrimDb() const noexcept { return outputTrimDb.load(); }
     void setInputTrimBypassed (bool value) noexcept;
     bool isInputTrimBypassed() const noexcept { return inputTrimBypassed.load(); }
     void setOutputTrimBypassed (bool value) noexcept;
     bool isOutputTrimBypassed() const noexcept { return outputTrimBypassed.load(); }
+
+    void setPcAudioEnabled (bool value) noexcept { pcAudioEnabled.store (value); }
+    bool isPcAudioEnabled() const noexcept { return pcAudioEnabled.load(); }
+    void setPcAudioGainDb (float value) noexcept;
+    float getPcAudioGainDb() const noexcept { return pcAudioGainDb.load(); }
+    void setPcAudioMuted (bool value) noexcept { pcAudioMuted.store (value); }
+    bool isPcAudioMuted() const noexcept { return pcAudioMuted.load(); }
+    void setDuckingEnabled (bool value) noexcept { duckingEnabled.store (value); }
+    bool isDuckingEnabled() const noexcept { return duckingEnabled.load(); }
+    void setDuckingDepthDb (float value) noexcept;
+    float getDuckingDepthDb() const noexcept { return duckingDepthDb.load(); }
 
     void setEngineEnabled (bool value) noexcept { engineEnabled.store (value); }
     bool isEngineEnabled() const noexcept { return engineEnabled.load(); }
@@ -134,23 +159,40 @@ private:
     juce::AudioDeviceManager deviceManager;
     juce::AudioBuffer<float> processBuffer;
     juce::AudioBuffer<float> detectorBuffer;
+    juce::AudioBuffer<float> pcAudioBuffer;
     juce::MidiBuffer emptyMidi;
 
     MusicalNoiseClean noiseClean;
     SmoothDownwardExpander expander;
     EnhancerEngineBridge enhancerBridge;
+    PcAudioLoopbackCapture pcLoopback;
 
     juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> inputGainLinear;
+    juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> sc220MixGainLinear;
     juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> outputGainLinear;
+    juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> pcGainLinear;
 
     std::atomic<bool> engineEnabled { true };
     std::atomic<float> inputTrimDb { 0.0f };
+    std::atomic<float> sc220FaderDb { 0.0f };
     std::atomic<float> outputTrimDb { 0.0f };
     std::atomic<bool> inputTrimBypassed { false };
     std::atomic<bool> outputTrimBypassed { false };
     std::atomic<int> inputChannelMode { 2 };
     std::atomic<bool> enhancerBypassed { false };
-    std::atomic<bool> outputMuted { false };
+    std::atomic<bool> outputMuted { true };
+    std::atomic<bool> sc220Muted { false };
+    std::atomic<bool> pcAudioEnabled { true };
+    std::atomic<float> pcAudioGainDb { -10.0f };
+    std::atomic<bool> pcAudioMuted { false };
+    std::atomic<bool> duckingEnabled { true };
+    std::atomic<float> duckingDepthDb { -12.0f };
+    std::atomic<float> duckGainDb { 0.0f };
+    float duckGainLinear = 1.0f;
+    std::array<juce::dsp::IIR::Filter<float>, 2> loudnessShelf;
+    std::array<juce::dsp::IIR::Filter<float>, 2> loudnessHighPass;
+    double loudnessMeanSquare = 0.0;
+    std::atomic<float> loudnessLufs { -120.0f };
 
     std::atomic<bool> callbackRegistered { false };
     std::atomic<bool> running { false };

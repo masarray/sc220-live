@@ -1,7 +1,8 @@
-#include "LiveMainComponent.h"
+#include "SC220MainComponent.h"
 #include "LiveAudioEngine.h"
 #include "LiveIcons.h"
 #include "LiveTheme.h"
+#include "LiveWidgets.h"
 
 #include "BinaryData.h"
 
@@ -59,7 +60,7 @@ public:
                               juce::RectanglePlacement::centred, 1.0f);
         g.setColour (colours::text);
         g.setFont (lookAndFeel.jakarta (14.5f, true));
-        g.drawText ("Sonkupik Live", 45, 6, 190, 38, juce::Justification::centredLeft, false);
+        g.drawText ("SC220 Live", 45, 6, 190, 38, juce::Justification::centredLeft, false);
         g.setColour (colours::border);
         g.drawHorizontalLine (44, 12.0f, static_cast<float> (getWidth() - 12));
 
@@ -120,7 +121,7 @@ public:
     LiveMainWindow (LiveAudioEngine& engine,
                     std::function<void()> showMini,
                     std::function<void()> hideMain)
-        : juce::DocumentWindow ("Sonkupik Live", colours::appBg,
+        : juce::DocumentWindow ("SC220 Live", colours::appBg,
                                 juce::DocumentWindow::allButtons, true),
           hideMainWindow (std::move (hideMain))
     {
@@ -130,7 +131,7 @@ public:
         setResizeLimits (1180, 720, 1920, 1200);
         setDropShadowEnabled (true);
 
-        LiveMainComponent::WindowActions actions;
+        SC220MainComponent::WindowActions actions;
         actions.minimise = [this] { setMinimised (true); };
         actions.toggleMaximise = [this]
         {
@@ -145,9 +146,9 @@ public:
         };
         actions.showMiniController = std::move (showMini);
 
-        mainComponent = new LiveMainComponent (engine, std::move (actions));
+        mainComponent = new SC220MainComponent (engine, std::move (actions));
         setContentOwned (mainComponent, true);
-        centreWithSize (1440, 860);
+        centreWithSize (1600, 900);
     }
 
     void closeButtonPressed() override
@@ -155,11 +156,11 @@ public:
         if (hideMainWindow) hideMainWindow(); else setVisible (false);
     }
 
-    LiveMainComponent* getMainComponent() const noexcept { return mainComponent; }
+    SC220MainComponent* getMainComponent() const noexcept { return mainComponent; }
 
 private:
     std::function<void()> hideMainWindow;
-    LiveMainComponent* mainComponent = nullptr;
+    SC220MainComponent* mainComponent = nullptr;
 };
 
 class TrayIcon final : public juce::SystemTrayIconComponent
@@ -182,7 +183,7 @@ public:
             if (icon.isValid())
                 setIconImage (icon, icon);
         }
-        setIconTooltip ("Sonkupik Live - audio continues in the background");
+        setIconTooltip ("SC220 Live - audio continues in the background");
     }
 
     void mouseDown (const juce::MouseEvent& event) override
@@ -197,7 +198,7 @@ public:
             menu.addItem (4, audioEngine.isBypassed() ? "Disable Bypass" : "Bypass Enhancer");
             menu.addItem (5, "Restart Audio Engine");
             menu.addSeparator();
-            menu.addItem (6, "Exit Sonkupik Live");
+            menu.addItem (6, "Exit SC220 Live");
             menu.showMenuAsync (juce::PopupMenu::Options(), [this] (int result)
             {
                 switch (result)
@@ -230,17 +231,17 @@ private:
     std::function<void()> quitApplication;
 };
 
-class SonkupikLiveApplication final : public juce::JUCEApplication
+class SC220LiveApplication final : public juce::JUCEApplication
 {
 public:
-    const juce::String getApplicationName() override { return "Sonkupik Live"; }
-    const juce::String getApplicationVersion() override { return "0.13.3"; }
+    const juce::String getApplicationName() override { return "SC220 Live"; }
+    const juce::String getApplicationVersion() override { return "0.1.0"; }
     bool moreThanOneInstanceAllowed() override { return false; }
 
     void initialise (const juce::String&) override
     {
         juce::PropertiesFile::Options options;
-        options.applicationName = "Sonkupik Live";
+        options.applicationName = "SC220 Live";
         options.filenameSuffix = ".settings";
         options.folderName = "MasArray";
         options.osxLibrarySubFolder = "Application Support";
@@ -260,6 +261,13 @@ public:
         {
             audioEngine->setInputChannelMode (file->getIntValue ("inputChannelMode", 2));
             audioEngine->setInputTrimDb (static_cast<float> (file->getDoubleValue ("inputTrimDb", 0.0)));
+            audioEngine->setSc220FaderDb (static_cast<float> (file->getDoubleValue ("sc220FaderDb", 0.0)));
+            audioEngine->setSc220Muted (file->getBoolValue ("sc220Muted", false));
+            audioEngine->setPcAudioEnabled (file->getBoolValue ("pcAudioEnabled", true));
+            audioEngine->setPcAudioGainDb (static_cast<float> (file->getDoubleValue ("pcAudioGainDb", -10.0)));
+            audioEngine->setPcAudioMuted (file->getBoolValue ("pcAudioMuted", false));
+            audioEngine->setDuckingEnabled (file->getBoolValue ("duckingEnabled", true));
+            audioEngine->setDuckingDepthDb (static_cast<float> (file->getDoubleValue ("duckingDepthDb", -12.0)));
             audioEngine->setOutputTrimDb (static_cast<float> (file->getDoubleValue ("outputTrimDb", 0.0)));
             audioEngine->setInputTrimBypassed (file->getBoolValue ("inputTrimBypassed", false));
             audioEngine->setOutputTrimBypassed (file->getBoolValue ("outputTrimBypassed", false));
@@ -354,7 +362,7 @@ private:
         if (miniWindow == nullptr)
         {
             miniWindow = std::make_unique<juce::DocumentWindow> (
-                "Sonkupik Live", colours::appBg, 0, true);
+                "SC220 Live", colours::appBg, 0, true);
             miniWindow->setUsingNativeTitleBar (false);
             miniWindow->setTitleBarHeight (0);
             miniWindow->setAlwaysOnTop (true);
@@ -390,6 +398,13 @@ private:
             file->setValue ("presetIndex", audioEngine->getPresetIndex());
             file->setValue ("inputChannelMode", audioEngine->getInputChannelMode());
             file->setValue ("inputTrimDb", audioEngine->getInputTrimDb());
+            file->setValue ("sc220FaderDb", audioEngine->getSc220FaderDb());
+            file->setValue ("sc220Muted", audioEngine->isSc220Muted());
+            file->setValue ("pcAudioEnabled", audioEngine->isPcAudioEnabled());
+            file->setValue ("pcAudioGainDb", audioEngine->getPcAudioGainDb());
+            file->setValue ("pcAudioMuted", audioEngine->isPcAudioMuted());
+            file->setValue ("duckingEnabled", audioEngine->isDuckingEnabled());
+            file->setValue ("duckingDepthDb", audioEngine->getDuckingDepthDb());
             file->setValue ("outputTrimDb", audioEngine->getOutputTrimDb());
             file->setValue ("inputTrimBypassed", audioEngine->isInputTrimBypassed());
             file->setValue ("outputTrimBypassed", audioEngine->isOutputTrimBypassed());
@@ -418,4 +433,4 @@ private:
 
 } // namespace askp::live
 
-START_JUCE_APPLICATION (askp::live::SonkupikLiveApplication)
+START_JUCE_APPLICATION (askp::live::SC220LiveApplication)

@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.22)
 
-project(SonkupikLive VERSION 0.14.0 LANGUAGES C CXX)
+project(SC220Live VERSION 0.1.0 LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -15,8 +15,7 @@ endif()
 # ---------------------------------------------------------------------------
 # The full ASK-P repository is mounted as a git submodule at one reviewed
 # commit. Sonkupik compiles only DSP, profile, processor and licence authority;
-# the ASK-P editor and OrbVisualizer remain excluded. The approved Sonkupik
-# sphere stays local and independent.
+# the ASK-P editor remains excluded from the SC220 Live surface.
 set(SONKUPIK_ASKP_COMMIT "5757119cab7a1a75f09dcf0edea6e3be97975439")
 set(ASKP_PORT_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/third_party/askp-vst")
 set(ASKP_ENGINE_DIR "${ASKP_PORT_ROOT}/engine")
@@ -147,9 +146,8 @@ file(WRITE "${ASKP_GENERATED_DIR}/PluginProcessor_Live.cpp"
 set(ASKP_LIVE_PROCESSOR_SOURCE "${ASKP_GENERATED_DIR}/PluginProcessor_Live.cpp")
 set(ASKP_HEADLESS_REFERENCE_SOURCE "${ASKP_GENERATED_DIR}/PluginProcessor_Reference.cpp")
 
-message(STATUS "Sonkupik Live enhancer authority: ArSonKuPik v0.5.23 @ ${SONKUPIK_ASKP_COMMIT}")
-message(STATUS "Sonkupik Live engine revision: 2026073102; profiles: 13; Live glide: 12 ms")
-message(STATUS "Sonkupik Live sphere authority: local approved v0.10.4 visual baseline")
+message(STATUS "SC220 Live enhancer authority: ArSonKuPik v0.5.23 @ ${SONKUPIK_ASKP_COMMIT}")
+message(STATUS "SC220 Live engine revision: 2026073102; profiles: 13; Live glide: 12 ms")
 
 # Relaxed contraction stays confined to the DSP translation unit.
 set_property(SOURCE "${ASKP_DSP_SOURCE}" APPEND PROPERTY COMPILE_OPTIONS
@@ -181,7 +179,7 @@ endif()
 # ---------------------------------------------------------------------------
 # Embedded UI assets
 # ---------------------------------------------------------------------------
-juce_add_binary_data(SonkupikLiveAssets
+juce_add_binary_data(SC220LiveAssets
     SOURCES
         assets/ui/askp_sphere_gloss.png
         assets/ui/askp_faceplate_brushed.png
@@ -189,6 +187,8 @@ juce_add_binary_data(SonkupikLiveAssets
         assets/ui/askp_app_logo.png
         assets/ui/askp_header_logo.png
         assets/ui/askp_header_icon.png
+        assets/ui/recording_tech_logo.png
+        assets/ui/sc220_mkii_device.png
         assets/ui/favicon-96x96.png
         assets/ui/favicon-512x512.png
         assets/fonts/plus_jakarta_sans_regular.ttf
@@ -220,17 +220,17 @@ juce_add_binary_data(SonkupikLiveAssets
 )
 
 # ---------------------------------------------------------------------------
-# Sonkupik Live
+# SC220 Live
 # ---------------------------------------------------------------------------
-juce_add_gui_app(SonkupikLive
-    PRODUCT_NAME "Sonkupik Live"
-    COMPANY_NAME "MasArray"
-    BUNDLE_ID "com.masarray.sonkupik.live"
+juce_add_gui_app(SC220Live
+    PRODUCT_NAME "SC220 Live"
+    COMPANY_NAME "Recording Tech / MasArray"
+    BUNDLE_ID "com.masarray.sc220.live"
     ICON_BIG assets/ui/favicon-512x512.png
     ICON_SMALL assets/ui/favicon-96x96.png
 )
 
-target_sources(SonkupikLive PRIVATE
+target_sources(SC220Live PRIVATE
     "${ASKP_DSP_SOURCE}"
     "${ASKP_PRESET_SOURCE}"
     "${ASKP_LIVE_PROCESSOR_SOURCE}"
@@ -241,16 +241,18 @@ target_sources(SonkupikLive PRIVATE
     live/LicenseCheckoutClient.cpp
     live/LiveLicensePanel.cpp
     live/MusicalNoiseClean.cpp
+    live/PcAudioLoopbackCapture.cpp
     live/LiveAudioEngine.cpp
     live/LiveTheme.cpp
     live/LiveIcons.cpp
     live/LiveWidgets.cpp
     live/SonkupikSphereVisualizer.cpp
     live/LiveMainComponent.cpp
+    live/SC220MainComponent.cpp
     live/LiveApplication.cpp
 )
 
-target_include_directories(SonkupikLive PRIVATE
+target_include_directories(SC220Live PRIVATE
     "${ASKP_GENERATED_DIR}"
     "${ASKP_PROCESSOR_DIR}"
     "${ASKP_ENGINE_DIR}"
@@ -258,7 +260,7 @@ target_include_directories(SonkupikLive PRIVATE
     live
 )
 
-target_compile_definitions(SonkupikLive PRIVATE
+target_compile_definitions(SC220Live PRIVATE
     JUCE_WEB_BROWSER=0
     JUCE_USE_CURL=0
     JUCE_MODAL_LOOPS_PERMITTED=1
@@ -275,15 +277,15 @@ target_compile_definitions(SonkupikLive PRIVATE
     JucePlugin_Version=0.5.23
     JucePlugin_VersionCode=0x517
     JucePlugin_VersionString="0.5.23"
-    ASKP_BUILD_CHANNEL="Sonkupik Live Embedded Authority v0.5.23"
+    ASKP_BUILD_CHANNEL="SC220 Live Embedded Authority v0.5.23"
     SONKUPIK_ENGINE_REVISION=2026073102
     SONKUPIK_LICENSE_API_URL="https://masarray-license-api.masari.workers.dev"
-    SONKUPIK_LICENSE_PRODUCT_ID="sonkupik-live"
+    SONKUPIK_LICENSE_PRODUCT_ID="sc220-live"
     SONKUPIK_LICENSE_PRICE_IDR=249000
 )
 
-target_link_libraries(SonkupikLive PRIVATE
-    SonkupikLiveAssets
+target_link_libraries(SC220Live PRIVATE
+    SC220LiveAssets
     juce::juce_audio_utils
     juce::juce_audio_processors
     juce::juce_cryptography
@@ -294,6 +296,10 @@ target_link_libraries(SonkupikLive PRIVATE
     juce::juce_recommended_lto_flags
     juce::juce_recommended_warning_flags
 )
+
+if(WIN32)
+    target_link_libraries(SC220Live PRIVATE ole32 avrt)
+endif()
 
 # ---------------------------------------------------------------------------
 # Optional preset-by-preset parity renderers
@@ -331,7 +337,7 @@ if(SONKUPIK_BUILD_PARITY_QA)
             SONKUPIK_PARITY_VARIANT="${variant_name}"
         )
         target_link_libraries(${target_name} PRIVATE
-            SonkupikLiveAssets
+            SC220LiveAssets
             juce::juce_audio_utils
             juce::juce_audio_processors
             juce::juce_cryptography

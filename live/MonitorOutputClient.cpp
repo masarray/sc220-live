@@ -255,18 +255,26 @@ void MonitorOutputClient::audioDeviceIOCallbackWithContext (
     gainLinear.setTargetValue (juce::Decibels::decibelsToGain (gainDb.load()));
     const float gainStart = gainLinear.getCurrentValue();
     const float gainEnd = gainLinear.skip (numSamples);
+    const float gainStep = (gainEnd - gainStart)
+                         / static_cast<float> (juce::jmax (1, numSamples));
 
     for (int channel = 0; channel < numOutputChannels; ++channel)
     {
-        if (outputChannelData[channel] == nullptr)
+        auto* output = outputChannelData[channel];
+        if (output == nullptr)
             continue;
         if (silent)
-            juce::FloatVectorOperations::clear (outputChannelData[channel], numSamples);
-        else
-            juce::FloatVectorOperations::multiplyWithMultiply (
-                outputChannelData[channel], gainStart,
-                (gainEnd - gainStart) / static_cast<float> (juce::jmax (1, numSamples)),
-                numSamples);
+        {
+            juce::FloatVectorOperations::clear (output, numSamples);
+            continue;
+        }
+
+        float gain = gainStart;
+        for (int sample = 0; sample < numSamples; ++sample)
+        {
+            output[sample] *= gain;
+            gain += gainStep;
+        }
     }
 }
 

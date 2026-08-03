@@ -100,3 +100,7 @@ get_filename_component(_generated_directory "${SC220_APP_GENERATED_SOURCE}" DIRE
 file(MAKE_DIRECTORY "${_generated_directory}")
 file(WRITE "${SC220_APP_GENERATED_SOURCE}" "${_app}")
 message(STATUS "SC220 Live broadcast-state source: ${SC220_APP_GENERATED_SOURCE}")
+
+# The monitor UI source exists at this point. Apply the final responsive grid,
+# extended fader and lightweight analyzer transformations before compilation.
+include("${CMAKE_CURRENT_LIST_DIR}/PolishSC220FinalUi.cmake")

@@ -6,8 +6,6 @@ aligned = (ROOT / "cmake/GenerateSC220AlignedUi.cmake").read_text(encoding="utf-
 monitor = (ROOT / "cmake/GenerateSC220MonitorUi.cmake").read_text(encoding="utf-8")
 state = (ROOT / "cmake/GenerateSC220BroadcastState.cmake").read_text(encoding="utf-8")
 polish = (ROOT / "cmake/PolishSC220FinalUi.cmake").read_text(encoding="utf-8")
-bridge_h = (ROOT / "live/EnhancerEngineBridge.h").read_text(encoding="utf-8")
-bridge_cpp = (ROOT / "live/EnhancerEngineBridge.cpp").read_text(encoding="utf-8")
 main_cpp = (ROOT / "live/SC220MainComponent.cpp").read_text(encoding="utf-8")
 
 checks: list[tuple[str, bool]] = []
@@ -18,7 +16,7 @@ def check(name: str, condition: bool) -> None:
 
 
 check(
-    "CMake generates the reviewed UI authority",
+    "CMake generates one reviewed UI authority",
     all(
         token in cmake
         for token in (
@@ -29,18 +27,27 @@ check(
     ),
 )
 check(
-    "aligned and monitor generators are chained",
+    "aligned monitor and final generators are chained",
     "GenerateSC220MonitorUi.cmake" in aligned
-    and "SC220_UI_MONITOR_GENERATED_SOURCE" in aligned,
+    and "SC220_UI_MONITOR_GENERATED_SOURCE" in aligned
+    and 'include("${CMAKE_CURRENT_LIST_DIR}/PolishSC220FinalUi.cmake")' in state,
 )
 check(
-    "final polish runs after monitor generation",
-    'include("${CMAKE_CURRENT_LIST_DIR}/PolishSC220FinalUi.cmake")' in state,
-)
-check(
-    "one shared grid still owns SC220 PC and Stream geometry",
+    "final polish owns both UI and engine output",
     all(
-        token in aligned
+        token in polish
+        for token in (
+            'file(READ "${SC220_UI_MONITOR_GENERATED_SOURCE}" _ui)',
+            'file(READ "${SC220_ENGINE_GENERATED_SOURCE}" _engine)',
+            'file(WRITE "${SC220_UI_MONITOR_GENERATED_SOURCE}" "${_ui}")',
+            'file(WRITE "${SC220_ENGINE_GENERATED_SOURCE}" "${_engine}")',
+        )
+    ),
+)
+check(
+    "one shared grid owns SC220 PC and Stream faders",
+    all(
+        token in aligned + polish
         for token in (
             "sharedFaderTop",
             "sharedFaderBottom",
@@ -57,22 +64,37 @@ check(
     ),
 )
 check(
-    "lower empty space is used by extended faders",
-    "inputArea.getBottom() - 96" in polish
-    and "juce::jmax (248, sharedFaderBottom - sharedFaderTop)" in polish,
-)
-check(
-    "master panel receives balanced desktop width",
-    "0.310f" in polish and "0.450f" in polish,
-)
-check(
-    "Stream and Monitor selectors use responsive separated columns",
+    "vertical console grid scales from 720 to 900 pixels",
     all(
         token in polish
         for token in (
-            "masterColumnGap = 12",
+            "juce::jlimit (245, 288",
+            "static_cast<float> (inputArea.getHeight()) * 0.37f",
+            "sharedFaderTop = sourceSelectorY + 82",
+            "inputArea.getBottom() - 76",
+            "juce::jmax (176",
+        )
+    ),
+)
+check(
+    "Input Trim and Auto Duck share the pre-fader row",
+    "sourceSelectorY - 94, 76, 84" in polish
+    and "AUTO DUCK  /  SC220 KEY" in polish
+    and "duckAmount.getRight() + 20" not in polish,
+)
+check(
+    "Master receives one quarter of the desktop",
+    "0.310f" in polish and "0.440f" in polish,
+)
+check(
+    "Stream and Monitor selectors use separated responsive columns",
+    all(
+        token in polish
+        for token in (
+            "masterColumnGap = 14",
             "masterColumnWidth",
             "selectorWidth",
+            "juce::jmin (158",
             "outputBox.setBounds",
             "monitorOutputBox.setBounds",
             "programMonitorButton.setBounds",
@@ -81,81 +103,73 @@ check(
     ),
 )
 check(
-    "fixed colliding 164px monitor layout is replaced",
-    "responsive stream and monitor columns" in polish
-    and "juce::jmin (154" in polish,
-)
-check(
-    "Stream selector stays on the shared source row",
-    "outputBox.setBounds (streamColumn.getCentreX() - selectorWidth / 2" in polish
-    and "sourceSelectorY, selectorWidth, 34" in polish,
-)
-check(
-    "visual taps follow UI lifecycle",
+    "routing labels are explicit and non-ambiguous",
     all(
-        token in aligned
+        token in polish
         for token in (
-            "getVoiceEnhancerBridge().setVisualTapEnabled (active)",
-            "getMusicEnhancerBridge().setVisualTapEnabled (active)",
+            '"STREAM OUTPUT"',
+            '"MONITOR OUTPUT"',
+            '"VB-CABLE / OBS"',
+            '"HEADPHONES / SPEAKERS"',
         )
     ),
 )
 check(
-    "bridge owns a dedicated analyzer tap",
-    all(
-        token in bridge_h
-        for token in (
-            "askp::ScopeTap analyzerTap_",
-            "analysisTap()",
-            "analyzerTap_.setEnabled (enabled)",
-            "std::atomic<bool> visualTapEnabled_",
-        )
-    ),
+    "Stream selector only lists virtual-cable endpoints",
+    "juce::StringArray streamOutputs" in polish
+    and 'name.containsIgnoreCase ("CABLE")' in polish
+    and 'outputBox.addItemList (streamOutputs, 1)' in polish,
 )
 check(
-    "embedded ASK-P tap remains disabled",
-    "processor_.scopeTap.setEnabled (false);" in bridge_cpp
-    and "processor_.scopeTap.push" not in bridge_cpp,
+    "legacy physical Stream selection is recovered to VB-CABLE",
+    "savedDeviceState == nullptr || ! outputCable.load()" in polish,
 )
 check(
-    "post-Signature audio publishes to the dedicated tap",
+    "post-master protected programme publishes analyzer samples",
     all(
-        token in bridge_cpp
+        token in polish
         for token in (
-            "processor_.processBlock (audio, midi);",
-            "visualTapEnabled_.load",
-            "analyzerTap_.push (left, right, audio.getNumSamples());",
+            "masterLimiter.process (masterContext);",
+            "programmeSpectrumTap = voiceEnhancerBridge.analysisTap()",
+            "programmeSpectrumTap.push",
+            "voiceBlock.getReadPointer (0)",
+            "voiceBlock.getReadPointer (1)",
         )
     )
-    and bridge_cpp.find("analyzerTap_.push")
-    > bridge_cpp.find("processor_.processBlock"),
+    and polish.find("programmeSpectrumTap.push")
+    > polish.find("masterLimiter.process (masterContext);"),
 )
 check(
-    "UI reads both bridge-owned analyzer taps",
-    polish.count(".analysisTap()") == 2,
+    "per-lane visual publication stays disabled",
+    polish.count("setVisualTapEnabled (false)") >= 4
+    and "setVisualTapEnabled (active)" not in polish,
 )
 check(
-    "spectrum work is throttled to about 15 fps",
-    "spectrumDivider >= 2" in polish,
+    "UI consumes the one programme tap",
+    "auto& programmeTap = audioEngine.getVoiceEnhancerBridge().analysisTap()" in polish
+    and "programmeTap.setEnabled (uiActive)" in polish
+    and "post-master programme spectrum" in polish,
 )
 check(
-    "lightweight 1024-point FFT and 72 display bins are generated",
-    "fftOrder = 10" in polish
+    "spectrum work remains lightweight",
+    "spectrumDivider >= 2" in polish
+    and "fftOrder = 10" in polish
     and "std::array<float, 72> smoothed" in polish,
 )
 check(
-    "spectrum implementation still consumes Voice and Music",
+    "FFT implementation remains real audio analysis",
     all(
         token in main_cpp
         for token in (
-            "voiceTap.consumeLatest",
-            "musicTap.consumeLatest",
+            "consumeLatest",
+            "multiplyWithWindowingTable",
             "performFrequencyOnlyForwardTransform",
+            "gainToDecibels",
         )
     ),
 )
 check(
-    "monitor source controls remain part of final UI",
+    "physical Monitor controls remain part of final UI",
     all(
         token in monitor
         for token in (
@@ -168,7 +182,7 @@ check(
 )
 
 failed = [name for name, ok in checks if not ok]
-print("SC220 Live responsive console and lightweight analyzer audit")
+print("SC220 Live final console and post-master spectrum audit")
 for name, ok in checks:
     print(f"[ {'PASS' if ok else 'FAIL'} ] {name}")
 print(f"Checks: {len(checks)}  Passed: {len(checks) - len(failed)}  Failed: {len(failed)}")

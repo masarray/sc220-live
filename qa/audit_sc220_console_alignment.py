@@ -14,6 +14,37 @@ def check(name: str, condition: bool) -> None:
     checks.append((name, bool(condition)))
 
 
+def cmake_bracket_value(name: str) -> str:
+    prefix = f"set({name} [=[\n"
+    start = generator.find(prefix)
+    if start < 0:
+        raise ValueError(f"missing CMake bracket value: {name}")
+    start += len(prefix)
+    end = generator.find("\n]=])", start)
+    if end < 0:
+        raise ValueError(f"unterminated CMake bracket value: {name}")
+    return generator[start:end]
+
+
+transformed = main_cpp
+transforms_ok = True
+for anchor_name, replacement_name in (
+    ("_input_layout_anchor", "_input_layout_replacement"),
+    ("_master_layout_anchor", "_master_layout_replacement"),
+    ("_stream_title_anchor", "_stream_title_replacement"),
+    ("_ui_active_anchor", "_ui_active_replacement"),
+):
+    try:
+        anchor = cmake_bracket_value(anchor_name)
+        replacement = cmake_bracket_value(replacement_name)
+    except ValueError:
+        transforms_ok = False
+        continue
+    if transformed.count(anchor) != 1:
+        transforms_ok = False
+        continue
+    transformed = transformed.replace(anchor, replacement, 1)
+
 check(
     "CMake generates aligned production UI source",
     all(
@@ -30,10 +61,11 @@ check(
     'set(SC220_UI_SOURCE "${CMAKE_CURRENT_SOURCE_DIR}/live/SC220MainComponent.cpp")'
     in cmake,
 )
+check("all UI transformation anchors apply exactly once", transforms_ok)
 check(
     "one console grid owns all fader dimensions",
     all(
-        token in generator
+        token in transformed
         for token in (
             "sharedFaderTop",
             "sharedFaderBottom",
@@ -46,7 +78,7 @@ check(
 check(
     "SC220 PC and Stream meters share geometry",
     all(
-        token in generator
+        token in transformed
         for token in (
             "sc220Meter->setBounds",
             "pcMeter->setBounds",
@@ -58,7 +90,7 @@ check(
 check(
     "SC220 PC and Stream faders share geometry",
     all(
-        token in generator
+        token in transformed
         for token in (
             "sc220Fader.setBounds",
             "pcFader.setBounds",
@@ -70,23 +102,32 @@ check(
 check(
     "System Mix and Stream Output use same source row",
     all(
-        token in generator
+        token in transformed
         for token in (
             "pcSourceBox.setBounds",
             "outputBox.setBounds",
             "sourceSelectorY",
         )
     )
-    and generator.count("sourceSelectorY, 164, 34") >= 2,
+    and transformed.count("sourceSelectorY, 164, 34") >= 2,
+)
+check(
+    "old mismatched PC fader geometry is removed",
+    "pcStripArea.getY() + 214" not in transformed
+    and "pcStripArea.getHeight() - 300" not in transformed,
+)
+check(
+    "old bottom Stream Output selector is removed",
+    "masterArea.getBottom() - 108" not in transformed,
 )
 check(
     "Stream title follows output selector",
-    'g.drawText ("STREAM", outputBox.getX(), outputBox.getY() - 47' in generator,
+    'g.drawText ("STREAM", outputBox.getX(), outputBox.getY() - 47' in transformed,
 )
 check(
     "visual taps follow UI lifecycle",
     all(
-        token in generator
+        token in transformed
         for token in (
             "getVoiceEnhancerBridge().setVisualTapEnabled (active)",
             "getMusicEnhancerBridge().setVisualTapEnabled (active)",
@@ -119,7 +160,7 @@ check(
 check(
     "spectrum still consumes both live engine taps",
     all(
-        token in main_cpp
+        token in transformed
         for token in (
             "voiceTap.consumeLatest",
             "musicTap.consumeLatest",

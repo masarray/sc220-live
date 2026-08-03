@@ -225,6 +225,22 @@ else()
     FetchContent_MakeAvailable(JUCE)
 endif()
 
+add_executable(SC220ProgrammeAnalyzerAudit qa/ProgrammeAnalyzerAudit.cpp)
+target_include_directories(SC220ProgrammeAnalyzerAudit PRIVATE
+    "${ASKP_GENERATED_DIR}"
+    "${ASKP_PROCESSOR_DIR}"
+    "${ASKP_ENGINE_DIR}"
+)
+target_link_libraries(SC220ProgrammeAnalyzerAudit PRIVATE
+    juce::juce_audio_utils
+    juce::juce_dsp
+)
+target_compile_definitions(SC220ProgrammeAnalyzerAudit PRIVATE
+    JUCE_WEB_BROWSER=0
+    JUCE_USE_CURL=0
+)
+add_test(NAME SC220ProgrammeAnalyzerAudit COMMAND SC220ProgrammeAnalyzerAudit)
+
 # ---------------------------------------------------------------------------
 # Embedded UI assets
 # ---------------------------------------------------------------------------

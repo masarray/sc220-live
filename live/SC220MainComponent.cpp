@@ -320,6 +320,14 @@ public:
                                   capFace.getX() + 3.0f, capFace.getRight() - 3.0f);
         }
     }
+
+    int getSliderThumbRadius (juce::Slider& slider) override
+    {
+        if (slider.getSliderStyle() == juce::Slider::LinearVertical)
+            return 34;
+
+        return juce::LookAndFeel_V4::getSliderThumbRadius (slider);
+    }
 };
 
 class SC220MainComponent::StereoMeter final : public juce::Component
@@ -395,14 +403,24 @@ public:
             return;
         }
 
-        fftData.fill (0.0f);
+        leftFftData.fill (0.0f);
+        rightFftData.fill (0.0f);
         const int destinationStart = fftSize - count;
+        float capturedPeak = 0.0f;
         for (int i = 0; i < count; ++i)
-            fftData[static_cast<size_t> (destinationStart + i)] = 0.5f
-                * (left[static_cast<size_t> (i)] + right[static_cast<size_t> (i)]);
+        {
+            const auto leftSample = left[static_cast<size_t> (i)];
+            const auto rightSample = right[static_cast<size_t> (i)];
+            leftFftData[static_cast<size_t> (destinationStart + i)] = leftSample;
+            rightFftData[static_cast<size_t> (destinationStart + i)] = rightSample;
+            capturedPeak = juce::jmax (capturedPeak,
+                                       juce::jmax (std::abs (leftSample), std::abs (rightSample)));
+        }
 
-        window.multiplyWithWindowingTable (fftData.data(), fftSize);
-        fft.performFrequencyOnlyForwardTransform (fftData.data());
+        window.multiplyWithWindowingTable (leftFftData.data(), fftSize);
+        window.multiplyWithWindowingTable (rightFftData.data(), fftSize);
+        fft.performFrequencyOnlyForwardTransform (leftFftData.data());
+        fft.performFrequencyOnlyForwardTransform (rightFftData.data());
 
         constexpr float minFrequency = 20.0f;
         constexpr float maxFrequency = 20000.0f;
@@ -420,14 +438,19 @@ public:
 
             float magnitude = 0.0f;
             for (int bin = bin0; bin < bin1; ++bin)
-                magnitude = juce::jmax (magnitude, fftData[static_cast<size_t> (bin)]);
+            {
+                const auto leftMagnitude = leftFftData[static_cast<size_t> (bin)];
+                const auto rightMagnitude = rightFftData[static_cast<size_t> (bin)];
+                const auto stereoMagnitude = std::sqrt (0.5f
+                    * (leftMagnitude * leftMagnitude + rightMagnitude * rightMagnitude));
+                magnitude = juce::jmax (magnitude, stereoMagnitude);
+            }
 
             const float db = juce::Decibels::gainToDecibels (magnitude / static_cast<float> (fftSize), -96.0f);
             const float next = normaliseDb (db, -84.0f);
             smoothed[i] = next > smoothed[i] ? next : smoothed[i] * 0.86f + next * 0.14f;
         }
-        hasSignal = std::any_of (smoothed.begin(), smoothed.end(),
-                                 [] (float value) { return value > 0.015f; });
+        hasSignal = capturedPeak > juce::Decibels::decibelsToGain (-84.0f);
         repaint();
     }
 
@@ -507,7 +530,8 @@ private:
     static constexpr int fftSize = 1 << fftOrder;
     juce::dsp::FFT fft;
     juce::dsp::WindowingFunction<float> window;
-    std::array<float, fftSize * 2> fftData {};
+    std::array<float, fftSize * 2> leftFftData {};
+    std::array<float, fftSize * 2> rightFftData {};
     std::array<float, 32> smoothed {};
     bool hasSignal = false;
 };

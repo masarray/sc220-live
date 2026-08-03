@@ -372,6 +372,10 @@ sc220_polish_replace_once(_ui "post-master programme spectrum"
 foreach(_required_ui_token IN ITEMS
         "static constexpr int fftOrder = 10;"
         "std::array<float, 32> smoothed {};"
+        "std::array<float, fftSize * 2> leftFftData {};"
+        "std::array<float, fftSize * 2> rightFftData {};"
+        "getSliderThumbRadius"
+        "return 34;"
         "POST-MASTER ANALYZER"
         "audioEngine.programmeAnalyzerTap()")
     string(FIND "${_ui}" "${_required_ui_token}" _required_ui_position)

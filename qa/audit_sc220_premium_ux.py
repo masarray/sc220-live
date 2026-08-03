@@ -50,6 +50,12 @@ check("hardware controls match approved dot-calibrated metal surface", all(token
     "sliderPos - 34.0f, 40.0f, 68.0f",
     "const auto accentStart = endAngle - 0.38f",
 )))
+check("full-height fader caps remain inside their endpoint bounds", all(token in source for token in (
+    "getSliderThumbRadius",
+    "slider.getSliderStyle() == juce::Slider::LinearVertical",
+    "return 34;",
+    "sliderPos - 34.0f, 40.0f, 68.0f",
+)))
 check("macro controls preserve approved endpoint labels", all(token in source for token in (
     'g.drawText ("0%"',
     'g.drawText ("100%"',

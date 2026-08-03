@@ -16,6 +16,7 @@ LiveAudioEngine::LiveAudioEngine()
     deviceManager.addChangeListener (this);
     voiceEnhancerBridge.setVisualTapEnabled (false);
     musicEnhancerBridge.setVisualTapEnabled (false);
+    programmeAnalyzer.setEnabled (true);
 
     updateInputTrimRouting();
     updateOutputTrimRouting();

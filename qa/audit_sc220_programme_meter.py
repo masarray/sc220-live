@@ -25,6 +25,12 @@ check("analyzer is post limiter and 32-band message-thread FFT", all(token in en
     "std::array<float, 32> smoothed",
     "performFrequencyOnlyForwardTransform",
 )))
+check("stereo analyzer cannot cancel anti-phase programme", all(token in ui for token in (
+    "leftFftData",
+    "rightFftData",
+    "leftMagnitude * leftMagnitude + rightMagnitude * rightMagnitude",
+    "capturedPeak",
+)))
 check("integrated loudness uses 400 ms blocks with 75 percent overlap", all(token in meter for token in (
     "sampleRate * 0.100",
     "std::array<double, 4> segmentEnergy",

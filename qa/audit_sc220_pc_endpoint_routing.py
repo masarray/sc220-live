@@ -7,7 +7,9 @@ engine_h = (ROOT / "live/LiveAudioEngine.h").read_text(encoding="utf-8")
 generator = (ROOT / "cmake/GenerateSC220PcEndpointRouting.cmake").read_text(encoding="utf-8")
 state_generator = (ROOT / "cmake/GenerateSC220BroadcastState.cmake").read_text(encoding="utf-8")
 
-generated_root = ROOT / "generated" / "sc220-monitor"
+generated_root = ROOT / "build-sc220" / "generated" / "sc220-monitor"
+if not generated_root.exists():
+    generated_root = ROOT / "generated" / "sc220-monitor"
 generated_engine_path = generated_root / "LiveAudioEngine_Monitor.cpp"
 generated_ui_path = generated_root / "SC220MainComponent_Monitor.cpp"
 generated_app_path = generated_root / "LiveApplication_BroadcastState.cpp"
@@ -31,6 +33,19 @@ check(
         "getDeviceFriendlyName",
         "EndpointInfo",
     )),
+)
+check(
+    "Windows property-key definitions are available before endpoint keys",
+    "#include <propkeydef.h>" in source
+    and source.find("#include <propkeydef.h>")
+    < source.find("#include <functiondiscoverykeys_devpkey.h>"),
+)
+check(
+    "WRL ComPtr endpoints use explicit Get access before dereference",
+    "getDeviceId (*defaultEndpoint.Get())" in source
+    and "getDeviceId (*endpoint.Get())" in source
+    and "getDeviceFriendlyName (*endpoint.Get())" in source
+    and "getDeviceId (*defaultEndpoint)" not in source,
 )
 check(
     "SYSTEM DEFAULT and explicit endpoint selection are retained across restarts",

@@ -47,7 +47,6 @@ set(_input_layout_replacement [=[
     const int sharedFaderBottom = inputArea.getBottom() - 154;
     const int sharedFaderHeight = juce::jmax (190, sharedFaderBottom - sharedFaderTop);
     const int sourceSelectorY = sharedFaderTop - 78;
-    constexpr int sharedMeterWidth = 30;
     constexpr int sharedFaderWidth = 68;
 
     stereoButton.setBounds (sc220StripArea.getX() + 10, sourceSelectorY,
@@ -57,7 +56,7 @@ set(_input_layout_replacement [=[
     inputTrim.setBounds (sc220StripArea.getCentreX() - 42,
                          sourceSelectorY - 94, 84, 84);
     sc220Meter->setBounds (sc220StripArea.getX() + 18, sharedFaderTop,
-                           sharedMeterWidth, sharedFaderHeight);
+                           sc220StripArea.getWidth() - 36, sharedFaderHeight);
     sc220Fader.setBounds (sc220StripArea.getCentreX() - sharedFaderWidth / 2,
                           sharedFaderTop, sharedFaderWidth, sharedFaderHeight);
     sc220Mute.setBounds (sc220StripArea.getCentreX() - 36,
@@ -65,7 +64,7 @@ set(_input_layout_replacement [=[
 
     pcSourceBox.setBounds (pcStripArea.getCentreX() - 82, sourceSelectorY, 164, 34);
     pcMeter->setBounds (pcStripArea.getX() + 18, sharedFaderTop,
-                        sharedMeterWidth, sharedFaderHeight);
+                        pcStripArea.getWidth() - 36, sharedFaderHeight);
     pcFader.setBounds (pcStripArea.getCentreX() - sharedFaderWidth / 2,
                        sharedFaderTop, sharedFaderWidth, sharedFaderHeight);
     duckAmount.setBounds (pcStripArea.getX() + 24,

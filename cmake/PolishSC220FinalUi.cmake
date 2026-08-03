@@ -160,7 +160,7 @@ set(_master_layout_replacement [=[
     outputBox.setBounds (streamColumn.getCentreX() - selectorWidth / 2,
                          sourceSelectorY, selectorWidth, 36);
     streamMeter->setBounds (streamColumn.getX() + 5, sharedFaderTop,
-                            sharedMeterWidth, sharedFaderHeight);
+                            streamColumn.getWidth() - 10, sharedFaderHeight);
     streamFader.setBounds (streamColumn.getCentreX() - sharedFaderWidth / 2,
                            sharedFaderTop, sharedFaderWidth, sharedFaderHeight);
     streamMute.setBounds (streamColumn.getCentreX() - 36,
@@ -232,11 +232,45 @@ set(_stream_list_replacement [=[
     for (const auto& name : audioEngine.getOutputDeviceNames())
         if (name.containsIgnoreCase ("CABLE"))
             streamOutputs.add (name);
-    outputBox.addItemList (streamOutputs, 1);
+    for (int i = 0; i < streamOutputs.size(); ++i)
+        outputBox.addItem (i == 0 ? "VB-CABLE"
+                                  : "VB-CABLE " + juce::String (i + 1), i + 1);
     outputBox.setTextWhenNothingSelected ("SELECT VB-CABLE");
 ]=])
 sc220_polish_replace_once(_ui "VB-CABLE-only stream selector"
     "${_stream_list_anchor}" "${_stream_list_replacement}")
+
+set(_stream_change_anchor [=[
+    outputBox.onChange = [this]
+    {
+        if (outputBox.getSelectedItemIndex() < 0)
+            return;
+        const auto error = audioEngine.selectOutputDevice (outputBox.getText());
+        if (error.isNotEmpty())
+            juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::WarningIcon,
+                                                     "Output unavailable", error);
+    };
+]=])
+set(_stream_change_replacement [=[
+    outputBox.onChange = [this]
+    {
+        const int selectedIndex = outputBox.getSelectedItemIndex();
+        if (selectedIndex < 0)
+            return;
+        juce::StringArray streamOutputs;
+        for (const auto& name : audioEngine.getOutputDeviceNames())
+            if (name.containsIgnoreCase ("CABLE"))
+                streamOutputs.add (name);
+        if (! juce::isPositiveAndBelow (selectedIndex, streamOutputs.size()))
+            return;
+        const auto error = audioEngine.selectOutputDevice (streamOutputs[selectedIndex]);
+        if (error.isNotEmpty())
+            juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::WarningIcon,
+                                                     "Output unavailable", error);
+    };
+]=])
+sc220_polish_replace_once(_ui "short stream alias with real endpoint mapping"
+    "${_stream_change_anchor}" "${_stream_change_replacement}")
 
 set(_stream_refresh_anchor [=[
     const auto outputIndex = audioEngine.getOutputDeviceNames().indexOf (status.outputDevice);
@@ -244,10 +278,11 @@ set(_stream_refresh_anchor [=[
         outputBox.setSelectedItemIndex (outputIndex, juce::dontSendNotification);
 ]=])
 set(_stream_refresh_replacement [=[
-    int outputIndex = -1;
-    for (int i = 0; i < outputBox.getNumItems(); ++i)
-        if (outputBox.getItemText (i).equalsIgnoreCase (status.outputDevice))
-            outputIndex = i;
+    juce::StringArray streamOutputs;
+    for (const auto& name : audioEngine.getOutputDeviceNames())
+        if (name.containsIgnoreCase ("CABLE"))
+            streamOutputs.add (name);
+    const int outputIndex = streamOutputs.indexOf (status.outputDevice);
     if (outputIndex >= 0)
         outputBox.setSelectedItemIndex (outputIndex, juce::dontSendNotification);
     else

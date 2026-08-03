@@ -8,7 +8,9 @@ state = (ROOT / "cmake/GenerateSC220BroadcastState.cmake").read_text(encoding="u
 polish = (ROOT / "cmake/PolishSC220FinalUi.cmake").read_text(encoding="utf-8")
 main_cpp = (ROOT / "live/SC220MainComponent.cpp").read_text(encoding="utf-8")
 
-generated_root = ROOT / "generated" / "sc220-monitor"
+generated_root = ROOT / "build-sc220" / "generated" / "sc220-monitor"
+if not generated_root.exists():
+    generated_root = ROOT / "generated" / "sc220-monitor"
 generated_ui_path = generated_root / "SC220MainComponent_Monitor.cpp"
 generated_engine_path = generated_root / "LiveAudioEngine_Monitor.cpp"
 generated_ui = (
@@ -70,7 +72,6 @@ check(
             "sharedFaderTop",
             "sharedFaderBottom",
             "sharedFaderHeight",
-            "sharedMeterWidth",
             "sharedFaderWidth",
             "sc220Meter->setBounds",
             "pcMeter->setBounds",
@@ -80,6 +81,13 @@ check(
             "streamFader.setBounds",
         )
     ),
+)
+check(
+    "stereo meters symmetrically flank all three faders",
+    "sc220StripArea.getWidth() - 36" in generated_ui
+    and "pcStripArea.getWidth() - 36" in generated_ui
+    and "streamColumn.getWidth() - 10" in generated_ui
+    and "setInterceptsMouseClicks (false, false)" in generated_ui,
 )
 check(
     "vertical console grid scales from 720 to 900 pixels",
@@ -137,7 +145,8 @@ check(
     "Stream selector only lists virtual-cable endpoints",
     "juce::StringArray streamOutputs" in generated_ui
     and 'name.containsIgnoreCase ("CABLE")' in generated_ui
-    and 'outputBox.addItemList (streamOutputs, 1)' in generated_ui,
+    and 'outputBox.addItem (i == 0 ? "VB-CABLE"' in generated_ui
+    and "audioEngine.selectOutputDevice (streamOutputs[selectedIndex])" in generated_ui,
 )
 check(
     "legacy physical Stream selection is recovered to VB-CABLE",

@@ -7,6 +7,7 @@
 #if JUCE_WINDOWS
  #include <Windows.h>
  #include <audioclient.h>
+ #include <propkeydef.h>
  #include <functiondiscoverykeys_devpkey.h>
  #include <ksmedia.h>
  #include <mmdeviceapi.h>
@@ -198,7 +199,7 @@ PcAudioLoopbackCapture::availableEndpoints()
     if (SUCCEEDED (enumerator->GetDefaultAudioEndpoint (eRender, eConsole,
                                                         defaultEndpoint.GetAddressOf()))
         && defaultEndpoint != nullptr)
-        defaultId = getDeviceId (*defaultEndpoint);
+        defaultId = getDeviceId (*defaultEndpoint.Get());
 
     ComPtr<IMMDeviceCollection> collection;
     if (FAILED (enumerator->EnumAudioEndpoints (eRender, DEVICE_STATE_ACTIVE,
@@ -216,8 +217,8 @@ PcAudioLoopbackCapture::availableEndpoints()
             continue;
 
         EndpointInfo info;
-        info.id = getDeviceId (*endpoint);
-        info.name = getDeviceFriendlyName (*endpoint);
+        info.id = getDeviceId (*endpoint.Get());
+        info.name = getDeviceFriendlyName (*endpoint.Get());
         if (info.name.isEmpty())
             info.name = info.id;
         info.isDefault = info.id.isNotEmpty() && info.id == defaultId;
@@ -475,8 +476,8 @@ void PcAudioLoopbackCapture::run()
 
     if (SUCCEEDED (hr) && endpoint != nullptr)
     {
-        const auto endpointId = getDeviceId (*endpoint);
-        auto endpointName = getDeviceFriendlyName (*endpoint);
+        const auto endpointId = getDeviceId (*endpoint.Get());
+        auto endpointName = getDeviceFriendlyName (*endpoint.Get());
         if (endpointName.isEmpty())
             endpointName = endpointId;
         const juce::ScopedLock lock (endpointLock);

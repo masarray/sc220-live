@@ -38,7 +38,19 @@ check("spectrum consumes real voice and music taps", all(token in source for tok
 check("voice and music visual taps are enabled", all(token in source for token in (
     "getVoiceEnhancerBridge().setVisualTapEnabled (true)",
     "getMusicEnhancerBridge().setVisualTapEnabled (true)")))
-check("main surface requests Inter typography", 'font.setTypefaceName ("Inter")' in source)
+check("main surface uses native Windows premium typography", 'font.setTypefaceName ("Segoe UI Variable")' in source)
+check("hardware controls use calibrated ticks and metal layers", all(token in source for token in (
+    "for (int i = 0; i <= 20; ++i)",
+    "palette::metalHi",
+    "palette::metalMid",
+    "drawFaderScale",
+    "capGradient.addColour",
+)))
+check("SC220 device art uses a focused source crop", all(token in source for token in (
+    "const int sourceY",
+    "const int sourceWidth",
+    "g.drawImage (sc220Image",
+)))
 check("free-days button removed from main surface", all(token not in header + source for token in (
     "licenseButton", "FREE 365 DAYS")))
 check("license remains available from Settings", all(token in source for token in (

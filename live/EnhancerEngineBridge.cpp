@@ -28,17 +28,32 @@ void EnhancerEngineBridge::prepare (double sampleRate, int maximumBlockSize)
 {
     processor_.setRateAndBufferSizeDetails (sampleRate, maximumBlockSize);
     processor_.prepareToPlay (sampleRate, maximumBlockSize);
+    processor_.scopeTap.setEnabled (false);
 }
 
 void EnhancerEngineBridge::release()
 {
+    processor_.scopeTap.setEnabled (false);
     processor_.releaseResources();
 }
 
 void EnhancerEngineBridge::process (juce::AudioBuffer<float>& audio,
                                     juce::MidiBuffer& midi)
 {
+    // Prevent the embedded plugin/editor publisher from owning the live-app
+    // analyzer contract. SC220 Live publishes exactly one post-DSP block below.
+    processor_.scopeTap.setEnabled (false);
     processor_.processBlock (audio, midi);
+
+    if (! visualTapEnabled_.load (std::memory_order_acquire)
+        || audio.getNumChannels() <= 0
+        || audio.getNumSamples() <= 0)
+        return;
+
+    const auto* left = audio.getReadPointer (0);
+    const auto* right = audio.getNumChannels() > 1 ? audio.getReadPointer (1) : left;
+    processor_.scopeTap.setEnabled (true);
+    processor_.scopeTap.push (left, right, audio.getNumSamples());
 }
 
 void EnhancerEngineBridge::setInputGainDb (float valueDb) noexcept

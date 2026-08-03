@@ -1,6 +1,7 @@
 #pragma once
 
 #include "LiveAudioEngine.h"
+#include "LiveIcons.h"
 #include "LiveLicensePanel.h"
 
 #include <juce_gui_extra/juce_gui_extra.h>
@@ -28,6 +29,10 @@ public:
 
     void paint (juce::Graphics&) override;
     void resized() override;
+    void mouseDown (const juce::MouseEvent&) override;
+    void mouseDrag (const juce::MouseEvent&) override;
+    void mouseUp (const juce::MouseEvent&) override;
+    void mouseDoubleClick (const juce::MouseEvent&) override;
 
     void setUiActive (bool active);
     void refreshAllControls();
@@ -35,17 +40,20 @@ public:
 private:
     class SurfaceLookAndFeel;
     class StereoMeter;
-    class SignatureDisplay;
+    class LiveSpectrumDisplay;
     class LoudnessDisplay;
 
     void timerCallback() override;
     void configureControls();
+    void showSettingsMenu();
     void showAudioSettings();
     void drawHeader (juce::Graphics&);
     void drawInputSurface (juce::Graphics&);
     void drawSignatureSurface (juce::Graphics&);
     void drawMasterSurface (juce::Graphics&);
     void drawFooter (juce::Graphics&);
+    bool headerDragAllowedAt (juce::Point<int>) const noexcept;
+    static bool looksLikeSc220Input (const juce::String& name) noexcept;
 
     LiveAudioEngine& audioEngine;
     WindowActions windowActions;
@@ -54,11 +62,11 @@ private:
     juce::Image recordingTechLogo;
     juce::Image sc220Image;
 
-    juce::TextButton minimiseButton { "-" };
-    juce::TextButton maximiseButton { "[]" };
-    juce::TextButton closeButton { "X" };
-    juce::TextButton settingsButton { "SETTINGS" };
-    juce::TextButton licenseButton { "FREE 365 DAYS" };
+    LucideIconButton minimiseButton { "Minimise", "minimize_2_svg", juce::Colours::white };
+    LucideIconButton maximiseButton { "Maximise", "maximize_2_svg", juce::Colours::white };
+    LucideIconButton closeButton { "Close", "x_svg", juce::Colours::white };
+    LucideIconButton settingsButton { "Settings", "settings_svg", juce::Colours::white };
+    LucideIconButton enhancerPowerButton { "Smart Enhancer", "power_svg", juce::Colours::white };
     juce::TextButton goLiveButton { "GO LIVE" };
 
     juce::ComboBox presetBox;
@@ -77,12 +85,11 @@ private:
 
     juce::TextButton sc220Mute { "MUTE" };
     juce::TextButton streamMute { "MUTE" };
-    juce::TextButton detailsButton { "DETAILS" };
 
     std::unique_ptr<StereoMeter> sc220Meter;
     std::unique_ptr<StereoMeter> pcMeter;
     std::unique_ptr<StereoMeter> streamMeter;
-    std::unique_ptr<SignatureDisplay> signatureDisplay;
+    std::unique_ptr<LiveSpectrumDisplay> spectrumDisplay;
     std::unique_ptr<LoudnessDisplay> loudnessDisplay;
     std::unique_ptr<LiveLicensePanel> licensePanel;
 
@@ -94,6 +101,8 @@ private:
     juce::Rectangle<int> sc220StripArea;
     juce::Rectangle<int> pcStripArea;
 
+    juce::ComponentDragger windowDragger;
+    bool draggingWindow = false;
     LiveAudioEngine::Status lastStatus;
     bool uiActive = true;
 

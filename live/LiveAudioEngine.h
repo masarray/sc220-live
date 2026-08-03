@@ -47,6 +47,7 @@ public:
         float duckGainDb = 0.0f;
         float loudnessLufs = -120.0f;
         bool pcLoopbackRunning = false;
+        bool pcAudioLoopBlocked = false;
         int pcUnderflows = 0;
         int pcOverflows = 0;
         bool monitorRunning = false;
@@ -61,6 +62,9 @@ public:
         int musicDspLatencySamples = 0;
         juce::String inputDevice;
         juce::String outputDevice;
+        juce::String pcAudioDevice;
+        juce::String pcAudioEndpointId;
+        juce::String pcAudioError;
         juce::String monitorDevice;
         juce::String monitorError;
         juce::String lastError;
@@ -86,12 +90,15 @@ public:
     juce::StringArray getInputDeviceNames();
     juce::StringArray getOutputDeviceNames();
     juce::StringArray getMonitorOutputDeviceNames();
+    juce::StringArray getPcAudioEndpointNames();
     juce::Array<double> getAvailableSampleRates() const;
     juce::Array<int> getAvailableBufferSizes() const;
 
     juce::String selectInputDevice (const juce::String& name);
     juce::String selectOutputDevice (const juce::String& name);
     juce::String selectMonitorOutputDevice (const juce::String& name);
+    juce::String selectPcAudioEndpoint (const juce::String& name);
+    juce::String getPcAudioEndpointName() const;
     juce::String setSampleRate (double value);
     juce::String setBufferSize (int value);
     void setInputChannelMode (int channels) noexcept { inputChannelMode.store (channels <= 1 ? 1 : 2); }
@@ -244,6 +251,7 @@ private:
     std::atomic<bool> pcAudioEnabled { true };
     std::atomic<float> pcAudioGainDb { -10.0f };
     std::atomic<bool> pcAudioMuted { false };
+    std::atomic<bool> pcAudioLoopBlocked { false };
     std::atomic<bool> duckingEnabled { true };
     std::atomic<float> duckingDepthDb { -12.0f };
     std::atomic<float> duckGainDb { 0.0f };
@@ -278,6 +286,7 @@ private:
     mutable juce::CriticalSection statusLock;
     juce::String currentInputName;
     juce::String currentOutputName;
+    juce::String pcAudioRoutingError;
     juce::String lastError;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (LiveAudioEngine)

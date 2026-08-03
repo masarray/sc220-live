@@ -153,8 +153,8 @@ file(MAKE_DIRECTORY "${_generated_directory}")
 file(WRITE "${SC220_UI_GENERATED_SOURCE}" "${_sc220_ui_source}")
 message(STATUS "SC220 Live aligned UI source: ${SC220_UI_GENERATED_SOURCE}")
 
-# Generate both final sources in normal configure and in CI script mode. Target
-# mutation commands are guarded because they are not legal under cmake -P.
+# Generate final sources in normal configure and CI script mode. Target mutation
+# commands are guarded because they are not legal under cmake -P.
 set(SC220_ENGINE_SOURCE "${CMAKE_CURRENT_SOURCE_DIR}/live/LiveAudioEngine.cpp")
 set(SC220_ENGINE_GENERATED_SOURCE
     "${CMAKE_CURRENT_BINARY_DIR}/generated/sc220-monitor/LiveAudioEngine_Monitor.cpp")
@@ -165,11 +165,18 @@ set(SC220_UI_MONITOR_GENERATED_SOURCE
     "${CMAKE_CURRENT_BINARY_DIR}/generated/sc220-monitor/SC220MainComponent_Monitor.cpp")
 include("${CMAKE_CURRENT_SOURCE_DIR}/cmake/GenerateSC220MonitorUi.cmake")
 
+set(SC220_APP_SOURCE "${CMAKE_CURRENT_SOURCE_DIR}/live/LiveApplication.cpp")
+set(SC220_APP_GENERATED_SOURCE
+    "${CMAKE_CURRENT_BINARY_DIR}/generated/sc220-monitor/LiveApplication_BroadcastState.cpp")
+include("${CMAKE_CURRENT_SOURCE_DIR}/cmake/GenerateSC220BroadcastState.cmake")
+
 if(NOT CMAKE_SCRIPT_MODE_FILE)
     set_source_files_properties("${SC220_ENGINE_SOURCE}" PROPERTIES HEADER_FILE_ONLY TRUE)
     set_source_files_properties("${SC220_UI_GENERATED_SOURCE}" PROPERTIES HEADER_FILE_ONLY TRUE)
+    set_source_files_properties("${SC220_APP_SOURCE}" PROPERTIES HEADER_FILE_ONLY TRUE)
     target_sources(SC220Live PRIVATE
         "${SC220_ENGINE_GENERATED_SOURCE}"
         "${CMAKE_CURRENT_SOURCE_DIR}/live/MonitorOutputClient.cpp"
-        "${SC220_UI_MONITOR_GENERATED_SOURCE}")
+        "${SC220_UI_MONITOR_GENERATED_SOURCE}"
+        "${SC220_APP_GENERATED_SOURCE}")
 endif()

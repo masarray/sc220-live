@@ -4,6 +4,8 @@
 
 #include <juce_audio_basics/juce_audio_basics.h>
 
+#include <atomic>
+
 namespace askp::live {
 
 // Stable boundary between the standalone live rack and the embedded
@@ -75,9 +77,13 @@ public:
 
     MeterSnapshot meters() const noexcept;
 
+    // The bridge owns visual publication instead of relying on the embedded
+    // plugin editor path. process() disables the internal publisher and pushes
+    // the actual post-Signature block exactly once after DSP has completed.
     void setVisualTapEnabled (bool enabled) noexcept
     {
-        processor_.scopeTap.setEnabled (enabled);
+        visualTapEnabled_.store (enabled, std::memory_order_release);
+        processor_.scopeTap.setEnabled (false);
     }
 
     askp::Processor& processor() noexcept { return processor_; }
@@ -88,6 +94,7 @@ private:
     float getParameter (const char* parameterId, float fallback = 0.0f) const noexcept;
 
     askp::Processor processor_;
+    std::atomic<bool> visualTapEnabled_ { false };
 };
 
 } // namespace askp::live

@@ -14,7 +14,8 @@ float dbFromPeak (float peak) noexcept
 LiveAudioEngine::LiveAudioEngine()
 {
     deviceManager.addChangeListener (this);
-    enhancerBridge.setVisualTapEnabled (false);
+    voiceEnhancerBridge.setVisualTapEnabled (false);
+    musicEnhancerBridge.setVisualTapEnabled (false);
 
     updateInputTrimRouting();
     updateOutputTrimRouting();
@@ -61,7 +62,8 @@ void LiveAudioEngine::shutdown()
     if (callbackRegistered.exchange (false))
         deviceManager.removeAudioCallback (this);
     deviceManager.closeAudioDevice();
-    enhancerBridge.release();
+    voiceEnhancerBridge.release();
+    musicEnhancerBridge.release();
     running.store (false);
     deviceOpen.store (false);
 }
@@ -126,9 +128,6 @@ juce::String LiveAudioEngine::applyDeviceSelection (const juce::String* inputNam
     if (outputName != nullptr)
         requested.outputDeviceName = outputName->trim();
 
-    // Let each newly selected endpoint expose its normal channel mask. Keeping
-    // a stale BigInteger from the previous device is a common reason a valid
-    // Windows/WASAPI selection needs several attempts before it opens.
     requested.useDefaultInputChannels = true;
     requested.useDefaultOutputChannels = true;
 
@@ -153,7 +152,6 @@ juce::String LiveAudioEngine::applyDeviceSelection (const juce::String* inputNam
         return juce::String ("The audio backend did not keep the requested device selection.");
     };
 
-    // First preserve the user's current latency settings.
     auto firstError = trySetup (requested);
     if (firstError.isEmpty())
     {
@@ -162,9 +160,6 @@ juce::String LiveAudioEngine::applyDeviceSelection (const juce::String* inputNam
         return {};
     }
 
-    // A new input/output pair may not support the previous pair's exact sample
-    // rate or buffer size. Zero asks JUCE/WASAPI to negotiate compatible values
-    // in one transaction instead of requiring repeated manual selections.
     auto automatic = requested;
     automatic.sampleRate = 0.0;
     automatic.bufferSize = 0;
@@ -176,9 +171,6 @@ juce::String LiveAudioEngine::applyDeviceSelection (const juce::String* inputNam
         return {};
     }
 
-    // Some Windows drivers retain a busy endpoint until the old device is
-    // explicitly closed. Reopen once with automatic timing, then roll back if
-    // the requested pair still cannot be established.
     deviceManager.closeAudioDevice();
     auto reopenError = trySetup (automatic);
     if (reopenError.isEmpty())
@@ -271,9 +263,22 @@ void LiveAudioEngine::setDuckingDepthDb (float value) noexcept
 
 void LiveAudioEngine::setBypassed (bool value) noexcept
 {
+    setVoiceEnhancerBypassed (value);
+    setMusicEnhancerBypassed (value);
+}
+
+void LiveAudioEngine::setVoiceEnhancerBypassed (bool value) noexcept
+{
     if (! fullFeaturesAllowed()) return;
-    enhancerBypassed.store (value);
-    enhancerBridge.setBypassed (value);
+    voiceEnhancerBypassed.store (value);
+    voiceEnhancerBridge.setBypassed (value);
+}
+
+void LiveAudioEngine::setMusicEnhancerBypassed (bool value) noexcept
+{
+    if (! fullFeaturesAllowed()) return;
+    musicEnhancerBypassed.store (value);
+    musicEnhancerBridge.setBypassed (value);
 }
 
 void LiveAudioEngine::restartAudio()
@@ -291,10 +296,6 @@ void LiveAudioEngine::restartAudio()
 
 void LiveAudioEngine::applyVstReferenceConditions() noexcept
 {
-    // Manual A/B reference: remove every Live-only tonal/dynamics stage while
-    // leaving the authoritative askp::Processor active at unity I/O gain.
-    // MusicalNoiseClean still maintains its fixed latency line when disabled,
-    // so comparisons must align by the latency value reported in the footer.
     noiseClean.setEnabled (false);
     expander.setEnabled (false);
     setInputChannelMode (2);
@@ -304,36 +305,38 @@ void LiveAudioEngine::applyVstReferenceConditions() noexcept
     setOutputTrimBypassed (false);
     setEngineEnabled (true);
     setBypassed (false);
-    enhancerBridge.setGainMatchEnabled (false);
+    voiceEnhancerBridge.setGainMatchEnabled (false);
+    musicEnhancerBridge.setGainMatchEnabled (false);
     setOutputMuted (false);
 }
 
-void LiveAudioEngine::setPresetIndex (int index)
-{
-    enhancerBridge.setPresetIndex (index);
-}
+void LiveAudioEngine::setPresetIndex (int index)                 { voiceEnhancerBridge.setPresetIndex (index); }
+int LiveAudioEngine::getPresetIndex() const noexcept             { return voiceEnhancerBridge.presetIndex(); }
+juce::StringArray LiveAudioEngine::getPresetNames() const        { return voiceEnhancerBridge.presetNames(); }
+void LiveAudioEngine::setEnhance (float value) noexcept          { voiceEnhancerBridge.setEnhance (value); }
+void LiveAudioEngine::setSmartBass (float value) noexcept        { voiceEnhancerBridge.setSmartBass (value); }
+void LiveAudioEngine::setSmartTreble (float value) noexcept      { voiceEnhancerBridge.setSmartTreble (value); }
+void LiveAudioEngine::setVocalBody (float value) noexcept        { voiceEnhancerBridge.setVocalBody (value); }
+void LiveAudioEngine::setStereoMagic (float value) noexcept      { voiceEnhancerBridge.setStereoMagic (value); }
+float LiveAudioEngine::getEnhance() const noexcept               { return voiceEnhancerBridge.enhance(); }
+float LiveAudioEngine::getSmartBass() const noexcept             { return voiceEnhancerBridge.smartBass(); }
+float LiveAudioEngine::getSmartTreble() const noexcept           { return voiceEnhancerBridge.smartTreble(); }
+float LiveAudioEngine::getVocalBody() const noexcept             { return voiceEnhancerBridge.vocalBody(); }
+float LiveAudioEngine::getStereoMagic() const noexcept           { return voiceEnhancerBridge.stereoMagic(); }
 
-int LiveAudioEngine::getPresetIndex() const noexcept
-{
-    return enhancerBridge.presetIndex();
-}
-
-juce::StringArray LiveAudioEngine::getPresetNames() const
-{
-    return enhancerBridge.presetNames();
-}
-
-void LiveAudioEngine::setEnhance (float value) noexcept     { enhancerBridge.setEnhance (value); }
-void LiveAudioEngine::setSmartBass (float value) noexcept   { enhancerBridge.setSmartBass (value); }
-void LiveAudioEngine::setSmartTreble (float value) noexcept { enhancerBridge.setSmartTreble (value); }
-void LiveAudioEngine::setVocalBody (float value) noexcept   { enhancerBridge.setVocalBody (value); }
-void LiveAudioEngine::setStereoMagic (float value) noexcept { enhancerBridge.setStereoMagic (value); }
-
-float LiveAudioEngine::getEnhance() const noexcept      { return enhancerBridge.enhance(); }
-float LiveAudioEngine::getSmartBass() const noexcept    { return enhancerBridge.smartBass(); }
-float LiveAudioEngine::getSmartTreble() const noexcept  { return enhancerBridge.smartTreble(); }
-float LiveAudioEngine::getVocalBody() const noexcept    { return enhancerBridge.vocalBody(); }
-float LiveAudioEngine::getStereoMagic() const noexcept  { return enhancerBridge.stereoMagic(); }
+void LiveAudioEngine::setMusicPresetIndex (int index)            { musicEnhancerBridge.setPresetIndex (index); }
+int LiveAudioEngine::getMusicPresetIndex() const noexcept        { return musicEnhancerBridge.presetIndex(); }
+juce::StringArray LiveAudioEngine::getMusicPresetNames() const   { return musicEnhancerBridge.presetNames(); }
+void LiveAudioEngine::setMusicEnhance (float value) noexcept     { musicEnhancerBridge.setEnhance (value); }
+void LiveAudioEngine::setMusicSmartBass (float value) noexcept   { musicEnhancerBridge.setSmartBass (value); }
+void LiveAudioEngine::setMusicSmartTreble (float value) noexcept { musicEnhancerBridge.setSmartTreble (value); }
+void LiveAudioEngine::setMusicVocalBody (float value) noexcept   { musicEnhancerBridge.setVocalBody (value); }
+void LiveAudioEngine::setMusicStereoMagic (float value) noexcept { musicEnhancerBridge.setStereoMagic (value); }
+float LiveAudioEngine::getMusicEnhance() const noexcept          { return musicEnhancerBridge.enhance(); }
+float LiveAudioEngine::getMusicSmartBass() const noexcept        { return musicEnhancerBridge.smartBass(); }
+float LiveAudioEngine::getMusicSmartTreble() const noexcept      { return musicEnhancerBridge.smartTreble(); }
+float LiveAudioEngine::getMusicVocalBody() const noexcept        { return musicEnhancerBridge.vocalBody(); }
+float LiveAudioEngine::getMusicStereoMagic() const noexcept      { return musicEnhancerBridge.stereoMagic(); }
 
 LiveAudioEngine::Status LiveAudioEngine::getStatus() const
 {
@@ -352,6 +355,9 @@ LiveAudioEngine::Status LiveAudioEngine::getStatus() const
     status.outputPeakDbL = outputPeakL.load();
     status.outputPeakDbR = outputPeakR.load();
     status.gainReductionDb = gainReduction.load();
+    status.voiceGainReductionDb = voiceGainReduction.load();
+    status.musicGainReductionDb = musicGainReduction.load();
+    status.masterGainReductionDb = masterGainReduction.load();
     status.expanderReductionDb = expander.getGainReductionDb();
     status.duckGainDb = duckGainDb.load();
     status.loudnessLufs = loudnessLufs.load();
@@ -360,6 +366,8 @@ LiveAudioEngine::Status LiveAudioEngine::getStatus() const
     status.pcOverflows = pcLoopback.overflows();
     status.dropouts = dropoutCount.load();
     status.totalLatencySamples = totalLatencySamples.load();
+    status.voiceLatencySamples = voiceLatencySamples.load();
+    status.musicDspLatencySamples = musicDspLatencySamples.load();
 
     const juce::ScopedLock lock (statusLock);
     status.inputDevice = currentInputName;
@@ -385,69 +393,85 @@ void LiveAudioEngine::audioDeviceIOCallbackWithContext (
         return;
 
     constexpr int processingChannels = 2;
-    if (processBuffer.getNumSamples() < numSamples || processBuffer.getNumChannels() < processingChannels)
+    if (processBuffer.getNumSamples() < numSamples
+        || detectorBuffer.getNumSamples() < numSamples
+        || pcAudioBuffer.getNumSamples() < numSamples)
     {
         ++dropoutCount;
         return;
     }
 
-    const bool dualMonoInput = inputChannelMode.load() == 1;
+    juce::AudioBuffer<float> voiceBlock (processBuffer.getArrayOfWritePointers(),
+                                         processingChannels, numSamples);
+    juce::AudioBuffer<float> detectorBlock (detectorBuffer.getArrayOfWritePointers(),
+                                            processingChannels, numSamples);
+    juce::AudioBuffer<float> musicBlock (pcAudioBuffer.getArrayOfWritePointers(),
+                                         processingChannels, numSamples);
+
+    // Stereo keeps channels 1/2 as L/R. Dual Mono also preserves channels 1/2;
+    // its independent per-channel faders/pan are a UI/transport follow-up. The
+    // previous implementation incorrectly duplicated channel 1 and discarded 2.
     for (int channel = 0; channel < processingChannels; ++channel)
     {
-        const int sourceChannel = dualMonoInput ? 0
-                                                : juce::jmin (channel, juce::jmax (0, numInputChannels - 1));
+        const int sourceChannel = juce::jmin (channel, juce::jmax (0, numInputChannels - 1));
         if (numInputChannels > 0 && inputChannelData[sourceChannel] != nullptr)
-            processBuffer.copyFrom (channel, 0, inputChannelData[sourceChannel], numSamples);
+            voiceBlock.copyFrom (channel, 0, inputChannelData[sourceChannel], numSamples);
         else
-            processBuffer.clear (channel, 0, numSamples);
+            voiceBlock.clear (channel, 0, numSamples);
     }
 
-    const float inputTargetDb = inputTrimBypassed.load() ? 0.0f
-                                                        : juce::jmin (0.0f, inputTrimDb.load() + 12.0f);
+    // SC220 trim is now entirely local to the voice lane. It can no longer
+    // change the PC Music level through the shared ASK-P input parameter.
+    const float inputTargetDb = inputTrimBypassed.load() ? 0.0f : inputTrimDb.load();
     inputGainLinear.setTargetValue (juce::Decibels::decibelsToGain (inputTargetDb));
     const float inputStart = inputGainLinear.getCurrentValue();
     const float inputEnd = inputGainLinear.skip (numSamples);
-    if (std::abs (inputStart - 1.0f) > 0.00001f || std::abs (inputEnd - 1.0f) > 0.00001f)
-        processBuffer.applyGainRamp (0, numSamples, inputStart, inputEnd);
+    voiceBlock.applyGainRamp (0, numSamples, inputStart, inputEnd);
 
-    noiseClean.process (processBuffer);
-
+    noiseClean.process (voiceBlock);
     for (int channel = 0; channel < processingChannels; ++channel)
-        detectorBuffer.copyFrom (channel, 0, processBuffer, channel, 0, numSamples);
+        detectorBlock.copyFrom (channel, 0, voiceBlock, channel, 0, numSamples);
 
     float sc220PeakL = 0.0f;
     float sc220PeakR = 0.0f;
     for (int sample = 0; sample < numSamples; ++sample)
     {
-        sc220PeakL = juce::jmax (sc220PeakL, std::abs (detectorBuffer.getSample (0, sample)));
-        sc220PeakR = juce::jmax (sc220PeakR, std::abs (detectorBuffer.getSample (1, sample)));
+        sc220PeakL = juce::jmax (sc220PeakL, std::abs (detectorBlock.getSample (0, sample)));
+        sc220PeakR = juce::jmax (sc220PeakR, std::abs (detectorBlock.getSample (1, sample)));
     }
     const float meterReleaseDb = static_cast<float> (26.0 * static_cast<double> (numSamples)
                                                      / juce::jmax (1.0, currentSampleRate.load()));
     inputPeakL.store (juce::jmax (dbFromPeak (sc220PeakL), inputPeakL.load() - meterReleaseDb));
     inputPeakR.store (juce::jmax (dbFromPeak (sc220PeakR), inputPeakR.load() - meterReleaseDb));
 
-    // Source conditioning remains confined to the SC220 lane. Program audio
-    // must not be gated or denoised before the two sources meet at the final
-    // ASK-P Signature bus.
     expander.setNoiseFloorDb (noiseClean.hasProfile()
                               ? noiseClean.getEstimatedNoiseFloorDb()
                               : -72.0f);
-    expander.process (processBuffer, detectorBuffer);
+    expander.process (voiceBlock, detectorBlock);
+
+    voiceMidi.clear();
+    voiceEnhancerBridge.process (voiceBlock, voiceMidi);
 
     sc220MixGainLinear.setTargetValue (juce::Decibels::decibelsToGain (sc220FaderDb.load()));
     const float sc220MuteGain = sc220Muted.load() ? 0.0f : 1.0f;
     const float sc220GainStart = sc220MixGainLinear.getCurrentValue() * sc220MuteGain;
     const float sc220GainEnd = sc220MixGainLinear.skip (numSamples) * sc220MuteGain;
-    processBuffer.applyGainRamp (0, numSamples, sc220GainStart, sc220GainEnd);
+    voiceBlock.applyGainRamp (0, numSamples, sc220GainStart, sc220GainEnd);
 
-    pcLoopback.read (pcAudioBuffer, numSamples);
+    pcLoopback.read (musicBlock, numSamples);
     if (! pcAudioEnabled.load() || pcAudioMuted.load())
     {
-        pcAudioBuffer.clear();
+        musicBlock.clear();
+        duckGainLinear = 1.0f;
+        duckGainDb.store (0.0f);
     }
     else
     {
+        // Program audio receives its own ASK-P Signature pass before ducking,
+        // so its bass/detail/stereo character remains stable while voice talks.
+        musicMidi.clear();
+        musicEnhancerBridge.process (musicBlock, musicMidi);
+
         const float keyPeak = juce::jmax (sc220PeakL, sc220PeakR);
         const bool voicePresent = dbFromPeak (keyPeak) > -36.0f;
         const float targetDuck = duckingEnabled.load() && voicePresent
@@ -462,31 +486,34 @@ void LiveAudioEngine::audioDeviceIOCallbackWithContext (
         pcGainLinear.setTargetValue (juce::Decibels::decibelsToGain (pcAudioGainDb.load()));
         const float pcGainStart = pcGainLinear.getCurrentValue() * duckGainLinear;
         const float pcGainEnd = pcGainLinear.skip (numSamples) * nextDuck;
-        pcAudioBuffer.applyGainRamp (0, numSamples, pcGainStart, pcGainEnd);
+        musicBlock.applyGainRamp (0, numSamples, pcGainStart, pcGainEnd);
         duckGainLinear = nextDuck;
         duckGainDb.store (juce::Decibels::gainToDecibels (juce::jmax (nextDuck, 1.0e-6f), -120.0f));
     }
 
     for (int channel = 0; channel < processingChannels; ++channel)
-        processBuffer.addFrom (channel, 0, pcAudioBuffer, channel, 0, numSamples);
+        voiceBlock.addFrom (channel, 0, musicBlock, channel, 0, numSamples);
 
-    emptyMidi.clear();
-    enhancerBridge.process (processBuffer, emptyMidi);
-
-    const float outputTargetDb = outputTrimBypassed.load() ? 0.0f
-                                                          : juce::jmin (0.0f, outputTrimDb.load() + 12.0f);
+    // Output trim is a master-bus control. The protected mix is then caught by
+    // a final -1 dB limiter rather than sending two independently safe lanes to
+    // VB-CABLE without sum protection.
+    const float outputTargetDb = outputTrimBypassed.load() ? 0.0f : outputTrimDb.load();
     outputGainLinear.setTargetValue (juce::Decibels::decibelsToGain (outputTargetDb));
     const float outputStart = outputGainLinear.getCurrentValue();
     const float outputEnd = outputGainLinear.skip (numSamples);
-    if (std::abs (outputStart - 1.0f) > 0.00001f || std::abs (outputEnd - 1.0f) > 0.00001f)
-        processBuffer.applyGainRamp (0, numSamples, outputStart, outputEnd);
+    voiceBlock.applyGainRamp (0, numSamples, outputStart, outputEnd);
+
+    const float preLimiterPeakDb = peakDb (voiceBlock);
+    auto masterBlock = juce::dsp::AudioBlock<float> (voiceBlock);
+    juce::dsp::ProcessContextReplacing<float> masterContext (masterBlock);
+    masterLimiter.process (masterContext);
 
     double weightedEnergy = 0.0;
     for (int sample = 0; sample < numSamples; ++sample)
     {
         for (int channel = 0; channel < processingChannels; ++channel)
         {
-            float value = processBuffer.getSample (channel, sample);
+            float value = voiceBlock.getSample (channel, sample);
             value = loudnessShelf[static_cast<size_t> (channel)].processSample (value);
             value = loudnessHighPass[static_cast<size_t> (channel)].processSample (value);
             weightedEnergy += static_cast<double> (value) * static_cast<double> (value);
@@ -502,7 +529,7 @@ void LiveAudioEngine::audioDeviceIOCallbackWithContext (
         ? static_cast<float> (-0.691 + 10.0 * std::log10 (loudnessMeanSquare))
         : -120.0f);
 
-    updateMeters (processBuffer);
+    updateMeters (voiceBlock, preLimiterPeakDb);
 
     if (! outputMuted.load())
     {
@@ -512,7 +539,7 @@ void LiveAudioEngine::audioDeviceIOCallbackWithContext (
                 continue;
             const int sourceChannel = juce::jmin (channel, processingChannels - 1);
             juce::FloatVectorOperations::copy (outputChannelData[channel],
-                                               processBuffer.getReadPointer (sourceChannel),
+                                               voiceBlock.getReadPointer (sourceChannel),
                                                numSamples);
         }
     }
@@ -547,22 +574,34 @@ void LiveAudioEngine::audioDeviceAboutToStart (juce::AudioIODevice* device)
     noiseClean.prepare (sampleRate, blockSize, channels);
     expander.prepare (sampleRate);
 
-    enhancerBridge.prepare (sampleRate, blockSize);
+    voiceEnhancerBridge.prepare (sampleRate, blockSize);
+    musicEnhancerBridge.prepare (sampleRate, blockSize);
     updateInputTrimRouting();
     updateOutputTrimRouting();
-    enhancerBridge.setBypassed (enhancerBypassed.load());
-    enhancerBridge.setGainMatchEnabled (false);
+    voiceEnhancerBridge.setBypassed (voiceEnhancerBypassed.load());
+    musicEnhancerBridge.setBypassed (musicEnhancerBypassed.load());
+    voiceEnhancerBridge.setGainMatchEnabled (false);
+    musicEnhancerBridge.setGainMatchEnabled (false);
+
+    juce::dsp::ProcessSpec masterSpec;
+    masterSpec.sampleRate = sampleRate;
+    masterSpec.maximumBlockSize = static_cast<juce::uint32> (blockSize);
+    masterSpec.numChannels = channels;
+    masterLimiter.prepare (masterSpec);
+    masterLimiter.setThreshold (-1.0f);
+    masterLimiter.setRelease (80.0f);
+    masterLimiter.reset();
 
     inputGainLinear.reset (sampleRate, 0.020);
     sc220MixGainLinear.reset (sampleRate, 0.020);
     outputGainLinear.reset (sampleRate, 0.020);
     pcGainLinear.reset (sampleRate, 0.020);
     inputGainLinear.setCurrentAndTargetValue (juce::Decibels::decibelsToGain (
-        inputTrimBypassed.load() ? 0.0f : juce::jmin (0.0f, inputTrimDb.load() + 12.0f)));
+        inputTrimBypassed.load() ? 0.0f : inputTrimDb.load()));
     sc220MixGainLinear.setCurrentAndTargetValue (
         juce::Decibels::decibelsToGain (sc220FaderDb.load()));
     outputGainLinear.setCurrentAndTargetValue (juce::Decibels::decibelsToGain (
-        outputTrimBypassed.load() ? 0.0f : juce::jmin (0.0f, outputTrimDb.load() + 12.0f)));
+        outputTrimBypassed.load() ? 0.0f : outputTrimDb.load()));
     pcGainLinear.setCurrentAndTargetValue (juce::Decibels::decibelsToGain (pcAudioGainDb.load()));
     duckGainLinear = 1.0f;
     duckGainDb.store (0.0f);
@@ -585,10 +624,11 @@ void LiveAudioEngine::audioDeviceAboutToStart (juce::AudioIODevice* device)
     pcLoopback.prepare (sampleRate);
     pcLoopback.start();
 
-    currentSampleRate.store (sampleRate);
-    currentBufferSize.store (blockSize);
-    totalLatencySamples.store (noiseClean.getLatencySamples()
-                               + enhancerBridge.latencySamples()
+    const int voiceLatency = noiseClean.getLatencySamples() + voiceEnhancerBridge.latencySamples();
+    const int musicLatency = musicEnhancerBridge.latencySamples();
+    voiceLatencySamples.store (voiceLatency);
+    musicDspLatencySamples.store (musicLatency);
+    totalLatencySamples.store (juce::jmax (voiceLatency, musicLatency)
                                + device->getInputLatencyInSamples()
                                + device->getOutputLatencyInSamples());
     running.store (true);
@@ -601,7 +641,9 @@ void LiveAudioEngine::audioDeviceAboutToStart (juce::AudioIODevice* device)
 void LiveAudioEngine::audioDeviceStopped()
 {
     pcLoopback.stop();
-    enhancerBridge.release();
+    voiceEnhancerBridge.release();
+    musicEnhancerBridge.release();
+    masterLimiter.reset();
     running.store (false);
     deviceOpen.store (false);
 }
@@ -626,9 +668,23 @@ void LiveAudioEngine::clearOutputs (float* const* outputChannelData,
             juce::FloatVectorOperations::clear (outputChannelData[channel], samples);
 }
 
-void LiveAudioEngine::updateMeters (const juce::AudioBuffer<float>& finalOutput) noexcept
+float LiveAudioEngine::peakDb (const juce::AudioBuffer<float>& buffer) noexcept
 {
-    const auto engineMeters = enhancerBridge.meters();
+    float peak = 0.0f;
+    for (int channel = 0; channel < buffer.getNumChannels(); ++channel)
+    {
+        const auto* data = buffer.getReadPointer (channel);
+        for (int sample = 0; sample < buffer.getNumSamples(); ++sample)
+            peak = juce::jmax (peak, std::abs (data[sample]));
+    }
+    return dbFromPeak (peak);
+}
+
+void LiveAudioEngine::updateMeters (const juce::AudioBuffer<float>& finalOutput,
+                                    float preLimiterPeakDb) noexcept
+{
+    const auto voiceMeters = voiceEnhancerBridge.meters();
+    const auto musicMeters = musicEnhancerBridge.meters();
 
     const int samples = finalOutput.getNumSamples();
     const int right = juce::jmin (1, finalOutput.getNumChannels() - 1);
@@ -646,7 +702,14 @@ void LiveAudioEngine::updateMeters (const juce::AudioBuffer<float>& finalOutput)
                                                 / juce::jmax (1.0, currentSampleRate.load()));
     outputPeakL.store (juce::jmax (dbFromPeak (leftPeak), outputPeakL.load() - releaseDb));
     outputPeakR.store (juce::jmax (dbFromPeak (rightPeak), outputPeakR.load() - releaseDb));
-    gainReduction.store (engineMeters.gainReductionDb);
+
+    const float postLimiterPeakDb = dbFromPeak (juce::jmax (leftPeak, rightPeak));
+    const float masterReduction = juce::jmax (0.0f, preLimiterPeakDb - postLimiterPeakDb);
+    voiceGainReduction.store (voiceMeters.gainReductionDb);
+    musicGainReduction.store (musicMeters.gainReductionDb);
+    masterGainReduction.store (masterReduction);
+    gainReduction.store (juce::jmax (masterReduction,
+                          juce::jmax (voiceMeters.gainReductionDb, musicMeters.gainReductionDb)));
 }
 
 void LiveAudioEngine::refreshDeviceStatus()
@@ -663,19 +726,17 @@ void LiveAudioEngine::refreshDeviceStatus()
 
 void LiveAudioEngine::updateInputTrimRouting() noexcept
 {
-    const float requested = inputTrimBypassed.load() ? 0.0f : inputTrimDb.load();
-    // The authoritative VST input faucet covers -12..+12 dB. Only attenuation
-    // below -12 dB is completed by the outer rack gain, and multiplication is
-    // still pre-engine, so the enhancer sees the requested total input level.
-    enhancerBridge.setInputGainDb (requested);
+    // SC220 trim is implemented in the dedicated voice lane. Keep the embedded
+    // processor's input faucet at unity so it cannot alter PC Music.
+    voiceEnhancerBridge.setInputGainDb (0.0f);
 }
 
 void LiveAudioEngine::updateOutputTrimRouting() noexcept
 {
-    const float requested = outputTrimBypassed.load() ? 0.0f : outputTrimDb.load();
-    // Positive and normal attenuation remain inside the exact VST lookahead
-    // safety path. Only attenuation below -12 dB is completed after processing.
-    enhancerBridge.setFinalOutputGainDb (requested);
+    // Each source processor stays at its profile output level. Final trim is a
+    // master-bus gain directly before the final -1 dB safety limiter.
+    voiceEnhancerBridge.setFinalOutputGainDb (0.0f);
+    musicEnhancerBridge.setFinalOutputGainDb (0.0f);
 }
 
 bool LiveAudioEngine::looksLikeVirtualCable (const juce::String& name)

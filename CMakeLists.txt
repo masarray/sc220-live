@@ -273,6 +273,11 @@ juce_add_gui_app(SC220Live
     ICON_SMALL assets/ui/favicon-96x96.png
 )
 
+set(SC220_UI_SOURCE "${CMAKE_CURRENT_SOURCE_DIR}/live/SC220MainComponent.cpp")
+set(SC220_UI_GENERATED_SOURCE
+    "${CMAKE_CURRENT_BINARY_DIR}/generated/sc220-ui/SC220MainComponent_Aligned.cpp")
+include("${CMAKE_CURRENT_SOURCE_DIR}/cmake/GenerateSC220AlignedUi.cmake")
+
 target_sources(SC220Live PRIVATE
     "${ASKP_DSP_SOURCE}"
     "${ASKP_PRESET_SOURCE}"
@@ -291,7 +296,7 @@ target_sources(SC220Live PRIVATE
     live/LiveWidgets.cpp
     live/SonkupikSphereVisualizer.cpp
     live/LiveMainComponent.cpp
-    live/SC220MainComponent.cpp
+    "${SC220_UI_GENERATED_SOURCE}"
     live/LiveApplication.cpp
 )
 

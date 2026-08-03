@@ -28,11 +28,17 @@ Status legend:
 - [x] SC220 presence is reported from the real endpoint name, not a fake connected state
 - [x] Device names matching `MIXER`, `SC220`, or `Recording Tech` are recognised as SC220
 - [~] Automatic selection of the SC220 `MIXER` input needs hardware validation
-- [x] PC System Mix is captured through Windows loopback
+- [x] PC System Mix is captured through Windows WASAPI loopback
+- [x] Windows render endpoints are enumerated using stable endpoint IDs and friendly names
+- [x] Selectable PC playback/loopback endpoint in the main PC Audio dropdown
+- [x] `SYSTEM DEFAULT` remains available when it is safe relative to the Stream endpoint
+- [x] Selected PC playback endpoint is persisted and restored before the audio graph starts
+- [x] Obvious virtual-cable endpoints are excluded from the normal PC playback list
+- [x] Self-loop validation between the selected PC loopback endpoint and Stream endpoint
+- [x] Unsafe PC Audio/Stream combinations are blocked before capture or output reopen
 - [x] Stream selector is restricted to virtual-cable endpoints
 - [x] An older saved physical Stream output is recovered toward VB-CABLE routing
-- [ ] Selectable PC playback/loopback endpoint
-- [ ] Self-loop validation between the selected PC loopback endpoint and Stream endpoint
+- [~] PC endpoint enumeration, switching, persistence, and anti-loop alerts need Windows validation
 - [ ] Adaptive asynchronous sample-rate and clock-drift correction for long broadcasts
 
 ## Music, ducking, and broadcast workflow
@@ -89,6 +95,8 @@ Status legend:
 - [x] Stream and Monitor selectors use separate responsive columns
 - [x] Explicit `STREAM OUTPUT` and `MONITOR OUTPUT` labels
 - [x] Explicit `VB-CABLE / OBS` and `HEADPHONES / SPEAKERS` routing descriptions
+- [x] PC Audio source dropdown now represents the selected Windows playback endpoint
+- [x] PC Audio status distinguishes active capture, startup, and routing blocked states
 - [~] Final layout needs visual confirmation at `1180x720`, `1600x900`, and maximised size
 - [~] Inter is requested by the UI but is not embedded in the executable
 - [ ] Replace remaining Plus Jakarta assets/usages in the mini controller
@@ -100,12 +108,31 @@ Status legend:
 - [x] Safe muted Stream startup
 - [x] Clean build closes the preview executable before removing the build tree
 - [x] Bounded retry and lock-owner diagnostics for Windows clean builds
-- [x] Repository source audits for ASK-P authority, dual-source routing, premium UX, console geometry, Monitor Bus, and clean build
+- [x] Repository source audits for ASK-P authority, dual-source routing, premium UX, console geometry, Monitor Bus, clean build, PC endpoint selection, and anti-loop routing
 - [~] Full Windows/MSVC Release compile must pass on the local machine after the latest commit
-- [~] SC220 `MIXER` + VB-CABLE + physical monitor end-to-end test
+- [~] SC220 `MIXER` + selected PC playback endpoint + VB-CABLE + physical monitor end-to-end test
+- [ ] One-click 10-minute transport stability test
+- [ ] Two-hour zero-dropout transport qualification
 - [ ] Eight-hour broadcast soak test
 - [ ] Automated audio continuity/drift test
 - [ ] Installer and portable release packaging validation for this branch
+
+## Next engineering milestone: Transport v2
+
+The next code milestone is the release-critical transport layer:
+
+- [ ] Independent capture/render clock-domain telemetry
+- [ ] Target FIFO-fill controller for PC Audio
+- [ ] Adaptive asynchronous sample-rate correction instead of fixed-ratio conversion
+- [ ] Bounded correction range with reported ppm drift
+- [ ] Declared underrun/overrun recovery counters
+- [ ] Emergency frame insert/drop only after a declared transport fault
+- [ ] Preserve DSP and endpoint state across device reopen
+- [ ] Local endpoint capability dump for sample rate, period, and channel format
+- [ ] `48 kHz / 32-bit float` baseline qualification
+- [ ] Low mode remains default until Ultra mode passes the local endpoint probe
+- [ ] Reconnect recovery target of `<= 2 s`
+- [ ] Input-to-VB-CABLE latency validation target of `<= 12 ms`
 
 ## Current merge decision
 
@@ -113,7 +140,9 @@ The branch should remain a Draft PR until these minimum checks pass:
 
 1. Windows Release build succeeds from a clean tree.
 2. Spectrum moves with PC Music and SC220 input.
-3. Stream output is VB-CABLE and Monitor output is a physical endpoint.
-4. Program and Music Cue monitoring are heard correctly.
-5. Layout is visually inspected at minimum, default, and maximised window sizes.
-6. A minimum one-hour live soak test completes without dropouts, FIFO growth, or routing feedback.
+3. PC Audio endpoint switching and persistence work on Windows.
+4. Selecting VB-CABLE or the active Stream endpoint as PC Audio is blocked with a clear warning.
+5. Stream output is VB-CABLE and Monitor output is a physical endpoint.
+6. Program and Music Cue monitoring are heard correctly.
+7. Layout is visually inspected at minimum, default, and maximised window sizes.
+8. A minimum one-hour live soak test completes without dropouts, FIFO growth, or routing feedback.

@@ -81,10 +81,13 @@ check(
     )),
 )
 check(
-    "telemetry includes fast per-frequency rhythm envelopes",
+    "telemetry includes flat frequency-dependent rhythm envelopes",
     all(token in telemetry for token in (
-        "fastPower", "slowPower", "attackSeconds", "releaseSeconds",
-        "maximumTransientBoostDb", "transientEmphasis", "transientDb",
+        "envelopePower", "attackSeconds", "releaseSeconds",
+        "envelopeSeconds", "coefficient",
+    ))
+    and all(token not in telemetry for token in (
+        "slowPower", "transientDb", "transientEmphasis",
     )),
 )
 check(

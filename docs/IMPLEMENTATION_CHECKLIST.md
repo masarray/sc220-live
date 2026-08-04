@@ -71,32 +71,25 @@ Status legend:
 - [~] Physical monitoring requires listening tests with headphones/speakers
 - [ ] Asynchronous clock correction for the physical Monitor Bus
 
-## Spectralizer and metering
+## Programme analyzer and metering
 
-- [x] Incorrect `OLDER -> NOW` history visualizer removed
-- [x] Main visualizer is a fixed-frequency OBS-style spectralizer
-- [x] Frequency position is fixed from bass on the left to treble on the right
-- [x] All previous `ScopeTap`, ASK-P recovery, and direct-WASAPI visual fallbacks are removed from the production UI
-- [x] The exact protected post-limiter stereo buffer is the only production visual source
-- [x] Audio callback accumulates exactly `512` samples into a preallocated double bank
-- [x] Producer publishes only complete banks
-- [x] UI rejects partial or concurrently changed banks using a sequence check
-- [x] Snapshot producer has no lock, wait, allocation, FFT, or drawing work
-- [x] Visible status reports `POST-LIMITER SNAPSHOT #<generation>`
-- [x] Snapshot generation must increase while the Stream meter receives live programme audio
-- [x] Left and right channels are analysed separately and combined by stereo energy
-- [x] Anti-phase audio remains visible instead of cancelling through mono summing
-- [x] Lightweight `512`-point FFT
-- [x] FFT, smoothing, peak hold, and drawing run on the UI/message thread
-- [x] `24` logarithmically spaced bands from approximately `35 Hz` to `16 kHz`
-- [x] `15` segmented cells per band
-- [x] Bass receives a small display-only contour boost without changing audio
-- [x] Fast attack and smooth release ballistics per band
-- [x] Independent `500 ms` peak hold for every band
-- [x] Approximately `30 fps` visual refresh
-- [x] Frequency labels include `40`, `100`, `250`, `1k`, `4k`, and `12k`
-- [~] Post-limiter snapshot generation and bar movement require confirmation in the Windows executable
-- [~] Realtime spectrum movement with SC220 voice requires hardware confirmation
+- [x] All previous spectrum implementations were deleted from production
+- [x] Removed `ScopeTap`, FFT, snapshot, direct-WASAPI visual queue, and recovery fallbacks
+- [x] New analyzer was built from zero as a `14`-band fixed filter bank
+- [x] Fixed centre frequencies: `50`, `80`, `125`, `200`, `315`, `500`, `800`, `1.25k`, `2k`, `3.15k`, `5k`, `8k`, `12k`, `16k`
+- [x] Each band uses a real second-order band-pass biquad
+- [x] The exact protected post-limiter stereo buffer feeds the analyzer
+- [x] Left and right channels are filtered separately and combined by stereo energy
+- [x] Anti-phase stereo remains visible
+- [x] Audio callback publishes only atomic dB values and one generation counter
+- [x] No sample queue, copied frame, FFT, lock, wait, allocation, or drawing in the callback
+- [x] UI reads atomic band values directly at approximately `30 fps`
+- [x] Fast attack and smooth release ballistics
+- [x] Independent `600 ms` peak hold per band
+- [x] `14` segmented bars with fixed bass-to-treble positions
+- [x] Visible status reports `POST-LIMITER BANDS #<generation>`
+- [~] Generation counter and bar movement require confirmation in the Windows executable
+- [~] Realtime analyzer response with SC220 voice requires hardware confirmation
 - [x] Stereo input, PC Audio, and Stream level meters
 - [x] Integrated loudness and true-peak programme telemetry
 
@@ -131,12 +124,11 @@ Status legend:
 - [x] Clean build closes the preview executable before removing the build tree
 - [x] Bounded retry and lock-owner diagnostics for Windows clean builds
 - [x] Normal CMake builds compile the generated engine and final generated UI
-- [x] Repository audits cover ASK-P authority, routing, UX, console geometry, Monitor Bus, PC-only operation, synthetic frequency response, anti-phase response, and snapshot publication
-- [x] CI verifies snapshot publication occurs after the master limiter
-- [x] CI verifies the production engine no longer publishes analyzer `ScopeTap` samples
-- [x] CI verifies FFT exists only in generated UI and not in the audio engine or snapshot class
-- [x] CI verifies all obsolete queue/recovery visual sources are absent
-- [x] GitHub Actions source audit passes for the snapshot implementation
+- [x] Repository audits cover ASK-P authority, routing, UX, console geometry, Monitor Bus, PC-only operation, filter response, anti-phase response, and atomic publication
+- [x] CI verifies analyzer processing occurs after the master limiter
+- [x] CI verifies production engine no longer publishes analyzer sample queues
+- [x] CI verifies FFT, snapshot, and recovery paths are absent
+- [x] CI verifies the fixed biquad centres and synthetic bass/mid/treble localisation
 - [~] Full Windows/MSVC Release compile must pass locally after the latest commit
 - [~] PC Music-only + distinct VB-CABLE source/stream + physical monitor test
 - [~] SC220 `MIXER` + PC Music + VB-CABLE + physical monitor end-to-end test
@@ -167,12 +159,12 @@ Draft PR #2 should remain unmerged until these minimum checks pass:
 
 1. Windows Release build succeeds from a clean tree.
 2. The PC Audio state becomes `PLAYBACK CAPTURE ACTIVE` or shows a specific `CAPTURE ERROR`.
-3. While the Stream meter moves, the visualizer header must show an increasing `POST-LIMITER SNAPSHOT #<generation>` value.
-4. Bass, mids, and treble produce visibly different fixed-frequency patterns.
+3. While the Stream meter moves, the header shows an increasing `POST-LIMITER BANDS #<generation>` value.
+4. Bass, mids, and treble produce visibly different fixed-band patterns.
 5. Peak markers hold briefly and then fall without sticking.
-6. Toggling Smart Enhancer power must audibly change the monitored app path.
+6. Toggling Smart Enhancer power audibly changes the monitored app path.
 7. A safe virtual source configuration works, for example Cable A as PC Music and Cable B as Stream.
 8. Selecting the same cable for PC Music and Stream is blocked with a clear warning.
 9. Enhanced PC Music is audible through Program Monitor and Music Cue.
 10. SC220 is automatically added when `MIXER` becomes available.
-11. A minimum one-hour live soak test completes without dropouts, FIFO growth, routing feedback, or visualizer-induced CPU spikes.
+11. A minimum one-hour live soak test completes without dropouts, routing feedback, or analyzer-induced CPU spikes.

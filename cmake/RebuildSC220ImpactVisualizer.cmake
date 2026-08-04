@@ -1,13 +1,16 @@
-# Replace the incorrect left-to-right history meter with a real OBS-style
-# fixed-frequency spectralizer. Audio samples are already published by the
-# lock-free post-master ScopeTap. The 512-point stereo FFT, ballistics, drawing,
-# and peak hold all run on the 30 Hz message thread, never in the audio callback.
+# Build a lightweight fixed-frequency spectralizer with a redundant runtime
+# sample path. The protected post-master ScopeTap remains primary. If that tap
+# is starved at runtime, the UI immediately falls back to the post-Signature
+# Music tap and then the Voice tap. All taps are lock-free SPSC queues. The
+# 512-point FFT, smoothing and drawing remain on the 30 Hz message thread.
 
-if(NOT DEFINED SC220_UI_MONITOR_GENERATED_SOURCE)
-    message(FATAL_ERROR "SC220 spectralizer requires the final generated UI source")
+if(NOT DEFINED SC220_UI_MONITOR_GENERATED_SOURCE
+   OR NOT DEFINED SC220_ENGINE_GENERATED_SOURCE)
+    message(FATAL_ERROR "SC220 spectralizer requires final UI and engine sources")
 endif()
 
 file(READ "${SC220_UI_MONITOR_GENERATED_SOURCE}" _ui)
+file(READ "${SC220_ENGINE_GENERATED_SOURCE}" _engine)
 
 function(sc220_spectrum_replace_range variable_name label start_marker end_marker replacement)
     set(_value "${${variable_name}}")
@@ -21,14 +24,17 @@ function(sc220_spectrum_replace_range variable_name label start_marker end_marke
     set(${variable_name} "${_prefix}${replacement}\n\n${_suffix}" PARENT_SCOPE)
 endfunction()
 
-function(sc220_spectrum_replace_once variable_name label anchor replacement)
+function(sc220_spectrum_replace_first variable_name label anchor replacement)
     set(_value "${${variable_name}}")
     string(FIND "${_value}" "${anchor}" _position)
     if(_position EQUAL -1)
         message(FATAL_ERROR "SC220 spectralizer anchor changed: ${label}")
     endif()
-    string(REPLACE "${anchor}" "${replacement}" _value "${_value}")
-    set(${variable_name} "${_value}" PARENT_SCOPE)
+    string(LENGTH "${anchor}" _anchor_length)
+    math(EXPR _suffix_position "${_position} + ${_anchor_length}")
+    string(SUBSTRING "${_value}" 0 ${_position} _prefix)
+    string(SUBSTRING "${_value}" ${_suffix_position} -1 _suffix)
+    set(${variable_name} "${_prefix}${replacement}${_suffix}" PARENT_SCOPE)
 endfunction()
 
 set(_display_start "class SC220MainComponent::LiveSpectrumDisplay final : public juce::Component")
@@ -46,19 +52,42 @@ public:
         peakHoldFrames.fill (0);
     }
 
-    void updateFromTap (askp::ScopeTap& programmeTap, double sampleRate)
+    void updateFromTaps (askp::ScopeTap& programmeTap,
+                         askp::ScopeTap& musicTap,
+                         askp::ScopeTap& voiceTap,
+                         double sampleRate)
     {
-        std::array<float, fftSize> left {};
-        std::array<float, fftSize> right {};
-        const int count = programmeTap.consumeLatest (left.data(), right.data(), fftSize);
+        int count = programmeTap.consumeLatest (captureLeft.data(),
+                                                captureRight.data(), fftSize);
+        source = count > 0 ? CaptureSource::postMaster : CaptureSource::none;
+
+        if (count <= 0)
+        {
+            count = musicTap.consumeLatest (captureLeft.data(),
+                                            captureRight.data(), fftSize);
+            if (count > 0)
+                source = CaptureSource::musicRecovery;
+        }
+
+        if (count <= 0)
+        {
+            count = voiceTap.consumeLatest (captureLeft.data(),
+                                            captureRight.data(), fftSize);
+            if (count > 0)
+                source = CaptureSource::voiceRecovery;
+        }
 
         if (count <= 0 || sampleRate <= 0.0)
         {
+            source = CaptureSource::none;
+            ++emptyFrameStreak;
             decayWithoutFrame();
             repaint();
             return;
         }
 
+        emptyFrameStreak = 0;
+        capturedFrameCount += static_cast<unsigned long long> (count);
         leftFftData.fill (0.0f);
         rightFftData.fill (0.0f);
         const int copied = juce::jlimit (0, fftSize, count);
@@ -66,8 +95,8 @@ public:
         float capturedPeak = 0.0f;
         for (int i = 0; i < copied; ++i)
         {
-            const float leftSample = left[static_cast<size_t> (i)];
-            const float rightSample = right[static_cast<size_t> (i)];
+            const float leftSample = captureLeft[static_cast<size_t> (i)];
+            const float rightSample = captureRight[static_cast<size_t> (i)];
             leftFftData[static_cast<size_t> (destinationStart + i)] = leftSample;
             rightFftData[static_cast<size_t> (destinationStart + i)] = rightSample;
             capturedPeak = juce::jmax (capturedPeak,
@@ -113,8 +142,7 @@ public:
             float db = juce::Decibels::gainToDecibels (
                 energy / static_cast<float> (fftSize), -96.0f);
 
-            // Gentle display contour: kick/bass is readable, body is restrained,
-            // and air remains calm. This affects only the drawing, never audio.
+            // Display-only contour. It never touches the programme audio.
             if (band < 5)
                 db += 4.0f;
             else if (band < 9)
@@ -139,7 +167,8 @@ public:
             }
             else
             {
-                heldPeaks[band] = juce::jmax (levels[band], heldPeaks[band] - 0.026f);
+                heldPeaks[band] = juce::jmax (levels[band],
+                                              heldPeaks[band] - 0.026f);
             }
         }
 
@@ -218,9 +247,20 @@ public:
                     juce::roundToInt (area.getX() + 34.0f),
                     juce::roundToInt (area.getY() + 6.0f), 190, 16,
                     juce::Justification::centredLeft);
-        g.setColour (juce::Colours::white.withAlpha (0.42f));
-        g.setFont (interFont (8.5f));
-        g.drawText ("24 BAND  /  30 FPS  /  500 ms HOLD",
+
+        juce::String sourceText;
+        switch (source)
+        {
+            case CaptureSource::postMaster:     sourceText = "POST-MASTER"; break;
+            case CaptureSource::musicRecovery: sourceText = "MUSIC RECOVERY"; break;
+            case CaptureSource::voiceRecovery: sourceText = "VOICE RECOVERY"; break;
+            case CaptureSource::none:          sourceText = "NO FRAMES"; break;
+        }
+        g.setColour (source == CaptureSource::none
+                         ? palette::red.withAlpha (0.78f)
+                         : palette::green.withAlpha (0.78f));
+        g.setFont (interFont (8.3f, true));
+        g.drawText (sourceText + "  /  24 BAND  /  30 FPS",
                     juce::roundToInt (area.getRight() - 245.0f),
                     juce::roundToInt (area.getY() + 6.0f), 211, 16,
                     juce::Justification::centredRight);
@@ -250,12 +290,16 @@ public:
         {
             g.setColour (juce::Colours::white.withAlpha (0.44f));
             g.setFont (interFont (11.0f, true));
-            g.drawText ("WAITING FOR PROGRAM AUDIO", graph.toNearestInt(),
-                        juce::Justification::centred);
+            g.drawText (source == CaptureSource::none
+                            ? "WAITING FOR ANALYZER FRAMES"
+                            : "PROGRAM SILENCE",
+                        graph.toNearestInt(), juce::Justification::centred);
         }
     }
 
 private:
+    enum class CaptureSource { none, postMaster, musicRecovery, voiceRecovery };
+
     void decayWithoutFrame()
     {
         for (size_t band = 0; band < bandCount; ++band)
@@ -264,7 +308,8 @@ private:
             if (peakHoldFrames[band] > 0)
                 --peakHoldFrames[band];
             else
-                heldPeaks[band] = juce::jmax (levels[band], heldPeaks[band] - 0.026f);
+                heldPeaks[band] = juce::jmax (levels[band],
+                                              heldPeaks[band] - 0.026f);
         }
         hasSignal = std::any_of (levels.begin(), levels.end(),
             [] (float value) { return value > 0.018f; });
@@ -275,16 +320,69 @@ private:
     static constexpr size_t bandCount = 24;
     juce::dsp::FFT fft;
     juce::dsp::WindowingFunction<float> window;
+    std::array<float, fftSize> captureLeft {};
+    std::array<float, fftSize> captureRight {};
     std::array<float, fftSize * 2> leftFftData {};
     std::array<float, fftSize * 2> rightFftData {};
     std::array<float, bandCount> levels {};
     std::array<float, bandCount> heldPeaks {};
     std::array<int, bandCount> peakHoldFrames {};
+    CaptureSource source = CaptureSource::none;
+    unsigned long long capturedFrameCount = 0;
+    int emptyFrameStreak = 0;
     bool hasSignal = false;
 };
 ]=])
-sc220_spectrum_replace_range(_ui "replace history meter with fixed-frequency spectralizer"
+sc220_spectrum_replace_range(_ui "fixed-frequency spectralizer with redundant taps"
     "${_display_start}" "${_display_end}" "${_display_replacement}")
+
+# Keep all three lock-free taps armed for the lifetime of the visible console.
+set(_constructor_anchor [=[
+    audioEngine.getVoiceEnhancerBridge().setVisualTapEnabled (false);
+    audioEngine.getMusicEnhancerBridge().setVisualTapEnabled (false);
+    audioEngine.setProgrammeAnalyzerEnabled (true);
+
+    configureControls();
+]=])
+set(_constructor_replacement [=[
+    audioEngine.getVoiceEnhancerBridge().setVisualTapEnabled (true);
+    audioEngine.getMusicEnhancerBridge().setVisualTapEnabled (true);
+    audioEngine.setProgrammeAnalyzerEnabled (true);
+
+    configureControls();
+]=])
+sc220_spectrum_replace_first(_ui "arm analyzer taps in constructor"
+    "${_constructor_anchor}" "${_constructor_replacement}")
+
+set(_ui_active_anchor [=[
+void SC220MainComponent::setUiActive (bool active)
+{
+    uiActive = active;
+    audioEngine.getVoiceEnhancerBridge().setVisualTapEnabled (false);
+    audioEngine.getMusicEnhancerBridge().setVisualTapEnabled (false);
+    if (active)
+        startTimerHz (30);
+    else
+        stopTimer();
+}
+]=])
+set(_ui_active_replacement [=[
+void SC220MainComponent::setUiActive (bool active)
+{
+    uiActive = active;
+    // Keep publication armed while hidden. ScopeTap drops visual data instead
+    // of ever blocking audio, and the reader receives the newest tail on resume.
+    audioEngine.getVoiceEnhancerBridge().setVisualTapEnabled (true);
+    audioEngine.getMusicEnhancerBridge().setVisualTapEnabled (true);
+    audioEngine.setProgrammeAnalyzerEnabled (true);
+    if (active)
+        startTimerHz (30);
+    else
+        stopTimer();
+}
+]=])
+sc220_spectrum_replace_first(_ui "keep analyzer publication armed"
+    "${_ui_active_anchor}" "${_ui_active_replacement}")
 
 set(_timer_anchor [=[
     static int spectrumDivider = 0;
@@ -296,11 +394,32 @@ set(_timer_anchor [=[
     }
 ]=])
 set(_timer_replacement [=[
-    spectrumDisplay->updateFromTap (audioEngine.programmeAnalyzerTap(),
-                                    lastStatus.sampleRate);
+    // Runtime recovery is deliberate: a device reopen or stale UI lifecycle
+    // cannot leave all visual taps disabled while the audio meters are moving.
+    audioEngine.setProgrammeAnalyzerEnabled (true);
+    audioEngine.getMusicEnhancerBridge().setVisualTapEnabled (true);
+    audioEngine.getVoiceEnhancerBridge().setVisualTapEnabled (true);
+    spectrumDisplay->updateFromTaps (audioEngine.programmeAnalyzerTap(),
+                                     audioEngine.getMusicEnhancerBridge().analysisTap(),
+                                     audioEngine.getVoiceEnhancerBridge().analysisTap(),
+                                     lastStatus.sampleRate);
 ]=])
-sc220_spectrum_replace_once(_ui "run lightweight spectralizer at the 30 Hz UI rate"
+sc220_spectrum_replace_first(_ui "drive spectralizer with redundant live taps"
     "${_timer_anchor}" "${_timer_replacement}")
+
+# The post-master publisher is also re-armed at the publication point. This is
+# one lock-free atomic store per callback and cannot wait, allocate or alter audio.
+set(_publish_anchor [=[
+    programmeAnalyzer.push (voiceBlock.getReadPointer (0),
+                            voiceBlock.getReadPointer (1), numSamples);
+]=])
+set(_publish_replacement [=[
+    programmeAnalyzer.setEnabled (true);
+    programmeAnalyzer.push (voiceBlock.getReadPointer (0),
+                            voiceBlock.getReadPointer (1), numSamples);
+]=])
+sc220_spectrum_replace_first(_engine "force post-master analyzer publication"
+    "${_publish_anchor}" "${_publish_replacement}")
 
 foreach(_required IN ITEMS
         "PROGRAM SPECTRUM"
@@ -308,12 +427,25 @@ foreach(_required IN ITEMS
         "fftOrder = 9"
         "segmentCount = 15"
         "peakHoldFrames[band] = 15"
-        "500 ms HOLD"
-        "programmeAnalyzerTap()"
+        "updateFromTaps"
+        "MUSIC RECOVERY"
+        "VOICE RECOVERY"
+        "WAITING FOR ANALYZER FRAMES"
+        "getMusicEnhancerBridge().analysisTap()"
+        "getVoiceEnhancerBridge().analysisTap()"
         "performFrequencyOnlyForwardTransform")
     string(FIND "${_ui}" "${_required}" _position)
     if(_position EQUAL -1)
         message(FATAL_ERROR "SC220 spectralizer authority missing: ${_required}")
+    endif()
+endforeach()
+
+foreach(_required_engine IN ITEMS
+        "programmeAnalyzer.setEnabled (true);"
+        "programmeAnalyzer.push")
+    string(FIND "${_engine}" "${_required_engine}" _position)
+    if(_position EQUAL -1)
+        message(FATAL_ERROR "SC220 analyzer publisher missing: ${_required_engine}")
     endif()
 endforeach()
 
@@ -322,12 +454,14 @@ foreach(_forbidden IN ITEMS
         "PC INPUT IMPACT"
         "OLDER"
         "NOW"
-        "historySize = 32")
+        "historySize = 32"
+        "spectrumDisplay->updateFromTap")
     string(FIND "${_ui}" "${_forbidden}" _position)
     if(NOT _position EQUAL -1)
-        message(FATAL_ERROR "SC220 obsolete history visualizer remains: ${_forbidden}")
+        message(FATAL_ERROR "SC220 obsolete visualizer remains: ${_forbidden}")
     endif()
 endforeach()
 
 file(WRITE "${SC220_UI_MONITOR_GENERATED_SOURCE}" "${_ui}")
-message(STATUS "SC220 Live lightweight OBS-style programme spectralizer generated")
+file(WRITE "${SC220_ENGINE_GENERATED_SOURCE}" "${_engine}")
+message(STATUS "SC220 Live redundant post-master/music/voice spectralizer generated")

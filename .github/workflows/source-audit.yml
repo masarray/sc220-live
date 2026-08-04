@@ -41,6 +41,10 @@ jobs:
         run: python qa/audit_sc220_spectralizer_response.py
       - name: Validate atomic post-limiter telemetry
         run: python qa/audit_sc220_atomic_bands.py
+      - name: Compile atomic band telemetry
+        run: g++ -std=c++17 -O2 qa/programme_band_telemetry_test.cpp -o /tmp/programme-band-test
+      - name: Run atomic band telemetry
+        run: /tmp/programme-band-test
       - name: Validate independent physical Monitor Bus
         run: python qa/audit_sc220_monitor_bus.py
       - name: Validate selectable PC endpoint and anti-loop routing

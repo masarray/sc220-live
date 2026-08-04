@@ -134,7 +134,7 @@ Status legend:
 - [x] Bounded retry and lock-owner diagnostics for Windows clean builds
 - [x] Normal CMake builds compile the generated engine and final generated UI
 - [x] CI validates pink-flat response, rhythm response, loudness movement, endpoint routing, and monitor-rate conversion contracts
-- [x] CI run #320 passes all repository checks
+- [x] Source-audit milestone run #320 passes all repository checks
 - [~] Full Windows/MSVC Release compile must pass locally after the latest commit
 - [~] PC Music-only + distinct VB-CABLE source/stream + physical monitor test
 - [~] SC220 `MIXER` + PC Music + VB-CABLE + physical monitor end-to-end test

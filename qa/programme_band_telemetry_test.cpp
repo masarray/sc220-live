@@ -1,4 +1,5 @@
 #include "../live/ProgrammeBandTelemetry.h"
+#include "../live/ProgrammeLoudnessIntegrator.h"
 
 #include <algorithm>
 #include <array>
@@ -7,7 +8,6 @@
 #include <cstdint>
 #include <iostream>
 #include <limits>
-#include <vector>
 
 namespace {
 constexpr double sampleRate = 48000.0;
@@ -117,6 +117,35 @@ float runPinkFlatness (askp::live::ProgrammeBandTelemetry& telemetry)
     std::cout << "\n";
     return *limits.second - *limits.first;
 }
+
+bool runMovingLoudnessTest()
+{
+    askp::live::ProgrammeLoudnessIntegrator meter;
+    meter.prepare (sampleRate);
+    const auto quietEnergy = askp::live::ProgrammeLoudnessIntegrator::energyFromLufs (-30.0);
+    const auto loudEnergy = askp::live::ProgrammeLoudnessIntegrator::energyFromLufs (-12.0);
+
+    for (int frame = 0; frame < static_cast<int> (sampleRate * 0.6); ++frame)
+        meter.processFrame (quietEnergy);
+    const float quietMomentary = meter.momentaryLufs();
+
+    for (int frame = 0; frame < static_cast<int> (sampleRate * 0.6); ++frame)
+        meter.processFrame (loudEnergy);
+    const float loudMomentary = meter.momentaryLufs();
+
+    for (int frame = 0; frame < static_cast<int> (sampleRate * 2.4); ++frame)
+        meter.processFrame (loudEnergy);
+    const float integrated = meter.integratedLufs();
+
+    std::cout << "Quiet LUFS-M: " << quietMomentary << "\n"
+              << "Loud LUFS-M: " << loudMomentary << "\n"
+              << "Integrated LUFS-I: " << integrated << "\n";
+
+    return std::abs (quietMomentary + 30.0f) < 0.15f
+        && std::abs (loudMomentary + 12.0f) < 0.15f
+        && loudMomentary - quietMomentary > 17.5f
+        && meter.ready() && integrated > -15.0f && integrated < -11.0f;
+}
 } // namespace
 
 int main()
@@ -128,14 +157,17 @@ int main()
     const auto treble = runTone (telemetry, 8000.0, false);
     const auto antiPhase = runTone (telemetry, 1250.0, true);
     const auto pinkSpreadDb = runPinkFlatness (telemetry);
+    const bool movingLoudness = runMovingLoudnessTest();
 
     std::cout << "80 Hz band: " << bass << "\n"
               << "800 Hz band: " << mid << "\n"
               << "8 kHz band: " << treble << "\n"
               << "1.25 kHz anti-phase band: " << antiPhase << "\n"
-              << "Pink-noise max/min spread: " << pinkSpreadDb << " dB\n";
+              << "Pink-noise max/min spread: " << pinkSpreadDb << " dB\n"
+              << "Moving loudness: " << (movingLoudness ? "PASS" : "FAIL") << "\n";
 
     const bool passed = bass == 1 && mid == 6 && treble == 11
-                     && antiPhase == 7 && pinkSpreadDb <= 0.75f;
+                     && antiPhase == 7 && pinkSpreadDb <= 0.75f
+                     && movingLoudness;
     return passed ? 0 : 1;
 }

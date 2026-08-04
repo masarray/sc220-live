@@ -119,27 +119,26 @@ check(
     f"peak index={int(np.argmax(anti_bands))}",
 )
 check(
-    "telemetry source contains proportional bands pink calibration and rhythm envelopes",
+    "telemetry source contains proportional bands pink calibration and separate rhythm activity",
     all(token in TELEMETRY for token in (
         "bandCount = 14", "lowerBoundary", "upperBoundary",
         "nominal / bandwidth", "calculatePinkNoiseCalibration",
         "integrationPoints = 4096", "pinkCalibrationDb",
         "50.0f, 80.0f, 125.0f", "1250.0f", "8000.0f", "16000.0f",
-        "processSample", "envelopePower", "attackSeconds",
-        "releaseSeconds", "envelopeSeconds", "coefficient",
-    ))
-    and all(token not in TELEMETRY for token in (
-        "slowPower", "transientDb", "transientEmphasis",
+        "processSample", "calibratedPower", "fastPower",
+        "calibratedSmoothingSeconds = 0.180", "fastAttackSeconds",
+        "fastReleaseSeconds", "publishedActivity", "readActivity",
     )),
-    "sample-rate-aware pink-flat rhythmic filter-bank contract",
+    "sample-rate-aware pink-flat level plus onset activity contract",
 )
 check(
     "generated UI uses calibrated lively atomic 14-band contract",
     all(token in SOURCE for token in (
-        "programmeBandTelemetry.read", "segmentCount = 16",
-        "peakHoldFrames[band] = 14", "PROGRAM ANALYZER",
-        "PINK-FLAT BANDS", "const float displayDb = rawDb[band]",
-        "expandedDb = -38.0f", "positiveRise", "pulses[band]",
+        "programmeBandTelemetry.read", "programmeBandTelemetry.readActivity",
+        "segmentCount = 16", "peakHoldFrames[band] = 14",
+        "PROGRAM ANALYZER", "PINK-FLAT BANDS",
+        "const float displayDb = rawDb[band]", "rawActivity",
+        "baseTarget + rhythm * 0.20f", "positiveRise", "pulses[band]",
     )),
     "generated rhythmic pink-flat UI contract",
 )

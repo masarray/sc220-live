@@ -2,8 +2,9 @@
 #
 # The old ScopeTap, FFT, snapshot, direct-capture, and recovery paths are not
 # used. The exact post-limiter stereo buffer is measured by fourteen fixed
-# band-pass biquads inside ProgrammeBandTelemetry. Only atomic dB values cross
-# into the UI. There is no sample queue and therefore no empty-frame lifecycle.
+# band-pass biquads inside ProgrammeBandTelemetry. Stable calibrated dB values
+# and separate onset activity cross atomically into the UI. There is no sample
+# queue and therefore no empty-frame lifecycle.
 
 if(NOT DEFINED SC220_UI_MONITOR_GENERATED_SOURCE
    OR NOT DEFINED SC220_ENGINE_GENERATED_SOURCE)
@@ -72,8 +73,10 @@ public:
     void updateFromTelemetry()
     {
         std::array<float, bandCount> rawDb {};
+        std::array<float, bandCount> rawActivity {};
         std::uint64_t generation = 0;
         const bool available = programmeBandTelemetry.read (rawDb, generation);
+        programmeBandTelemetry.readActivity (rawActivity);
 
         if (! available)
         {
@@ -94,7 +97,8 @@ public:
         float strongestDb = -120.0f;
         for (size_t band = 0; band < bandCount; ++band)
         {
-            // Display-only contour. The audio is never modified.
+            // Display-only contour. The final calibration pass removes this
+            // placeholder so all bands use the same pink-flat baseline.
             float displayDb = rawDb[band];
             if (band <= 2)
                 displayDb += 4.0f;
@@ -105,25 +109,28 @@ public:
 
             strongestDb = juce::jmax (strongestDb, displayDb);
 
-            // Expand only the visual dynamic range around a neutral pivot. A
-            // flat pink-noise spectrum remains flat because every band receives
-            // the same transform, while musical attacks travel farther.
+            // Expand the stable calibrated range equally across every band.
+            // Separate onset activity adds up to about three temporary segments
+            // without contaminating pink-noise steady-state calibration.
             const float expandedDb = -38.0f + (displayDb + 38.0f) * 1.32f;
+            const float baseTarget = juce::jlimit (0.0f, 1.0f,
+                                                   (expandedDb + 64.0f) / 52.0f);
+            const float rhythm = juce::jlimit (0.0f, 1.0f, rawActivity[band]);
             const float target = juce::jlimit (0.0f, 1.0f,
-                                               (expandedDb + 64.0f) / 52.0f);
+                                               baseTarget + rhythm * 0.20f);
             const float previous = levels[band];
             const float bandPosition = static_cast<float> (band)
                                      / static_cast<float> (bandCount - 1);
             const float releaseMix = 0.14f + 0.10f * bandPosition;
 
             if (target > previous)
-                levels[band] = previous + (target - previous) * 0.90f;
+                levels[band] = previous + (target - previous) * 0.92f;
             else
                 levels[band] = previous * (1.0f - releaseMix) + target * releaseMix;
 
             const float positiveRise = juce::jmax (0.0f, target - previous);
-            pulses[band] = juce::jmax (pulses[band] * 0.66f,
-                                       juce::jmin (1.0f, positiveRise * 3.4f));
+            pulses[band] = juce::jmax (pulses[band] * 0.62f,
+                juce::jmax (rhythm, juce::jmin (1.0f, positiveRise * 3.4f)));
 
             if (levels[band] >= heldPeaks[band])
             {
@@ -335,7 +342,6 @@ set(_prepare_replacement [=[
 sc220_bands_replace_once(_engine "prepare fixed band filters on device start"
     "${_prepare_anchor}" "${_prepare_replacement}")
 
-# Remove all UI lifecycle manipulation belonging to the deleted tap visualizer.
 foreach(_obsolete_line IN ITEMS
         "    audioEngine.setProgrammeAnalyzerEnabled (true);\n"
         "    audioEngine.getMusicEnhancerBridge().setVisualTapEnabled (true);\n"
@@ -348,11 +354,14 @@ foreach(_required IN ITEMS
         "programmeBandTelemetry.prepare"
         "programmeBandTelemetry.process"
         "programmeBandTelemetry.read"
+        "programmeBandTelemetry.readActivity"
         "POST-LIMITER BANDS"
         "PROGRAM ANALYZER"
         "14 BAND"
         "segmentCount = 16"
         "peakHoldFrames[band] = 14"
+        "rawActivity"
+        "rhythm * 0.20f"
         "pulses[band]"
         "positiveRise")
     string(FIND "${_ui}${_engine}" "${_required}" _position)
@@ -389,4 +398,4 @@ endforeach()
 
 file(WRITE "${SC220_UI_MONITOR_GENERATED_SOURCE}" "${_ui}")
 file(WRITE "${SC220_ENGINE_GENERATED_SOURCE}" "${_engine}")
-message(STATUS "SC220 Live rhythmic atomic post-limiter filter-bank visualizer generated")
+message(STATUS "SC220 Live rhythmic pink-flat atomic filter-bank visualizer generated")

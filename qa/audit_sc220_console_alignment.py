@@ -73,21 +73,20 @@ check(
     )),
 )
 check(
-    "telemetry publishes only atomic dB values",
+    "telemetry publishes calibrated levels and separate rhythm activity atomically",
     all(token in telemetry for token in (
-        "std::array<std::atomic<float>, bandCount>",
+        "std::array<std::atomic<float>, bandCount> publishedDb",
+        "std::array<std::atomic<float>, bandCount> publishedActivity",
         "publishedGeneration.fetch_add", "publishedDb[band].store",
-        "publishedDb[band].load",
+        "publishedActivity[band].store", "readActivity",
     )),
 )
 check(
-    "telemetry includes flat frequency-dependent rhythm envelopes",
+    "telemetry keeps a stable 180 ms baseline plus fast per-frequency activity",
     all(token in telemetry for token in (
-        "envelopePower", "attackSeconds", "releaseSeconds",
-        "envelopeSeconds", "coefficient",
-    ))
-    and all(token not in telemetry for token in (
-        "slowPower", "transientDb", "transientEmphasis",
+        "calibratedPower", "fastPower", "calibratedSmoothingSeconds = 0.180",
+        "fastAttackSeconds", "fastReleaseSeconds", "activityThresholdDb",
+        "activityRangeDb",
     )),
 )
 check(
@@ -109,9 +108,10 @@ check(
     > generated_engine.find("masterLimiter.process (masterContext);"),
 )
 check(
-    "UI reads pink-calibrated atomic bands without sample transport",
+    "UI reads pink-calibrated levels and separate activity without sample transport",
     all(token in generated_ui for token in (
         "updateFromTelemetry", "programmeBandTelemetry.read",
+        "programmeBandTelemetry.readActivity", "rawActivity", "rhythm * 0.20f",
         "PINK-FLAT BANDS", "WAITING FOR ENGINE BANDS",
         "PROGRAM ANALYZER", "const float displayDb = rawDb[band]",
     )),
@@ -127,11 +127,12 @@ check(
     )),
 )
 check(
-    "rhythmic visual expansion pulse and peak hold remain deterministic",
+    "rhythmic visual lift pulse and peak hold remain deterministic",
     all(token in generated_ui for token in (
         "segmentCount = 16", "peakHoldFrames[band] = 14",
         "expandedDb = -38.0f", "* 1.32f", "positiveRise",
         "pulses[band]", "releaseMix", "heldPeaks[band] - 0.032f",
+        "baseTarget + rhythm * 0.20f",
     )),
 )
 check(

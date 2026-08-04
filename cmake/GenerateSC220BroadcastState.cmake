@@ -102,6 +102,8 @@ file(WRITE "${SC220_APP_GENERATED_SOURCE}" "${_app}")
 message(STATUS "SC220 Live broadcast-state source: ${SC220_APP_GENERATED_SOURCE}")
 
 # The monitor engine, UI and persisted application now exist. Add selectable
-# PC playback capture and anti-loop policy, then apply final visual polish.
+# PC playback capture and anti-loop policy, apply final visual polish, then
+# stabilise PC-music-only operation and safe virtual-cable source routing.
 include("${CMAKE_CURRENT_LIST_DIR}/GenerateSC220PcEndpointRouting.cmake")
 include("${CMAKE_CURRENT_LIST_DIR}/PolishSC220FinalUi.cmake")
+include("${CMAKE_CURRENT_LIST_DIR}/StabilizeSC220PcMusicMode.cmake")

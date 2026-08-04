@@ -1,33 +1,35 @@
-# Replace every queue/tap-based production visual path with one deterministic
-# post-limiter snapshot. The same stereo buffer that feeds Stream output and
-# Stream metering fills a lock-free double bank of exactly 512 samples. The UI
-# reads only complete banks. FFT and drawing remain on the 30 Hz message thread.
+# Build the SC220 programme visualizer from zero.
+#
+# The old ScopeTap, FFT, snapshot, direct-capture, and recovery paths are not
+# used. The exact post-limiter stereo buffer is measured by fourteen fixed
+# band-pass biquads inside ProgrammeBandTelemetry. Only atomic dB values cross
+# into the UI. There is no sample queue and therefore no empty-frame lifecycle.
 
 if(NOT DEFINED SC220_UI_MONITOR_GENERATED_SOURCE
    OR NOT DEFINED SC220_ENGINE_GENERATED_SOURCE)
-    message(FATAL_ERROR "SC220 snapshot spectralizer requires final UI and engine sources")
+    message(FATAL_ERROR "SC220 atomic band visualizer requires final UI and engine sources")
 endif()
 
 file(READ "${SC220_UI_MONITOR_GENERATED_SOURCE}" _ui)
 file(READ "${SC220_ENGINE_GENERATED_SOURCE}" _engine)
 
-function(sc220_snapshot_replace_range variable_name label start_marker end_marker replacement)
+function(sc220_bands_replace_range variable_name label start_marker end_marker replacement)
     set(_value "${${variable_name}}")
     string(FIND "${_value}" "${start_marker}" _start)
     string(FIND "${_value}" "${end_marker}" _end)
     if(_start EQUAL -1 OR _end EQUAL -1 OR _end LESS_EQUAL _start)
-        message(FATAL_ERROR "SC220 snapshot spectralizer range changed: ${label}")
+        message(FATAL_ERROR "SC220 atomic band range changed: ${label}")
     endif()
     string(SUBSTRING "${_value}" 0 ${_start} _prefix)
     string(SUBSTRING "${_value}" ${_end} -1 _suffix)
     set(${variable_name} "${_prefix}${replacement}\n\n${_suffix}" PARENT_SCOPE)
 endfunction()
 
-function(sc220_snapshot_replace_once variable_name label anchor replacement)
+function(sc220_bands_replace_once variable_name label anchor replacement)
     set(_value "${${variable_name}}")
     string(FIND "${_value}" "${anchor}" _position)
     if(_position EQUAL -1)
-        message(FATAL_ERROR "SC220 snapshot spectralizer anchor changed: ${label}")
+        message(FATAL_ERROR "SC220 atomic band anchor changed: ${label}")
     endif()
     string(REPLACE "${anchor}" "${replacement}" _value "${_value}")
     set(${variable_name} "${_value}" PARENT_SCOPE)
@@ -38,9 +40,9 @@ set(_ui_include_anchor [=[
 ]=])
 set(_ui_include_replacement [=[
 #include "SC220MainComponent.h"
-#include "ProgrammeSpectrumSnapshot.h"
+#include "ProgrammeBandTelemetry.h"
 ]=])
-sc220_snapshot_replace_once(_ui "UI snapshot include"
+sc220_bands_replace_once(_ui "UI band telemetry include"
     "${_ui_include_anchor}" "${_ui_include_replacement}")
 
 set(_engine_include_anchor [=[
@@ -48,9 +50,9 @@ set(_engine_include_anchor [=[
 ]=])
 set(_engine_include_replacement [=[
 #include "LiveAudioEngine.h"
-#include "ProgrammeSpectrumSnapshot.h"
+#include "ProgrammeBandTelemetry.h"
 ]=])
-sc220_snapshot_replace_once(_engine "engine snapshot include"
+sc220_bands_replace_once(_engine "engine band telemetry include"
     "${_engine_include_anchor}" "${_engine_include_replacement}")
 
 set(_display_start "class SC220MainComponent::LiveSpectrumDisplay final : public juce::Component")
@@ -60,99 +62,57 @@ class SC220MainComponent::LiveSpectrumDisplay final : public juce::Component
 {
 public:
     LiveSpectrumDisplay()
-        : fft (fftOrder),
-          window (fftSize, juce::dsp::WindowingFunction<float>::hann, true)
     {
         levels.fill (0.0f);
         heldPeaks.fill (0.0f);
         peakHoldFrames.fill (0);
     }
 
-    void updateFromSnapshot (double sampleRate)
+    void updateFromTelemetry()
     {
-        const int count = programmeSpectrumSnapshot.consumeLatest (
-            captureLeft.data(), captureRight.data(), fftSize);
+        std::array<float, bandCount> rawDb {};
+        std::uint64_t generation = 0;
+        const bool available = programmeBandTelemetry.read (rawDb, generation);
 
-        if (count != fftSize || sampleRate <= 0.0)
+        if (! available)
         {
-            ++emptyFrameStreak;
-            decayWithoutFrame();
+            ++staleFrames;
+            decayWithoutCallback();
             repaint();
             return;
         }
 
-        emptyFrameStreak = 0;
-        ++receivedFrames;
-        leftFftData.fill (0.0f);
-        rightFftData.fill (0.0f);
-        float capturedPeak = 0.0f;
-        for (int i = 0; i < fftSize; ++i)
+        if (generation == lastGeneration)
+            ++staleFrames;
+        else
         {
-            const float leftSample = captureLeft[static_cast<size_t> (i)];
-            const float rightSample = captureRight[static_cast<size_t> (i)];
-            leftFftData[static_cast<size_t> (i)] = leftSample;
-            rightFftData[static_cast<size_t> (i)] = rightSample;
-            capturedPeak = juce::jmax (capturedPeak,
-                juce::jmax (std::abs (leftSample), std::abs (rightSample)));
+            lastGeneration = generation;
+            staleFrames = 0;
         }
 
-        window.multiplyWithWindowingTable (leftFftData.data(), fftSize);
-        window.multiplyWithWindowingTable (rightFftData.data(), fftSize);
-        fft.performFrequencyOnlyForwardTransform (leftFftData.data());
-        fft.performFrequencyOnlyForwardTransform (rightFftData.data());
-
-        const float safeRate = static_cast<float> (sampleRate);
-        const float upperFrequency = juce::jmin (16000.0f, safeRate * 0.45f);
-        constexpr float lowerFrequency = 35.0f;
-
+        float strongestDb = -120.0f;
         for (size_t band = 0; band < bandCount; ++band)
         {
-            const float t0 = static_cast<float> (band) / static_cast<float> (bandCount);
-            const float t1 = static_cast<float> (band + 1) / static_cast<float> (bandCount);
-            const float frequency0 = lowerFrequency
-                * std::pow (upperFrequency / lowerFrequency, t0);
-            const float frequency1 = lowerFrequency
-                * std::pow (upperFrequency / lowerFrequency, t1);
-            const int bin0 = juce::jlimit (1, fftSize / 2 - 1,
-                juce::roundToInt (frequency0 * static_cast<float> (fftSize) / safeRate));
-            const int bin1 = juce::jlimit (bin0 + 1, fftSize / 2,
-                juce::roundToInt (frequency1 * static_cast<float> (fftSize) / safeRate));
+            // Display-only contour. The audio is never modified.
+            float displayDb = rawDb[band];
+            if (band <= 2)
+                displayDb += 4.0f;
+            else if (band <= 5)
+                displayDb += 2.0f;
+            else if (band >= 12)
+                displayDb -= 1.5f;
 
-            float stereoPower = 0.0f;
-            int bins = 0;
-            for (int bin = bin0; bin < bin1; ++bin)
-            {
-                const float leftMagnitude = leftFftData[static_cast<size_t> (bin)];
-                const float rightMagnitude = rightFftData[static_cast<size_t> (bin)];
-                stereoPower += 0.5f * (leftMagnitude * leftMagnitude
-                                     + rightMagnitude * rightMagnitude);
-                ++bins;
-            }
-
-            const float energy = bins > 0
-                ? std::sqrt (stereoPower / static_cast<float> (bins))
-                : 0.0f;
-            float db = juce::Decibels::gainToDecibels (
-                energy / static_cast<float> (fftSize), -96.0f);
-
-            // Display-only contour. It never touches the programme audio.
-            if (band < 5)
-                db += 4.0f;
-            else if (band < 9)
-                db += 1.5f;
-            else if (band > 19)
-                db -= 1.5f;
-
-            const float target = normaliseDb (db, -72.0f);
+            strongestDb = juce::jmax (strongestDb, displayDb);
+            const float target = normaliseDb (displayDb, -72.0f);
             if (target > levels[band])
-                levels[band] += (target - levels[band]) * 0.82f;
+                levels[band] += (target - levels[band]) * 0.76f;
             else
-                levels[band] = levels[band] * 0.88f + target * 0.12f;
+                levels[band] = levels[band] * 0.84f + target * 0.16f;
 
             if (levels[band] >= heldPeaks[band])
             {
                 heldPeaks[band] = levels[band];
-                peakHoldFrames[band] = 15;
+                peakHoldFrames[band] = 18; // 600 ms at 30 Hz.
             }
             else if (peakHoldFrames[band] > 0)
             {
@@ -161,13 +121,11 @@ public:
             else
             {
                 heldPeaks[band] = juce::jmax (levels[band],
-                                              heldPeaks[band] - 0.026f);
+                                              heldPeaks[band] - 0.024f);
             }
         }
 
-        hasSignal = capturedPeak > juce::Decibels::decibelsToGain (-78.0f)
-                 || std::any_of (levels.begin(), levels.end(),
-                     [] (float value) { return value > 0.018f; });
+        hasSignal = strongestDb > -78.0f;
         repaint();
     }
 
@@ -180,9 +138,9 @@ public:
         g.drawRoundedRectangle (area, 7.0f, 1.0f);
 
         auto graph = area.reduced (34.0f, 27.0f);
-        graph.removeFromBottom (14.0f);
+        graph.removeFromBottom (17.0f);
 
-        g.setColour (juce::Colours::white.withAlpha (0.065f));
+        g.setColour (juce::Colours::white.withAlpha (0.060f));
         for (int line = 0; line <= 4; ++line)
         {
             const float y = graph.getBottom()
@@ -190,8 +148,8 @@ public:
             g.drawHorizontalLine (juce::roundToInt (y), graph.getX(), graph.getRight());
         }
 
-        constexpr int segmentCount = 15;
-        constexpr float barGap = 4.0f;
+        constexpr int segmentCount = 14;
+        constexpr float barGap = 6.0f;
         constexpr float segmentGap = 2.0f;
         const float barWidth = (graph.getWidth()
             - barGap * static_cast<float> (bandCount - 1))
@@ -215,111 +173,96 @@ public:
                 const auto cell = juce::Rectangle<float> (x, y, barWidth, segmentHeight);
                 const float heightNormal = static_cast<float> (segment)
                     / static_cast<float> (segmentCount - 1);
-                const auto activeColour = heightNormal > 0.86f ? palette::red
-                                        : heightNormal > 0.68f ? palette::amber
+                const auto activeColour = heightNormal > 0.84f ? palette::red
+                                        : heightNormal > 0.65f ? palette::amber
                                                                : palette::green;
                 g.setColour (segment < litSegments
-                    ? activeColour.withAlpha (0.94f)
-                    : activeColour.withAlpha (0.10f));
-                g.fillRoundedRectangle (cell, juce::jmin (1.8f, barWidth * 0.30f));
+                    ? activeColour.withAlpha (0.96f)
+                    : activeColour.withAlpha (0.095f));
+                g.fillRoundedRectangle (cell, juce::jmin (1.8f, barWidth * 0.28f));
             }
 
             if (heldPeaks[band] > 0.025f)
             {
                 const float peakY = graph.getBottom()
                     - heldPeaks[band] * graph.getHeight();
-                g.setColour (palette::amber.withAlpha (0.95f));
+                g.setColour (palette::amber.withAlpha (0.96f));
                 g.fillRoundedRectangle (x, peakY - 1.0f, barWidth, 2.0f,
                                         juce::jmin (1.0f, barWidth * 0.25f));
             }
         }
 
-        g.setColour (juce::Colours::white.withAlpha (0.72f));
+        g.setColour (juce::Colours::white.withAlpha (0.74f));
         g.setFont (interFont (9.5f, true));
-        g.drawText ("PROGRAM SPECTRUM",
+        g.drawText ("PROGRAM ANALYZER",
                     juce::roundToInt (area.getX() + 34.0f),
                     juce::roundToInt (area.getY() + 6.0f), 190, 16,
                     juce::Justification::centredLeft);
 
-        const auto published = programmeSpectrumSnapshot.generation();
-        const bool receiving = receivedFrames > 0 && emptyFrameStreak < 6;
-        g.setColour (receiving ? palette::green.withAlpha (0.82f)
-                               : palette::red.withAlpha (0.82f));
+        const bool callbackAlive = lastGeneration > 0 && staleFrames < 6;
+        g.setColour (callbackAlive ? palette::green.withAlpha (0.84f)
+                                   : palette::red.withAlpha (0.84f));
         g.setFont (interFont (8.3f, true));
-        const auto sourceText = receiving
-            ? "POST-LIMITER SNAPSHOT  #" + juce::String (published)
-            : "WAITING FOR POST-LIMITER SNAPSHOT";
-        g.drawFittedText (sourceText + "  /  24 BAND  /  30 FPS",
-                          juce::roundToInt (area.getRight() - 305.0f),
-                          juce::roundToInt (area.getY() + 6.0f), 271, 16,
+        const auto status = callbackAlive
+            ? "POST-LIMITER BANDS  #" + juce::String (lastGeneration)
+            : "WAITING FOR ENGINE BANDS";
+        g.drawFittedText (status + "  /  14 BAND  /  30 FPS",
+                          juce::roundToInt (area.getRight() - 300.0f),
+                          juce::roundToInt (area.getY() + 6.0f), 266, 16,
                           juce::Justification::centredRight, 1);
 
-        const auto labelY = juce::roundToInt (graph.getBottom() + 5.0f);
-        const auto frequencyX = [&graph] (float frequency)
-        {
-            constexpr float lower = 35.0f;
-            constexpr float upper = 16000.0f;
-            const float normal = std::log (frequency / lower) / std::log (upper / lower);
-            return graph.getX() + juce::jlimit (0.0f, 1.0f, normal) * graph.getWidth();
-        };
         g.setColour (juce::Colours::white.withAlpha (0.48f));
-        g.setFont (interFont (8.2f));
-        const std::array<std::pair<float, const char*>, 6> labels {{
-            { 40.0f, "40" }, { 100.0f, "100" }, { 250.0f, "250" },
-            { 1000.0f, "1k" }, { 4000.0f, "4k" }, { 12000.0f, "12k" }
+        g.setFont (interFont (8.0f));
+        const std::array<std::pair<size_t, const char*>, 7> labels {{
+            { 0, "50" }, { 2, "125" }, { 4, "315" }, { 6, "800" },
+            { 8, "2k" }, { 10, "5k" }, { 12, "12k" }
         }};
+        const int labelY = juce::roundToInt (graph.getBottom() + 5.0f);
         for (const auto& label : labels)
         {
-            const int x = juce::roundToInt (frequencyX (label.first));
-            g.drawText (label.second, x - 20, labelY, 40, 14,
-                        juce::Justification::centred);
+            const float x = graph.getX()
+                + static_cast<float> (label.first) * (barWidth + barGap)
+                + barWidth * 0.5f;
+            g.drawText (label.second, juce::roundToInt (x) - 22,
+                        labelY, 44, 14, juce::Justification::centred);
         }
 
         if (! hasSignal)
         {
             g.setColour (juce::Colours::white.withAlpha (0.44f));
             g.setFont (interFont (11.0f, true));
-            g.drawText (receivedFrames == 0
-                            ? "WAITING FOR POST-LIMITER AUDIO"
-                            : "PROGRAM SILENCE",
+            g.drawText (callbackAlive ? "PROGRAM SILENCE"
+                                      : "WAITING FOR POST-LIMITER AUDIO",
                         graph.toNearestInt(), juce::Justification::centred);
         }
     }
 
 private:
-    void decayWithoutFrame()
+    void decayWithoutCallback()
     {
         for (size_t band = 0; band < bandCount; ++band)
         {
-            levels[band] *= 0.90f;
+            levels[band] *= 0.88f;
             if (peakHoldFrames[band] > 0)
                 --peakHoldFrames[band];
             else
                 heldPeaks[band] = juce::jmax (levels[band],
-                                              heldPeaks[band] - 0.026f);
+                                              heldPeaks[band] - 0.024f);
         }
         hasSignal = std::any_of (levels.begin(), levels.end(),
             [] (float value) { return value > 0.018f; });
     }
 
-    static constexpr int fftOrder = 9;
-    static constexpr int fftSize = 1 << fftOrder;
-    static constexpr size_t bandCount = 24;
-    juce::dsp::FFT fft;
-    juce::dsp::WindowingFunction<float> window;
-    std::array<float, fftSize> captureLeft {};
-    std::array<float, fftSize> captureRight {};
-    std::array<float, fftSize * 2> leftFftData {};
-    std::array<float, fftSize * 2> rightFftData {};
+    static constexpr size_t bandCount = ProgrammeBandTelemetry::bandCount;
     std::array<float, bandCount> levels {};
     std::array<float, bandCount> heldPeaks {};
     std::array<int, bandCount> peakHoldFrames {};
-    unsigned long long receivedFrames = 0;
-    int emptyFrameStreak = 0;
+    std::uint64_t lastGeneration = 0;
+    int staleFrames = 0;
     bool hasSignal = false;
 };
 ]=])
-sc220_snapshot_replace_range(_ui "snapshot-driven fixed-frequency spectralizer"
+sc220_bands_replace_range(_ui "new atomic filter-bank visualizer"
     "${_display_start}" "${_display_end}" "${_display_replacement}")
 
 set(_timer_anchor [=[
@@ -332,9 +275,9 @@ set(_timer_anchor [=[
     }
 ]=])
 set(_timer_replacement [=[
-    spectrumDisplay->updateFromSnapshot (lastStatus.sampleRate);
+    spectrumDisplay->updateFromTelemetry();
 ]=])
-sc220_snapshot_replace_once(_ui "drive spectrum directly from complete snapshots"
+sc220_bands_replace_once(_ui "drive UI from atomic band values"
     "${_timer_anchor}" "${_timer_replacement}")
 
 set(_publish_anchor [=[
@@ -342,44 +285,56 @@ set(_publish_anchor [=[
                             voiceBlock.getReadPointer (1), numSamples);
 ]=])
 set(_publish_replacement [=[
-    programmeSpectrumSnapshot.push (voiceBlock.getReadPointer (0),
+    programmeBandTelemetry.process (voiceBlock.getReadPointer (0),
                                     voiceBlock.getReadPointer (1), numSamples);
 ]=])
-sc220_snapshot_replace_once(_engine "publish the exact post-limiter programme buffer"
+sc220_bands_replace_once(_engine "measure exact post-limiter programme buffer"
     "${_publish_anchor}" "${_publish_replacement}")
 
-set(_reset_anchor [=[
+set(_prepare_anchor [=[
     programmeAnalyzer.setEnabled (true);
 
     juce::dsp::ProcessSpec masterSpec;
 ]=])
-set(_reset_replacement [=[
+set(_prepare_replacement [=[
     programmeAnalyzer.setEnabled (false);
-    programmeSpectrumSnapshot.reset();
+    programmeBandTelemetry.prepare (sampleRate);
 
     juce::dsp::ProcessSpec masterSpec;
 ]=])
-sc220_snapshot_replace_once(_engine "reset snapshot on audio device start"
-    "${_reset_anchor}" "${_reset_replacement}")
+sc220_bands_replace_once(_engine "prepare fixed band filters on device start"
+    "${_prepare_anchor}" "${_prepare_replacement}")
+
+# Remove all UI lifecycle manipulation belonging to the deleted tap visualizer.
+foreach(_obsolete_line IN ITEMS
+        "    audioEngine.setProgrammeAnalyzerEnabled (true);\n"
+        "    audioEngine.getMusicEnhancerBridge().setVisualTapEnabled (true);\n"
+        "    audioEngine.getVoiceEnhancerBridge().setVisualTapEnabled (true);\n")
+    string(REPLACE "${_obsolete_line}" "" _ui "${_ui}")
+endforeach()
 
 foreach(_required IN ITEMS
-        "ProgrammeSpectrumSnapshot.h"
-        "updateFromSnapshot"
-        "programmeSpectrumSnapshot.consumeLatest"
-        "programmeSpectrumSnapshot.push"
-        "POST-LIMITER SNAPSHOT"
-        "bandCount = 24"
-        "fftOrder = 9"
-        "segmentCount = 15"
-        "peakHoldFrames[band] = 15"
-        "performFrequencyOnlyForwardTransform")
+        "ProgrammeBandTelemetry.h"
+        "programmeBandTelemetry.prepare"
+        "programmeBandTelemetry.process"
+        "programmeBandTelemetry.read"
+        "POST-LIMITER BANDS"
+        "PROGRAM ANALYZER"
+        "14 BAND"
+        "segmentCount = 14"
+        "peakHoldFrames[band] = 18")
     string(FIND "${_ui}${_engine}" "${_required}" _position)
     if(_position EQUAL -1)
-        message(FATAL_ERROR "SC220 snapshot spectralizer authority missing: ${_required}")
+        message(FATAL_ERROR "SC220 atomic band authority missing: ${_required}")
     endif()
 endforeach()
 
 foreach(_forbidden IN ITEMS
+        "ProgrammeSpectrumSnapshot"
+        "programmeSpectrumSnapshot"
+        "performFrequencyOnlyForwardTransform"
+        "multiplyWithWindowingTable"
+        "updateFromSnapshot"
         "updateFromTaps"
         "programmeTap.consumeLatest"
         "musicTap.consumeLatest"
@@ -394,12 +349,12 @@ foreach(_forbidden IN ITEMS
         "OLDER"
         "NOW"
         "historySize = 32")
-    string(FIND "${_ui}" "${_forbidden}" _position)
+    string(FIND "${_ui}${_engine}" "${_forbidden}" _position)
     if(NOT _position EQUAL -1)
-        message(FATAL_ERROR "SC220 obsolete visualizer path remains: ${_forbidden}")
+        message(FATAL_ERROR "SC220 deleted visualizer path remains: ${_forbidden}")
     endif()
 endforeach()
 
 file(WRITE "${SC220_UI_MONITOR_GENERATED_SOURCE}" "${_ui}")
 file(WRITE "${SC220_ENGINE_GENERATED_SOURCE}" "${_engine}")
-message(STATUS "SC220 Live deterministic post-limiter snapshot spectralizer generated")
+message(STATUS "SC220 Live atomic post-limiter filter-bank visualizer generated")

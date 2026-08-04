@@ -6,43 +6,55 @@ import numpy as np
 ROOT = Path(__file__).resolve().parents[1]
 GENERATED = ROOT / "generated" / "sc220-monitor" / "SC220MainComponent_Monitor.cpp"
 SOURCE = GENERATED.read_text(encoding="utf-8") if GENERATED.exists() else ""
+TELEMETRY = (ROOT / "live/ProgrammeBandTelemetry.h").read_text(encoding="utf-8")
 
 SAMPLE_RATE = 48_000.0
-FFT_SIZE = 512
-BAND_COUNT = 24
-LOW_FREQUENCY = 35.0
-HIGH_FREQUENCY = 16_000.0
+CENTRES = np.array([
+    50.0, 80.0, 125.0, 200.0, 315.0, 500.0, 800.0,
+    1250.0, 2000.0, 3150.0, 5000.0, 8000.0, 12000.0, 16000.0,
+])
+Q = 1.10
+SAMPLES = 4096
+
+
+def coefficients(frequency: float) -> tuple[float, float, float, float, float]:
+    omega = 2.0 * math.pi * frequency / SAMPLE_RATE
+    alpha = math.sin(omega) / (2.0 * Q)
+    a0 = 1.0 + alpha
+    return (
+        alpha / a0,
+        0.0,
+        -alpha / a0,
+        -2.0 * math.cos(omega) / a0,
+        (1.0 - alpha) / a0,
+    )
+
+
+def filter_channel(signal: np.ndarray, frequency: float) -> np.ndarray:
+    b0, b1, b2, a1, a2 = coefficients(frequency)
+    output = np.zeros_like(signal)
+    x1 = x2 = y1 = y2 = 0.0
+    for index, sample in enumerate(signal):
+        value = b0 * sample + b1 * x1 + b2 * x2 - a1 * y1 - a2 * y2
+        x2, x1 = x1, float(sample)
+        y2, y1 = y1, value
+        output[index] = value
+    return output
 
 
 def analyse(left: np.ndarray, right: np.ndarray) -> np.ndarray:
-    window = np.hanning(FFT_SIZE)
-    left_magnitude = np.abs(np.fft.rfft(left * window))
-    right_magnitude = np.abs(np.fft.rfft(right * window))
-    result = np.zeros(BAND_COUNT, dtype=np.float64)
-
-    for band in range(BAND_COUNT):
-        t0 = band / BAND_COUNT
-        t1 = (band + 1) / BAND_COUNT
-        frequency0 = LOW_FREQUENCY * (HIGH_FREQUENCY / LOW_FREQUENCY) ** t0
-        frequency1 = LOW_FREQUENCY * (HIGH_FREQUENCY / LOW_FREQUENCY) ** t1
-        bin0 = int(np.clip(round(frequency0 * FFT_SIZE / SAMPLE_RATE), 1, FFT_SIZE // 2 - 1))
-        bin1 = int(np.clip(round(frequency1 * FFT_SIZE / SAMPLE_RATE), bin0 + 1, FFT_SIZE // 2))
-        stereo_power = 0.5 * (
-            left_magnitude[bin0:bin1] ** 2 + right_magnitude[bin0:bin1] ** 2
-        )
-        result[band] = math.sqrt(float(np.mean(stereo_power))) if stereo_power.size else 0.0
-
+    result = np.zeros(len(CENTRES), dtype=np.float64)
+    for index, frequency in enumerate(CENTRES):
+        filtered_left = filter_channel(left, float(frequency))
+        filtered_right = filter_channel(right, float(frequency))
+        stereo_energy = 0.5 * (filtered_left**2 + filtered_right**2)
+        result[index] = math.sqrt(float(np.mean(stereo_energy)))
     return result
 
 
-def band_centre(index: int) -> float:
-    t = (index + 0.5) / BAND_COUNT
-    return LOW_FREQUENCY * (HIGH_FREQUENCY / LOW_FREQUENCY) ** t
-
-
-def tone(frequency: float, phase: float = 0.0) -> np.ndarray:
-    time = np.arange(FFT_SIZE, dtype=np.float64) / SAMPLE_RATE
-    return np.sin(2.0 * np.pi * frequency * time + phase)
+def tone(frequency: float) -> np.ndarray:
+    time = np.arange(SAMPLES, dtype=np.float64) / SAMPLE_RATE
+    return np.sin (2.0 * np.pi * frequency * time)
 
 
 checks: list[tuple[str, bool, str]] = []
@@ -52,73 +64,73 @@ def check(name: str, condition: bool, detail: str) -> None:
     checks.append((name, bool(condition), detail))
 
 
-frequencies = (187.5, 1_500.0, 7_500.0)
+frequencies = (80.0, 800.0, 8000.0)
 peak_indices: list[int] = []
 for frequency in frequencies:
     signal = tone(frequency)
     bands = analyse(signal, signal)
     peak = int(np.argmax(bands))
     peak_indices.append(peak)
-    centre = band_centre(peak)
-    ratio = max(centre, frequency) / min(centre, frequency)
     check(
-        f"{frequency:g} Hz tone maps near its logarithmic band",
-        ratio < 1.9,
-        f"peak band={peak}, centre={centre:.1f} Hz, ratio={ratio:.2f}",
+        f"{frequency:g} Hz tone peaks at its fixed band",
+        math.isclose(float(CENTRES[peak]), frequency, rel_tol=0.01),
+        f"peak index={peak}, centre={CENTRES[peak]:.0f} Hz",
     )
 
 check(
-    "bass, mid, and treble peaks increase from left to right",
+    "bass mid and treble peaks increase left to right",
     peak_indices[0] < peak_indices[1] < peak_indices[2],
     f"indices={peak_indices}",
 )
 
-anti_left = tone(1_500.0)
+anti_left = tone(1250.0)
 anti_right = -anti_left
 mono_sum = 0.5 * (anti_left + anti_right)
 anti_bands = analyse(anti_left, anti_right)
 check(
-    "anti-phase stereo collapses in mono as the test intends",
+    "anti-phase test collapses in mono",
     float(np.max(np.abs(mono_sum))) < 1.0e-12,
     f"mono peak={float(np.max(np.abs(mono_sum))):.3e}",
 )
 check(
-    "stereo-energy spectralizer still detects anti-phase audio",
-    float(np.max(anti_bands)) > 10.0,
-    f"stereo spectral peak={float(np.max(anti_bands)):.3f}",
+    "stereo-energy filters retain anti-phase programme audio",
+    float(np.max(anti_bands)) > 0.5,
+    f"band peak={float(np.max(anti_bands)):.3f}",
 )
 check(
-    "anti-phase tone lands in the same band as in-phase tone",
-    int(np.argmax(anti_bands)) == peak_indices[1],
-    f"anti-phase band={int(np.argmax(anti_bands))}, reference={peak_indices[1]}",
+    "anti-phase tone peaks at 1.25 kHz band",
+    int(np.argmax(anti_bands)) == 7,
+    f"peak index={int(np.argmax(anti_bands))}",
 )
-
 check(
-    "generated UI uses the audited 512-point 24-band contract",
+    "telemetry source contains the audited centres and Q",
+    all(token in TELEMETRY for token in (
+        "bandCount = 14", "q = 1.10", "50.0f, 80.0f, 125.0f",
+        "1250.0f", "8000.0f", "16000.0f", "processSample",
+    )),
+    "fixed filter-bank contract",
+)
+check(
+    "generated UI uses atomic 14-band contract",
     all(token in SOURCE for token in (
-        "fftOrder = 9",
-        "bandCount = 24",
-        "stereoPower += 0.5f",
-        "segmentCount = 15",
-        "peakHoldFrames[band] = 15",
-        "PROGRAM SPECTRUM",
+        "programmeBandTelemetry.read", "segmentCount = 14",
+        "peakHoldFrames[band] = 18", "PROGRAM ANALYZER",
+        "POST-LIMITER BANDS",
     )),
-    "generated source contract",
+    "generated UI contract",
 )
 check(
-    "time-history direction labels are absent",
-    all(token not in SOURCE for token in (
-        "PROGRAM IMPACT",
-        "PC INPUT IMPACT",
-        '"OLDER"',
-        '"NOW"',
-        "historySize = 32",
+    "FFT snapshot and history implementations are absent",
+    all(token not in SOURCE + TELEMETRY for token in (
+        "performFrequencyOnlyForwardTransform", "ProgrammeSpectrumSnapshot",
+        "programmeSpectrumSnapshot", "PROGRAM IMPACT", "PC INPUT IMPACT",
+        '"OLDER"', '"NOW"', "historySize = 32",
     )),
-    "fixed frequency positions only",
+    "atomic bands only",
 )
 
 failed = [name for name, ok, _ in checks if not ok]
-print("SC220 Live synthetic fixed-frequency spectralizer audit")
+print("SC220 Live synthetic atomic filter-bank response audit")
 for name, ok, detail in checks:
     print(f"[ {'PASS' if ok else 'FAIL'} ] {name}: {detail}")
 print(f"Checks: {len(checks)}  Passed: {len(checks) - len(failed)}  Failed: {len(failed)}")

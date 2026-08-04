@@ -3,6 +3,9 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 header = (ROOT / "live/SC220MainComponent.h").read_text(encoding="utf-8")
 source = (ROOT / "live/SC220MainComponent.cpp").read_text(encoding="utf-8")
+generated_root = ROOT / "generated" / "sc220-monitor"
+generated_ui_path = generated_root / "SC220MainComponent_Monitor.cpp"
+final_ui = generated_ui_path.read_text(encoding="utf-8") if generated_ui_path.exists() else source
 
 checks: list[tuple[str, bool]] = []
 
@@ -29,13 +32,21 @@ check("Smart Enhancer power icon exists", all(token in header + source for token
     'LucideIconButton enhancerPowerButton { "Smart Enhancer", "power_svg"',
     "enhancerPowerButton.setClickingTogglesState",
     "audioEngine.setBypassed (! enhancerPowerButton.getToggleState())")))
-check("post-master analyzer renders lightweight real-audio bars", all(token in source for token in (
+check("final generated UI renders fixed-frequency programme spectrum", all(token in final_ui for token in (
     "class SC220MainComponent::LiveSpectrumDisplay",
-    "programmeTap.consumeLatest",
+    "updateFromTaps",
     "performFrequencyOnlyForwardTransform",
-    "updateFromTap",
-    '"32 BAND  /  15 FPS"')))
-check("voice and music visual taps are enabled", all(token in source for token in (
+    "bandCount = 24",
+    "segmentCount = 15",
+    '"PROGRAM SPECTRUM"')))
+check("final visualizer has explicit runtime recovery sources", all(token in final_ui for token in (
+    "programmeTap.consumeLatest",
+    "musicTap.consumeLatest",
+    "voiceTap.consumeLatest",
+    'sourceText = "POST-MASTER"',
+    'sourceText = "MUSIC RECOVERY"',
+    'sourceText = "VOICE RECOVERY"')))
+check("voice and music recovery taps remain enabled", all(token in final_ui for token in (
     "getVoiceEnhancerBridge().setVisualTapEnabled (true)",
     "getMusicEnhancerBridge().setVisualTapEnabled (true)")))
 check("main surface uses native Windows premium typography", 'font.setTypefaceName ("Segoe UI Variable")' in source)
@@ -80,6 +91,8 @@ check("fake unconditional SC220 status removed", 'g.drawText ("SC220 CONNECTED"'
 check("Details button removed", all(token not in header + source for token in (
     "detailsButton", '"DETAILS"', "SC220 Live Details")))
 check("output READY label remains removed", '"READY" : "SELECT VB-CABLE"' not in source)
+check("old time-history visualizer is absent from final UI", all(token not in final_ui for token in (
+    "PROGRAM IMPACT", "PC INPUT IMPACT", '"OLDER"', '"NOW"', "historySize = 32")))
 
 failed = [name for name, ok in checks if not ok]
 print("SC220 Live premium UX contract audit")

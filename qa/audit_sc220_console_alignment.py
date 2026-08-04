@@ -5,6 +5,7 @@ aligned = (ROOT / "cmake/GenerateSC220AlignedUi.cmake").read_text(encoding="utf-
 state = (ROOT / "cmake/GenerateSC220BroadcastState.cmake").read_text(encoding="utf-8")
 polish = (ROOT / "cmake/PolishSC220FinalUi.cmake").read_text(encoding="utf-8")
 visualizer = (ROOT / "cmake/RebuildSC220ImpactVisualizer.cmake").read_text(encoding="utf-8")
+calibrator = (ROOT / "cmake/CalibrateSC220Meters.cmake").read_text(encoding="utf-8")
 telemetry = (ROOT / "live/ProgrammeBandTelemetry.h").read_text(encoding="utf-8")
 
 generated_root = ROOT / "build-sc220" / "generated" / "sc220-monitor"
@@ -32,8 +33,11 @@ check(
     )),
 )
 check(
-    "atomic band visualizer is the final visual generator",
+    "atomic analyzer and pink calibration are the final visual passes",
     'include("${CMAKE_CURRENT_LIST_DIR}/RebuildSC220ImpactVisualizer.cmake")' in state
+    and 'include("${CMAKE_CURRENT_LIST_DIR}/CalibrateSC220Meters.cmake")' in state
+    and state.find("RebuildSC220ImpactVisualizer.cmake")
+    < state.find("CalibrateSC220Meters.cmake")
     and "GenerateSC220DirectPcCaptureVisualizer.cmake" not in state,
 )
 check("final generated sources exist", generated_ui_path.exists() and generated_engine_path.exists())
@@ -61,10 +65,11 @@ check(
     )),
 )
 check(
-    "telemetry uses fourteen preallocated band-pass filters",
+    "telemetry uses fourteen preallocated proportional band-pass filters",
     all(token in telemetry for token in (
         "bandCount = 14", "centreFrequencies", "Coefficients", "State",
         "processSample", "std::array<std::array<State, bandCount>, 2>",
+        "lowerBoundary", "upperBoundary", "nominal / bandwidth",
     )),
 )
 check(
@@ -94,11 +99,11 @@ check(
     > generated_engine.find("masterLimiter.process (masterContext);"),
 )
 check(
-    "UI reads atomic bands without sample transport",
+    "UI reads pink-calibrated atomic bands without sample transport",
     all(token in generated_ui for token in (
         "updateFromTelemetry", "programmeBandTelemetry.read",
-        "POST-LIMITER BANDS", "WAITING FOR ENGINE BANDS",
-        "PROGRAM ANALYZER",
+        "PINK-FLAT BANDS", "WAITING FOR ENGINE BANDS",
+        "PROGRAM ANALYZER", "const float displayDb = rawDb[band]",
     )),
 )
 check(
@@ -119,6 +124,15 @@ check(
     )),
 )
 check(
+    "calibration pass removes the old visual contour",
+    all(token in calibrator for token in (
+        "remove cosmetic analyzer contour", "PINK-FLAT BANDS",
+    ))
+    and all(token not in generated_ui for token in (
+        "displayDb += 4.0f", "displayDb += 2.0f", "displayDb -= 1.5f",
+    )),
+)
+check(
     "obsolete time-history visualizer is absent",
     all(token not in generated_ui for token in (
         "PROGRAM IMPACT", "PC INPUT IMPACT", '"OLDER"', '"NOW"', "historySize = 32",
@@ -133,7 +147,7 @@ check(
 )
 
 failed = [name for name, ok in checks if not ok]
-print("SC220 Live final console and atomic band visualizer audit")
+print("SC220 Live final console and pink-flat atomic analyzer audit")
 for name, ok in checks:
     print(f"[ {'PASS' if ok else 'FAIL'} ] {name}")
 print(f"Checks: {len(checks)}  Passed: {len(checks) - len(failed)}  Failed: {len(failed)}")

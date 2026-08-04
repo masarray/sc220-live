@@ -70,22 +70,27 @@ Status legend:
 - [~] Physical monitoring requires listening tests with headphones/speakers
 - [ ] Asynchronous clock correction for the physical Monitor Bus
 
-## Impact visualizer and metering
+## Spectralizer and metering
 
-- [x] The failed production ScopeTap/FFT display is no longer used by the visible visualizer
-- [x] Main visualizer is rebuilt as an OBS-style realtime level-history meter
-- [x] Visualizer uses the same live post-master peak telemetry as the Stream meter
-- [x] PC input meter is used as an explicitly labelled fallback when programme telemetry has not arrived
-- [x] Visualizer movement does not depend on SC220 availability
-- [x] Visualizer contains no FFT, windowing, allocation, lock, or added audio-callback processing
-- [x] Thirty-two recent programme-impact frames are displayed
-- [x] Fast attack and smooth release ballistics
-- [x] `500 ms` peak hold with deterministic decay
-- [x] Approximately `30 fps` UI refresh
-- [x] Old frequency labels and misleading static spectral bars removed
-- [x] Legacy programme ScopeTap remains available only for diagnostic tests
-- [~] Realtime movement with PC Music only still requires confirmation in the Windows executable
-- [~] Realtime movement with SC220 voice requires hardware confirmation
+- [x] Incorrect `OLDER -> NOW` history visualizer removed
+- [x] Main visualizer is a real fixed-frequency OBS-style spectralizer
+- [x] Frequency position is fixed from bass on the left to treble on the right
+- [x] Protected post-master programme samples feed the visualizer
+- [x] Left and right channels are analysed separately and combined by stereo energy
+- [x] Anti-phase audio remains visible instead of cancelling through mono summing
+- [x] Lightweight `512`-point FFT
+- [x] FFT, smoothing, peak hold, and drawing run on the UI/message thread
+- [x] No FFT, windowing, memory allocation, or visual processing is added to the audio callback
+- [x] `24` logarithmically spaced bands from approximately `35 Hz` to `16 kHz`
+- [x] `15` segmented cells per band, similar to common OBS visualizers
+- [x] Bass display receives a small visual contour boost without changing audio
+- [x] Mid and upper bands are intentionally calmer than bass
+- [x] Fast attack and smooth release ballistics per band
+- [x] Independent `500 ms` peak hold for every band
+- [x] Approximately `30 fps` visual refresh
+- [x] Frequency labels include `40`, `100`, `250`, `1k`, `4k`, and `12k`
+- [~] Realtime spectrum movement with PC Music only requires confirmation in the Windows executable
+- [~] Realtime spectrum movement with SC220 voice requires hardware confirmation
 - [x] Stereo input, PC Audio, and Stream level meters
 - [x] Integrated loudness and true-peak programme telemetry
 
@@ -119,8 +124,9 @@ Status legend:
 - [x] Safe muted Stream startup
 - [x] Clean build closes the preview executable before removing the build tree
 - [x] Bounded retry and lock-owner diagnostics for Windows clean builds
-- [x] Repository audits for ASK-P authority, dual-source routing, premium UX, console geometry, Monitor Bus, endpoint routing, PC-music-only mode, safe virtual-cable routing, and rebuilt impact visualizer behaviour
-- [x] CI verifies that production UI no longer calls the ScopeTap/FFT analyzer
+- [x] Repository audits for ASK-P authority, dual-source routing, premium UX, console geometry, Monitor Bus, endpoint routing, PC-music-only mode, safe virtual-cable routing, and spectralizer behaviour
+- [x] CI verifies the FFT is present only in the generated UI source and absent from the audio engine source
+- [x] CI verifies that the time-history visualizer is fully removed
 - [~] Full Windows/MSVC Release compile must pass locally after the latest commit
 - [~] PC Music-only + distinct VB-CABLE source/stream + physical monitor test
 - [~] SC220 `MIXER` + PC Music + VB-CABLE + physical monitor end-to-end test
@@ -150,10 +156,12 @@ Status legend:
 Draft PR #2 should remain unmerged until these minimum checks pass:
 
 1. Windows Release build succeeds from a clean tree.
-2. The new `PROGRAM IMPACT` bars move whenever the Stream meter moves.
-3. With only PC Music available, either `PROGRAM IMPACT` or the clearly labelled `PC INPUT IMPACT` fallback moves.
-4. A safe virtual source configuration works, for example Cable A as PC Music and Cable B as Stream.
-5. Selecting the same cable for PC Music and Stream is blocked with a clear warning.
-6. Enhanced PC Music is audible through Program Monitor and Music Cue.
-7. SC220 is automatically added when `MIXER` becomes available.
-8. A minimum one-hour live soak test completes without dropouts, FIFO growth, or routing feedback.
+2. `PROGRAM SPECTRUM` displays fixed bass-to-treble bars, not a time history.
+3. The spectral bars move with PC Music while SC220 is disconnected.
+4. Bass, mids, and treble produce visibly different bar patterns.
+5. Peak markers hold briefly and then fall without sticking.
+6. A safe virtual source configuration works, for example Cable A as PC Music and Cable B as Stream.
+7. Selecting the same cable for PC Music and Stream is blocked with a clear warning.
+8. Enhanced PC Music is audible through Program Monitor and Music Cue.
+9. SC220 is automatically added when `MIXER` becomes available.
+10. A minimum one-hour live soak test completes without dropouts, FIFO growth, routing feedback, or visualizer-induced CPU spikes.

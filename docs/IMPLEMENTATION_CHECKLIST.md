@@ -74,31 +74,28 @@ Status legend:
 ## Spectralizer and metering
 
 - [x] Incorrect `OLDER -> NOW` history visualizer removed
-- [x] Main visualizer is a real fixed-frequency OBS-style spectralizer
+- [x] Main visualizer is a fixed-frequency OBS-style spectralizer
 - [x] Frequency position is fixed from bass on the left to treble on the right
-- [x] Protected post-master programme samples remain the preferred visual source
-- [x] Music Signature and Voice Signature taps remain recovery sources
-- [x] Direct WASAPI PC capture is an independent recovery source before the DSP FIFO
-- [x] Direct capture has one producer and one UI consumer using a bounded lock-free queue
-- [x] A full DSP FIFO cannot suppress direct WASAPI visual publication
-- [x] Source priority is `POST-MASTER -> MUSIC RECOVERY -> PC CAPTURE -> VOICE RECOVERY`
-- [x] The visible source label reports which path is actually supplying frames
-- [x] `NO FRAMES` is distinguished from real signal silence
+- [x] All previous `ScopeTap`, ASK-P recovery, and direct-WASAPI visual fallbacks are removed from the production UI
+- [x] The exact protected post-limiter stereo buffer is the only production visual source
+- [x] Audio callback accumulates exactly `512` samples into a preallocated double bank
+- [x] Producer publishes only complete banks
+- [x] UI rejects partial or concurrently changed banks using a sequence check
+- [x] Snapshot producer has no lock, wait, allocation, FFT, or drawing work
+- [x] Visible status reports `POST-LIMITER SNAPSHOT #<generation>`
+- [x] Snapshot generation must increase while the Stream meter receives live programme audio
 - [x] Left and right channels are analysed separately and combined by stereo energy
 - [x] Anti-phase audio remains visible instead of cancelling through mono summing
 - [x] Lightweight `512`-point FFT
 - [x] FFT, smoothing, peak hold, and drawing run on the UI/message thread
-- [x] No FFT, windowing, memory allocation, or visual processing is added to the audio callback
 - [x] `24` logarithmically spaced bands from approximately `35 Hz` to `16 kHz`
-- [x] `15` segmented cells per band, similar to common OBS visualizers
-- [x] Bass display receives a small visual contour boost without changing audio
-- [x] Mid and upper bands are intentionally calmer than bass
+- [x] `15` segmented cells per band
+- [x] Bass receives a small display-only contour boost without changing audio
 - [x] Fast attack and smooth release ballistics per band
 - [x] Independent `500 ms` peak hold for every band
 - [x] Approximately `30 fps` visual refresh
 - [x] Frequency labels include `40`, `100`, `250`, `1k`, `4k`, and `12k`
-- [~] Direct `PC CAPTURE` movement requires confirmation in the Windows executable
-- [~] Preferred post-master spectrum movement requires Windows runtime confirmation
+- [~] Post-limiter snapshot generation and bar movement require confirmation in the Windows executable
 - [~] Realtime spectrum movement with SC220 voice requires hardware confirmation
 - [x] Stereo input, PC Audio, and Stream level meters
 - [x] Integrated loudness and true-peak programme telemetry
@@ -133,12 +130,13 @@ Status legend:
 - [x] Safe muted Stream startup
 - [x] Clean build closes the preview executable before removing the build tree
 - [x] Bounded retry and lock-owner diagnostics for Windows clean builds
-- [x] Normal CMake builds compile the generated PC capture authority and mark the base source header-only
-- [x] Repository audits cover ASK-P authority, routing, UX, console geometry, Monitor Bus, PC-only operation, spectral response, anti-phase response, and direct WASAPI publication
-- [x] CI verifies direct visual publication occurs before DSP FIFO free-space handling
-- [x] CI verifies the FFT exists only in generated UI and not in capture/audio engine sources
-- [x] CI verifies that the time-history visualizer is fully removed
-- [x] GitHub Actions source audit passes for the direct-capture implementation
+- [x] Normal CMake builds compile the generated engine and final generated UI
+- [x] Repository audits cover ASK-P authority, routing, UX, console geometry, Monitor Bus, PC-only operation, synthetic frequency response, anti-phase response, and snapshot publication
+- [x] CI verifies snapshot publication occurs after the master limiter
+- [x] CI verifies the production engine no longer publishes analyzer `ScopeTap` samples
+- [x] CI verifies FFT exists only in generated UI and not in the audio engine or snapshot class
+- [x] CI verifies all obsolete queue/recovery visual sources are absent
+- [x] GitHub Actions source audit passes for the snapshot implementation
 - [~] Full Windows/MSVC Release compile must pass locally after the latest commit
 - [~] PC Music-only + distinct VB-CABLE source/stream + physical monitor test
 - [~] SC220 `MIXER` + PC Music + VB-CABLE + physical monitor end-to-end test
@@ -169,10 +167,10 @@ Draft PR #2 should remain unmerged until these minimum checks pass:
 
 1. Windows Release build succeeds from a clean tree.
 2. The PC Audio state becomes `PLAYBACK CAPTURE ACTIVE` or shows a specific `CAPTURE ERROR`.
-3. With capture active, `PROGRAM SPECTRUM` must show `POST-MASTER`, `MUSIC RECOVERY`, or `PC CAPTURE`, never permanent `NO FRAMES`.
+3. While the Stream meter moves, the visualizer header must show an increasing `POST-LIMITER SNAPSHOT #<generation>` value.
 4. Bass, mids, and treble produce visibly different fixed-frequency patterns.
 5. Peak markers hold briefly and then fall without sticking.
-6. Toggling Smart Enhancer power must audibly change the monitored app path, proving audio is not merely the Windows direct path.
+6. Toggling Smart Enhancer power must audibly change the monitored app path.
 7. A safe virtual source configuration works, for example Cable A as PC Music and Cable B as Stream.
 8. Selecting the same cable for PC Music and Stream is blocked with a clear warning.
 9. Enhanced PC Music is audible through Program Monitor and Music Cue.

@@ -1,7 +1,7 @@
 # Final calibration pass for the generated SC220 Live analyzer and loudness UI.
 # ProgrammeBandTelemetry already applies sample-rate-aware pink-noise correction.
-# This pass removes the old cosmetic contour and connects the loudness dial to
-# live 400 ms BS.1770 momentary telemetry while retaining LUFS-I numerically.
+# This pass removes the cosmetic placeholder contour and connects the loudness
+# dial to live 400 ms BS.1770 momentary telemetry while retaining LUFS-I.
 
 if(NOT DEFINED SC220_UI_MONITOR_GENERATED_SOURCE
    OR NOT DEFINED SC220_ENGINE_GENERATED_SOURCE)
@@ -42,7 +42,8 @@ sc220_meter_replace_once(_engine "engine live loudness include"
     "${_engine_include_anchor}" "${_engine_include_replacement}")
 
 set(_display_contour_anchor [=[
-            // Display-only contour. The audio is never modified.
+            // Display-only contour. The final calibration pass removes this
+            // placeholder so all bands use the same pink-flat baseline.
             float displayDb = rawDb[band];
             if (band <= 2)
                 displayDb += 4.0f;
@@ -177,7 +178,6 @@ set(_engine_publish_replacement [=[
 sc220_meter_replace_once(_engine "publish live momentary loudness"
     "${_engine_publish_anchor}" "${_engine_publish_replacement}")
 
-# Reset the live bridge in both device-start and user-requested reset paths.
 string(REPLACE
     "        loudnessLufs.store (-120.0f);"
     "        loudnessLufs.store (-120.0f);\n        programmeLiveLoudnessTelemetry.reset();"

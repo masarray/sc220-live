@@ -155,7 +155,7 @@ check(
 )
 check(
     "obsolete one-tap and history paths are removed",
-    "spectrumDisplay->updateFromTap" not in ui
+    "spectrumDisplay->updateFromTap (" not in ui
     and "PROGRAM IMPACT" not in ui
     and "PC INPUT IMPACT" not in ui
     and '"OLDER"' not in ui

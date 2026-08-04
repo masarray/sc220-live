@@ -37,6 +37,8 @@ jobs:
         run: python qa/audit_sc220_premium_ux.py
       - name: Validate aligned console and analyzer bridge
         run: python qa/audit_sc220_console_alignment.py
+      - name: Validate synthetic spectralizer response
+        run: python qa/audit_sc220_spectralizer_response.py
       - name: Validate independent physical Monitor Bus
         run: python qa/audit_sc220_monitor_bus.py
       - name: Validate selectable PC endpoint and anti-loop routing

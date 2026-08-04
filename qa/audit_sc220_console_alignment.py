@@ -41,6 +41,15 @@ check(
     < state.find("RebuildSC220ImpactVisualizer.cmake"),
 )
 check(
+    "normal CMake build compiles generated engine and final UI",
+    all(token in aligned for token in (
+        'set_source_files_properties("${SC220_ENGINE_SOURCE}" PROPERTIES HEADER_FILE_ONLY TRUE)',
+        'set_source_files_properties("${SC220_UI_GENERATED_SOURCE}" PROPERTIES HEADER_FILE_ONLY TRUE)',
+        '"${SC220_ENGINE_GENERATED_SOURCE}"',
+        '"${SC220_UI_MONITOR_GENERATED_SOURCE}"',
+    )),
+)
+check(
     "final generated sources exist for audit",
     generated_ui_path.exists() and generated_engine_path.exists(),
 )
@@ -54,13 +63,15 @@ check(
     )),
 )
 check(
-    "spectralizer generator owns the final visualizer output",
+    "spectralizer generator owns final UI and engine publication output",
     all(token in spectralizer for token in (
         "sc220_spectrum_replace_range",
         "SC220_UI_MONITOR_GENERATED_SOURCE",
+        "SC220_ENGINE_GENERATED_SOURCE",
         "PROGRAM SPECTRUM",
-        "updateFromTap",
+        "updateFromTaps",
         'file(WRITE "${SC220_UI_MONITOR_GENERATED_SOURCE}" "${_ui}")',
+        'file(WRITE "${SC220_ENGINE_GENERATED_SOURCE}" "${_engine}")',
     )),
 )
 check(
@@ -140,29 +151,47 @@ check(
     "savedDeviceState == nullptr || ! outputCable.load()" in generated_engine,
 )
 check(
-    "post-master protected programme publishes spectrum samples after limiting",
+    "post-master protected programme publishes after limiting",
     all(token in generated_engine for token in (
         "masterLimiter.process (masterContext);",
+        "programmeAnalyzer.setEnabled (true);",
         "programmeAnalyzer.push",
         "voiceBlock.getReadPointer (0)",
         "voiceBlock.getReadPointer (1)",
     ))
-    and generated_engine.find("programmeAnalyzer.push")
-    > generated_engine.find("masterLimiter.process (masterContext);"),
+    and generated_engine.find("programmeAnalyzer.setEnabled (true);",
+                              generated_engine.find("masterLimiter.process (masterContext);"))
+    < generated_engine.find("programmeAnalyzer.push",
+                            generated_engine.find("masterLimiter.process (masterContext);")),
 )
 check(
-    "per-lane visual publication stays disabled in final UI",
-    generated_ui.count("setVisualTapEnabled (false)") >= 4
+    "voice and music recovery taps remain armed across UI lifecycle",
+    generated_ui.count("getVoiceEnhancerBridge().setVisualTapEnabled (true)") >= 3
+    and generated_ui.count("getMusicEnhancerBridge().setVisualTapEnabled (true)") >= 3
     and "setVisualTapEnabled (active)" not in generated_ui,
 )
 check(
-    "UI consumes the permanently armed post-master programme tap",
-    "spectrumDisplay->updateFromTap" in generated_ui
-    and "audioEngine.programmeAnalyzerTap()" in generated_ui
-    and "programmeAnalyzer.setEnabled (true)" in generated_engine
-    and "audioEngine.setProgrammeAnalyzerEnabled (false);" not in generated_ui
-    and "audioEngine.setProgrammeAnalyzerEnabled (active);" not in generated_ui
-    and "audioEngine.setProgrammeAnalyzerEnabled (uiActive);" not in generated_ui,
+    "UI consumes post-master then Music then Voice taps",
+    all(token in generated_ui for token in (
+        "updateFromTaps",
+        "programmeTap.consumeLatest",
+        "musicTap.consumeLatest",
+        "voiceTap.consumeLatest",
+        "audioEngine.programmeAnalyzerTap()",
+        "getMusicEnhancerBridge().analysisTap()",
+        "getVoiceEnhancerBridge().analysisTap()",
+        "MUSIC RECOVERY",
+        "VOICE RECOVERY",
+    )),
+)
+check(
+    "runtime timer re-arms all visual publication paths",
+    all(token in generated_ui for token in (
+        "audioEngine.setProgrammeAnalyzerEnabled (true);",
+        "audioEngine.getMusicEnhancerBridge().setVisualTapEnabled (true);",
+        "audioEngine.getVoiceEnhancerBridge().setVisualTapEnabled (true);",
+        "WAITING FOR ANALYZER FRAMES",
+    )),
 )
 check(
     "spectralizer uses lightweight stereo FFT outside the audio callback",
@@ -195,12 +224,12 @@ check(
         "levels[band] * 0.88f + target * 0.12f",
         "peakHoldFrames[band] = 15",
         "heldPeaks[band] - 0.026f",
-        "500 ms HOLD",
     )),
 )
 check(
-    "obsolete time-history visualizer is removed",
-    "PROGRAM IMPACT" not in generated_ui
+    "obsolete one-tap and time-history visualizers are removed",
+    "spectrumDisplay->updateFromTap" not in generated_ui
+    and "PROGRAM IMPACT" not in generated_ui
     and "PC INPUT IMPACT" not in generated_ui
     and '"OLDER"' not in generated_ui
     and '"NOW"' not in generated_ui
@@ -217,7 +246,7 @@ check(
 )
 
 failed = [name for name, ok in checks if not ok]
-print("SC220 Live generated final console and lightweight OBS spectralizer audit")
+print("SC220 Live final console and redundant OBS spectralizer audit")
 for name, ok in checks:
     print(f"[ {'PASS' if ok else 'FAIL'} ] {name}")
 print(f"Checks: {len(checks)}  Passed: {len(checks) - len(failed)}  Failed: {len(failed)}")

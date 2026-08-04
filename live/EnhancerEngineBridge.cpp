@@ -21,6 +21,7 @@ EnhancerEngineBridge::EnhancerEngineBridge()
                    "Unexpected ArSonKuPik engine revision");
     jassert (processor_.presetNames().size() == factoryProfileCount);
     processor_.scopeTap.setEnabled (false);
+    analyzerTap_.setEnabled (false);
     setGainMatchEnabled (false);
 }
 
@@ -28,17 +29,33 @@ void EnhancerEngineBridge::prepare (double sampleRate, int maximumBlockSize)
 {
     processor_.setRateAndBufferSizeDetails (sampleRate, maximumBlockSize);
     processor_.prepareToPlay (sampleRate, maximumBlockSize);
+    processor_.scopeTap.setEnabled (false);
+    analyzerTap_.setEnabled (visualTapEnabled_.load (std::memory_order_acquire));
 }
 
 void EnhancerEngineBridge::release()
 {
+    processor_.scopeTap.setEnabled (false);
+    analyzerTap_.setEnabled (false);
     processor_.releaseResources();
 }
 
 void EnhancerEngineBridge::process (juce::AudioBuffer<float>& audio,
                                     juce::MidiBuffer& midi)
 {
+    // ASK-P's editor tap remains disabled. The bridge publishes one clean
+    // post-Signature block to its own queue after DSP, with no per-block state
+    // toggling and no allocation or locking on the audio thread.
     processor_.processBlock (audio, midi);
+
+    if (! visualTapEnabled_.load (std::memory_order_acquire)
+        || audio.getNumChannels() <= 0
+        || audio.getNumSamples() <= 0)
+        return;
+
+    const auto* left = audio.getReadPointer (0);
+    const auto* right = audio.getNumChannels() > 1 ? audio.getReadPointer (1) : left;
+    analyzerTap_.push (left, right, audio.getNumSamples());
 }
 
 void EnhancerEngineBridge::setInputGainDb (float valueDb) noexcept

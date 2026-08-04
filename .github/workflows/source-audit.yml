@@ -1,4 +1,4 @@
-name: Sonkupik Live source audit
+name: SC220 Live source audit
 
 on:
   push:
@@ -23,8 +23,26 @@ jobs:
           python-version: '3.12'
       - name: Install source-audit dependencies
         run: python -m pip install --disable-pip-version-check numpy
+      - name: Generate aligned monitor-enabled SC220 sources
+        run: >-
+          cmake
+          -DSC220_UI_SOURCE=${{ github.workspace }}/live/SC220MainComponent.cpp
+          -DSC220_UI_GENERATED_SOURCE=${{ runner.temp }}/SC220MainComponent_Aligned.cpp
+          -P cmake/GenerateSC220AlignedUi.cmake
       - name: Validate ASK-P v0.5.23 port boundary
         run: python qa/audit_v0140_askp_v0523_port.py
+      - name: Validate SC220 dual-source broadcast bus
+        run: python qa/audit_sc220_dual_source_bus.py
+      - name: Validate SC220 premium UX contract
+        run: python qa/audit_sc220_premium_ux.py
+      - name: Validate aligned console and analyzer bridge
+        run: python qa/audit_sc220_console_alignment.py
+      - name: Validate independent physical Monitor Bus
+        run: python qa/audit_sc220_monitor_bus.py
+      - name: Validate selectable PC endpoint and anti-loop routing
+        run: python qa/audit_sc220_pc_endpoint_routing.py
+      - name: Validate clean-build executable unlock order
+        run: python qa/audit_sc220_clean_build.py
       - name: Validate fixed transform reference
         run: python qa/verify_fixed_fft.py
       - name: Checkout private ASK-P authority when CI token is configured

@@ -5,22 +5,46 @@
 
 #include <atomic>
 #include <memory>
+#include <vector>
 
 namespace askp::live {
 
-// Captures the Windows default render endpoint through WASAPI loopback and
+// Captures a selected Windows render endpoint through WASAPI loopback and
 // exposes a realtime-safe stereo FIFO to the main audio graph. The COM/WASAPI
 // client lives entirely on its own high-priority thread; the audio callback
 // only reads already-converted float samples from the lock-free FIFO.
 class PcAudioLoopbackCapture final : private juce::Thread
 {
 public:
+    struct EndpointInfo
+    {
+        juce::String id;
+        juce::String name;
+        bool isDefault = false;
+    };
+
+    static constexpr const char* systemDefaultLabel = "SYSTEM DEFAULT";
+
     PcAudioLoopbackCapture();
     ~PcAudioLoopbackCapture() override;
 
     void prepare (double targetSampleRate, int fifoDurationMs = 1200);
     bool start();
     void stop();
+
+    static std::vector<EndpointInfo> availableEndpoints();
+    static bool endpointNamesMatch (const juce::String& first,
+                                    const juce::String& second) noexcept;
+    static bool isUnsafeVirtualEndpoint (const juce::String& name) noexcept;
+    static bool endpointWouldConflict (const juce::String& requestedEndpoint,
+                                       const juce::String& streamOutput);
+
+    // Selection is retained across prepare/start cycles. An empty name or the
+    // SYSTEM DEFAULT label follows the current Windows console render endpoint.
+    juce::String selectEndpoint (const juce::String& name);
+    juce::String requestedEndpointName() const;
+    juce::String selectedEndpointName() const;
+    juce::String selectedEndpointId() const;
 
     int read (juce::AudioBuffer<float>& destination, int numSamples) noexcept;
 
@@ -47,6 +71,12 @@ private:
     std::atomic<float> peakR { -120.0f };
     std::atomic<int> underflowCount { 0 };
     std::atomic<int> overflowCount { 0 };
+
+    mutable juce::CriticalSection endpointLock;
+    juce::String requestedEndpointId;
+    juce::String requestedEndpointFriendlyName;
+    juce::String activeEndpointId;
+    juce::String activeEndpointFriendlyName;
 
     mutable juce::CriticalSection errorLock;
     juce::String errorMessage;

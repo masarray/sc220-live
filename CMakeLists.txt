@@ -2,6 +2,8 @@ cmake_minimum_required(VERSION 3.22)
 
 project(SC220Live VERSION 0.1.0 LANGUAGES C CXX)
 
+include(CTest)
+
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
@@ -200,6 +202,10 @@ set_property(SOURCE "${ASKP_DSP_SOURCE}" APPEND PROPERTY COMPILE_OPTIONS
     "$<$<AND:$<CONFIG:Release>,$<NOT:$<CXX_COMPILER_ID:MSVC>>>:-ffp-contract=fast>"
 )
 
+add_executable(SC220LoudnessAudit qa/ProgrammeLoudnessAudit.cpp)
+target_include_directories(SC220LoudnessAudit PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
+add_test(NAME SC220LoudnessAudit COMMAND SC220LoudnessAudit)
+
 # ---------------------------------------------------------------------------
 # JUCE
 # ---------------------------------------------------------------------------
@@ -218,6 +224,22 @@ else()
     )
     FetchContent_MakeAvailable(JUCE)
 endif()
+
+add_executable(SC220ProgrammeAnalyzerAudit qa/ProgrammeAnalyzerAudit.cpp)
+target_include_directories(SC220ProgrammeAnalyzerAudit PRIVATE
+    "${ASKP_GENERATED_DIR}"
+    "${ASKP_PROCESSOR_DIR}"
+    "${ASKP_ENGINE_DIR}"
+)
+target_link_libraries(SC220ProgrammeAnalyzerAudit PRIVATE
+    juce::juce_audio_utils
+    juce::juce_dsp
+)
+target_compile_definitions(SC220ProgrammeAnalyzerAudit PRIVATE
+    JUCE_WEB_BROWSER=0
+    JUCE_USE_CURL=0
+)
+add_test(NAME SC220ProgrammeAnalyzerAudit COMMAND SC220ProgrammeAnalyzerAudit)
 
 # ---------------------------------------------------------------------------
 # Embedded UI assets
@@ -273,6 +295,11 @@ juce_add_gui_app(SC220Live
     ICON_SMALL assets/ui/favicon-96x96.png
 )
 
+set(SC220_UI_SOURCE "${CMAKE_CURRENT_SOURCE_DIR}/live/SC220MainComponent.cpp")
+set(SC220_UI_GENERATED_SOURCE
+    "${CMAKE_CURRENT_BINARY_DIR}/generated/sc220-ui/SC220MainComponent_Aligned.cpp")
+include("${CMAKE_CURRENT_SOURCE_DIR}/cmake/GenerateSC220AlignedUi.cmake")
+
 target_sources(SC220Live PRIVATE
     "${ASKP_DSP_SOURCE}"
     "${ASKP_PRESET_SOURCE}"
@@ -291,7 +318,7 @@ target_sources(SC220Live PRIVATE
     live/LiveWidgets.cpp
     live/SonkupikSphereVisualizer.cpp
     live/LiveMainComponent.cpp
-    live/SC220MainComponent.cpp
+    "${SC220_UI_GENERATED_SOURCE}"
     live/LiveApplication.cpp
 )
 

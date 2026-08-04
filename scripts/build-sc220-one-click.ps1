@@ -25,12 +25,21 @@ if (-not (Test-Path (Join-Path $root 'third_party\askp-vst\engine\arsonkupik_dsp
 
 & (Join-Path $PSScriptRoot 'check-sc220-release-contract.ps1')
 
+# A clean build can fail before build-live-windows.ps1 reaches its own stale
+# output cleanup when the previous preview is still running in the tray. Release
+# only SC220 executables launched from build-sc220, then remove the tree with a
+# bounded retry before invoking the main build script.
+if ($Clean) {
+    & (Join-Path $PSScriptRoot 'prepare-sc220-clean-build.ps1') -BuildDir 'build-sc220'
+}
+
 $arguments = @{
     Configuration = $Configuration
     BuildDir = 'build-sc220'
     Generator = 'Ninja'
 }
-if ($Clean) { $arguments.Clean = $true }
+# The pre-clean helper already removed the complete tree. Do not ask the inner
+# script to delete it again, which avoids a second race with Explorer/antivirus.
 
 & (Join-Path $PSScriptRoot 'build-live-windows.ps1') @arguments
 

@@ -4,6 +4,8 @@
 
 #include <juce_audio_basics/juce_audio_basics.h>
 
+#include <atomic>
+
 namespace askp::live {
 
 // Stable boundary between the standalone live rack and the embedded
@@ -75,10 +77,18 @@ public:
 
     MeterSnapshot meters() const noexcept;
 
+    // SC220 Live owns a dedicated lock-free analyzer tap. The embedded ASK-P
+    // editor tap stays disabled permanently, so no per-block enable/disable
+    // race can starve the message-thread spectrum reader.
     void setVisualTapEnabled (bool enabled) noexcept
     {
-        processor_.scopeTap.setEnabled (enabled);
+        visualTapEnabled_.store (enabled, std::memory_order_release);
+        analyzerTap_.setEnabled (enabled);
+        processor_.scopeTap.setEnabled (false);
     }
+
+    askp::ScopeTap& analysisTap() noexcept { return analyzerTap_; }
+    const askp::ScopeTap& analysisTap() const noexcept { return analyzerTap_; }
 
     askp::Processor& processor() noexcept { return processor_; }
     const askp::Processor& processor() const noexcept { return processor_; }
@@ -88,6 +98,8 @@ private:
     float getParameter (const char* parameterId, float fallback = 0.0f) const noexcept;
 
     askp::Processor processor_;
+    askp::ScopeTap analyzerTap_;
+    std::atomic<bool> visualTapEnabled_ { false };
 };
 
 } // namespace askp::live

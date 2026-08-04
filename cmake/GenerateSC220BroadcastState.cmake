@@ -102,8 +102,8 @@ file(WRITE "${SC220_APP_GENERATED_SOURCE}" "${_app}")
 message(STATUS "SC220 Live broadcast-state source: ${SC220_APP_GENERATED_SOURCE}")
 
 # The monitor engine, UI and persisted application now exist. Add selectable
-# PC playback capture, safe PC-only routing and final layout. The last generator
-# replaces every production analyzer queue with one post-limiter snapshot.
+# PC playback capture, safe PC-only routing and final layout. The final generator
+# removes every sample-based analyzer and installs atomic post-limiter bands.
 include("${CMAKE_CURRENT_LIST_DIR}/GenerateSC220PcEndpointRouting.cmake")
 include("${CMAKE_CURRENT_LIST_DIR}/PolishSC220FinalUi.cmake")
 include("${CMAKE_CURRENT_LIST_DIR}/StabilizeSC220PcMusicMode.cmake")

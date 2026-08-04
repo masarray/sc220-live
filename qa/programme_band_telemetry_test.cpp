@@ -118,6 +118,57 @@ float runPinkFlatness (askp::live::ProgrammeBandTelemetry& telemetry)
     return *limits.second - *limits.first;
 }
 
+bool runRhythmResponseTest()
+{
+    askp::live::ProgrammeBandTelemetry telemetry;
+    telemetry.prepare (sampleRate);
+
+    std::array<float, blockSize> left {};
+    std::array<float, blockSize> right {};
+    for (int block = 0; block < 96; ++block)
+        telemetry.process (left.data(), right.data(), blockSize);
+
+    std::array<float, askp::live::ProgrammeBandTelemetry::bandCount> before {};
+    std::uint64_t generation = 0;
+    telemetry.read (before, generation);
+
+    double phase = 0.0;
+    const double step = 2.0 * pi * 80.0 / sampleRate;
+    for (int block = 0; block < 12; ++block)
+    {
+        for (int sample = 0; sample < blockSize; ++sample)
+        {
+            const float value = 0.75f * static_cast<float> (std::sin (phase));
+            phase += step;
+            if (phase >= 2.0 * pi)
+                phase -= 2.0 * pi;
+            left[static_cast<std::size_t> (sample)] = value;
+            right[static_cast<std::size_t> (sample)] = value;
+        }
+        telemetry.process (left.data(), right.data(), blockSize);
+    }
+
+    std::array<float, askp::live::ProgrammeBandTelemetry::bandCount> attack {};
+    telemetry.read (attack, generation);
+    const auto attackBand = static_cast<std::size_t> (
+        std::distance (attack.begin(), std::max_element (attack.begin(), attack.end())));
+
+    left.fill (0.0f);
+    right.fill (0.0f);
+    for (int block = 0; block < 48; ++block)
+        telemetry.process (left.data(), right.data(), blockSize);
+
+    std::array<float, askp::live::ProgrammeBandTelemetry::bandCount> release {};
+    telemetry.read (release, generation);
+
+    const float attackRise = attack[1] - before[1];
+    const float releaseFall = attack[1] - release[1];
+    std::cout << "Rhythm 80 Hz attack rise: " << attackRise
+              << " dB, release fall: " << releaseFall << " dB\n";
+
+    return attackBand == 1 && attackRise > 30.0f && releaseFall > 1.5f;
+}
+
 bool runMovingLoudnessTest()
 {
     askp::live::ProgrammeLoudnessIntegrator meter;
@@ -157,6 +208,7 @@ int main()
     const auto treble = runTone (telemetry, 8000.0, false);
     const auto antiPhase = runTone (telemetry, 1250.0, true);
     const auto pinkSpreadDb = runPinkFlatness (telemetry);
+    const bool rhythmResponse = runRhythmResponseTest();
     const bool movingLoudness = runMovingLoudnessTest();
 
     std::cout << "80 Hz band: " << bass << "\n"
@@ -164,10 +216,11 @@ int main()
               << "8 kHz band: " << treble << "\n"
               << "1.25 kHz anti-phase band: " << antiPhase << "\n"
               << "Pink-noise max/min spread: " << pinkSpreadDb << " dB\n"
+              << "Rhythm response: " << (rhythmResponse ? "PASS" : "FAIL") << "\n"
               << "Moving loudness: " << (movingLoudness ? "PASS" : "FAIL") << "\n";
 
     const bool passed = bass == 1 && mid == 6 && treble == 11
                      && antiPhase == 7 && pinkSpreadDb <= 0.75f
-                     && movingLoudness;
+                     && rhythmResponse && movingLoudness;
     return passed ? 0 : 1;
 }

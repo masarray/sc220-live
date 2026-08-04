@@ -1,6 +1,6 @@
 # SC220 Live implementation checklist
 
-Updated: 2026-08-04  
+Updated: 2026-08-05  
 Branch: `fix/pc-cable-source-analyzer`
 
 Status legend:
@@ -77,21 +77,32 @@ Status legend:
 - [x] Removed `ScopeTap`, FFT, snapshot, direct-WASAPI visual queue, and recovery fallbacks
 - [x] New analyzer was built from zero as a `14`-band fixed filter bank
 - [x] Fixed centre frequencies: `50`, `80`, `125`, `200`, `315`, `500`, `800`, `1.25k`, `2k`, `3.15k`, `5k`, `8k`, `12k`, `16k`
+- [x] Each band uses a proportional logarithmic bandwidth derived from adjacent centre frequencies
 - [x] Each band uses a real second-order band-pass biquad
 - [x] The exact protected post-limiter stereo buffer feeds the analyzer
 - [x] Left and right channels are filtered separately and combined by stereo energy
 - [x] Anti-phase stereo remains visible
+- [x] Pink-noise compensation is calculated from the actual digital filter response at the active sample rate
+- [x] Pink calibration integrates `4096` log-frequency response points
+- [x] Cosmetic bass and treble display contour removed
+- [x] Analyzer applies `180 ms` power-domain smoothing independent of callback block size
+- [x] Native C++ synthetic pink-noise test measures `0.348 dB` maximum band spread at `48 kHz`
 - [x] Audio callback publishes only atomic dB values and one generation counter
 - [x] No sample queue, copied frame, FFT, lock, wait, allocation, or drawing in the callback
 - [x] UI reads atomic band values directly at approximately `30 fps`
-- [x] Fast attack and smooth release ballistics
+- [x] Fast attack and smooth release visual ballistics
 - [x] Independent `600 ms` peak hold per band
 - [x] `14` segmented bars with fixed bass-to-treble positions
-- [x] Visible status reports `POST-LIMITER BANDS #<generation>`
-- [~] Generation counter and bar movement require confirmation in the Windows executable
+- [x] Visible status reports `PINK-FLAT BANDS #<generation>`
+- [~] Pink-noise flatness requires confirmation using the actual Windows pink-noise source and executable
 - [~] Realtime analyzer response with SC220 voice requires hardware confirmation
 - [x] Stereo input, PC Audio, and Stream level meters
-- [x] Integrated loudness and true-peak programme telemetry
+- [x] BS.1770 K-weighted integrated loudness (`LUFS-I`)
+- [x] Responsive `400 ms` momentary loudness (`LUFS-M`) for the moving needle and LED ring
+- [x] Main loudness number remains gated `LUFS-I`
+- [x] Lower loudness readout shows `M <LUFS-M> / TP <dBTP>`
+- [x] Native test verifies LUFS-M moves from `-30` to `-12` and LUFS-I settles near `-12.2`
+- [~] Loudness needle/ring movement requires confirmation in the Windows executable
 
 ## UX and visual identity
 
@@ -116,6 +127,17 @@ Status legend:
 - [ ] Embed the final application typeface instead of relying on Windows fallback
 - [ ] Replace remaining legacy typography/assets in the mini controller
 
+## System-wide Windows processing options
+
+- [x] Current application and VB-CABLE route do not require an SC220-owned kernel driver
+- [x] Microsoft APO architecture assessed as the correct official user-mode system-effect path
+- [ ] Clean-room SC220 SFX/MFX/EFX APO implementation
+- [ ] Signed Windows `AudioProcessingObject` / `SoftwareComponent` INF package
+- [ ] Hardware Support App or desktop control bridge for APO parameters
+- [ ] HLK and endpoint compatibility qualification
+- [ ] Decide whether system-wide APO mode is a separate optional product component
+- [ ] Do not reuse Equalizer APO GPLv2 source in proprietary SC220 binaries without a deliberate licensing decision
+
 ## Build, release, and quality assurance
 
 - [x] Proprietary/binary-only release checks
@@ -124,11 +146,13 @@ Status legend:
 - [x] Clean build closes the preview executable before removing the build tree
 - [x] Bounded retry and lock-owner diagnostics for Windows clean builds
 - [x] Normal CMake builds compile the generated engine and final generated UI
-- [x] Repository audits cover ASK-P authority, routing, UX, console geometry, Monitor Bus, PC-only operation, filter response, anti-phase response, and atomic publication
+- [x] Repository audits cover ASK-P authority, routing, UX, console geometry, Monitor Bus, PC-only operation, calibrated filter response, anti-phase response, atomic publication, and momentary loudness
 - [x] CI verifies analyzer processing occurs after the master limiter
 - [x] CI verifies production engine no longer publishes analyzer sample queues
 - [x] CI verifies FFT, snapshot, and recovery paths are absent
-- [x] CI verifies the fixed biquad centres and synthetic bass/mid/treble localisation
+- [x] CI verifies proportional band centres and synthetic bass/mid/treble localisation
+- [x] CI compiles and executes native pink-flat and moving-loudness tests
+- [x] GitHub Actions source audit run `#274` passes
 - [~] Full Windows/MSVC Release compile must pass locally after the latest commit
 - [~] PC Music-only + distinct VB-CABLE source/stream + physical monitor test
 - [~] SC220 `MIXER` + PC Music + VB-CABLE + physical monitor end-to-end test
@@ -158,13 +182,14 @@ Status legend:
 Draft PR #2 should remain unmerged until these minimum checks pass:
 
 1. Windows Release build succeeds from a clean tree.
-2. The PC Audio state becomes `PLAYBACK CAPTURE ACTIVE` or shows a specific `CAPTURE ERROR`.
-3. While the Stream meter moves, the header shows an increasing `POST-LIMITER BANDS #<generation>` value.
-4. Bass, mids, and treble produce visibly different fixed-band patterns.
-5. Peak markers hold briefly and then fall without sticking.
-6. Toggling Smart Enhancer power audibly changes the monitored app path.
-7. A safe virtual source configuration works, for example Cable A as PC Music and Cable B as Stream.
-8. Selecting the same cable for PC Music and Stream is blocked with a clear warning.
-9. Enhanced PC Music is audible through Program Monitor and Music Cue.
-10. SC220 is automatically added when `MIXER` becomes available.
-11. A minimum one-hour live soak test completes without dropouts, routing feedback, or analyzer-induced CPU spikes.
+2. Pink noise produces a visually flat analyzer within approximately `±0.5 dB` after settling.
+3. `PINK-FLAT BANDS #<generation>` continues increasing while programme audio runs.
+4. Loudness needle and LED ring visibly follow `LUFS-M`, while the main number remains `LUFS-I`.
+5. Bass, mids, and treble produce visibly different fixed-band patterns with programme material.
+6. Peak markers hold briefly and then fall without sticking.
+7. Toggling Smart Enhancer power audibly changes the monitored app path.
+8. A safe virtual source configuration works, for example Cable A as PC Music and Cable B as Stream.
+9. Selecting the same cable for PC Music and Stream is blocked with a clear warning.
+10. Enhanced PC Music is audible through Program Monitor and Music Cue.
+11. SC220 is automatically added when `MIXER` becomes available.
+12. A minimum one-hour live soak test completes without dropouts, routing feedback, or analyzer-induced CPU spikes.

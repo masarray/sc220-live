@@ -172,9 +172,12 @@ check(
     and "setVisualTapEnabled (active)" not in generated_ui,
 )
 check(
-    "UI consumes the one programme tap",
+    "UI consumes the one permanently armed programme tap",
     "audioEngine.programmeAnalyzerTap()" in generated_ui
-    and "setProgrammeAnalyzerEnabled (uiActive)" in generated_ui,
+    and "programmeAnalyzer.setEnabled (true)" in generated_engine
+    and "audioEngine.setProgrammeAnalyzerEnabled (false);" not in generated_ui
+    and "audioEngine.setProgrammeAnalyzerEnabled (active);" not in generated_ui
+    and "audioEngine.setProgrammeAnalyzerEnabled (uiActive);" not in generated_ui,
 )
 check(
     "spectrum work remains lightweight",

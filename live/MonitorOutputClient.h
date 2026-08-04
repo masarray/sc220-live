@@ -9,7 +9,9 @@ namespace askp::live {
 // Independent physical playback client for confidence monitoring. The primary
 // AudioDeviceManager remains dedicated to SC220 input -> VB-CABLE stream output.
 // This client owns a second output-only device and consumes a bounded stereo
-// FIFO written by the main broadcast callback.
+// FIFO written by the main broadcast callback. Source and monitor endpoints may
+// use different nominal rates; a realtime-safe adaptive interpolator bridges the
+// two clocks without requiring the user to reconfigure Windows Audio Setup.
 class MonitorOutputClient final : private juce::AudioIODeviceCallback
 {
 public:
@@ -18,7 +20,10 @@ public:
         bool deviceOpen = false;
         bool running = false;
         bool primed = false;
+        bool resampling = false;
+        double sourceSampleRate = 0.0;
         double sampleRate = 0.0;
+        double driftCorrectionPpm = 0.0;
         int bufferSize = 0;
         int bufferedSamples = 0;
         int underflows = 0;
@@ -65,17 +70,24 @@ private:
     void setError (juce::String message);
 
     static constexpr int fifoCapacitySamples = 384000;
+    static constexpr int resampleScratchCapacity = 32768;
 
     juce::AudioDeviceManager deviceManager;
     juce::AudioBuffer<float> ringBuffer;
     juce::AbstractFifo fifo { fifoCapacitySamples };
+    juce::AudioBuffer<float> resampleInput;
+    juce::AudioBuffer<float> resampleOutput;
+    juce::LagrangeInterpolator leftInterpolator;
+    juce::LagrangeInterpolator rightInterpolator;
     juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> gainLinear;
 
     std::atomic<double> sourceRate { 48000.0 };
     std::atomic<int> sourceBlockSize { 128 };
     std::atomic<double> outputRate { 0.0 };
     std::atomic<int> outputBlockSize { 0 };
-    std::atomic<int> primeTargetSamples { 1440 };
+    std::atomic<int> primeTargetSamples { 2880 };
+    std::atomic<double> currentDriftCorrectionPpm { 0.0 };
+    std::atomic<bool> rateConversionActive { false };
     std::atomic<bool> deviceOpen { false };
     std::atomic<bool> running { false };
     std::atomic<bool> primed { false };

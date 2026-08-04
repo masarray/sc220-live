@@ -49,13 +49,20 @@ check(
     )),
 )
 check(
-    "producer publishes smoothed atomic power telemetry per callback",
+    "producer publishes rhythmic fast and slow atomic power telemetry",
     all(token in telemetry for token in (
         "std::array<std::atomic<float>, bandCount>",
-        "powerSmoothingSeconds = 0.180", "smoothedPower",
-        "10.0 * std::log10", "publishedDb[band].store",
-        "publishedGeneration.fetch_add",
+        "fastPower", "slowPower", "attackSeconds", "releaseSeconds",
+        "slowReferenceSeconds = 0.420", "maximumTransientBoostDb = 6.0",
+        "transientEmphasis = 0.72", "transientDb",
+        "publishedDb[band].store", "publishedGeneration.fetch_add",
     )),
+)
+check(
+    "steady pink calibration is not modified by the transient display stage",
+    "fastDb - slowDb" in telemetry
+    and "std::clamp" in telemetry
+    and "pinkCalibrationDb[band]" in telemetry,
 )
 check(
     "telemetry has no concrete queue lock allocation or FFT implementation",
@@ -93,7 +100,7 @@ check(
 )
 check("production engine no longer publishes analyzer sample queues", "programmeAnalyzer.push" not in engine)
 check(
-    "generated UI reads calibrated atomic band values without cosmetic contour",
+    "generated UI reads calibrated atomic bands without cosmetic EQ contour",
     all(token in ui for token in (
         '#include "ProgrammeBandTelemetry.h"',
         "programmeBandTelemetry.read", "updateFromTelemetry",
@@ -102,6 +109,14 @@ check(
     ))
     and all(token not in ui for token in (
         "displayDb += 4.0f", "displayDb += 2.0f", "displayDb -= 1.5f",
+    )),
+)
+check(
+    "generated UI expands movement equally across bands and adds transient caps",
+    all(token in ui for token in (
+        "expandedDb = -38.0f", "* 1.32f", "(expandedDb + 64.0f) / 52.0f",
+        "positiveRise", "pulses[band]", "segmentCount = 16",
+        "peakHoldFrames[band] = 14", "releaseMix",
     )),
 )
 check(
@@ -148,7 +163,7 @@ check(
 check("generated final sources exist", engine_path.exists() and ui_path.exists())
 
 failed = [name for name, ok in checks if not ok]
-print("SC220 Live pink-flat atomic bands and moving loudness audit")
+print("SC220 Live rhythmic pink-flat atomic bands and moving loudness audit")
 for name, ok in checks:
     print(f"[ {'PASS' if ok else 'FAIL'} ] {name}")
 print(f"Checks: {len(checks)}  Passed: {len(checks) - len(failed)}  Failed: {len(failed)}")

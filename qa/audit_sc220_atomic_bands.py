@@ -49,20 +49,19 @@ check(
     )),
 )
 check(
-    "producer publishes frequency-dependent rhythmic atomic power telemetry",
+    "producer separates calibrated steady levels from rhythmic activity",
     all(token in telemetry for token in (
-        "std::array<std::atomic<float>, bandCount>",
-        "envelopePower", "attackSeconds", "releaseSeconds",
-        "envelopeSeconds", "coefficient", "publishedDb[band].store",
-        "publishedGeneration.fetch_add",
+        "calibratedPower", "fastPower", "calibratedSmoothingSeconds = 0.180",
+        "fastAttackSeconds", "fastReleaseSeconds", "activityThresholdDb = 1.5",
+        "activityRangeDb = 5.0", "publishedActivity", "readActivity",
+        "publishedDb[band].store", "publishedGeneration.fetch_add",
     )),
 )
 check(
-    "steady pink calibration remains the only per-band level correction",
-    "pinkCalibrationDb[band]" in telemetry
-    and "transientDb" not in telemetry
-    and "transientEmphasis" not in telemetry
-    and "slowPower" not in telemetry,
+    "rhythm activity cannot modify the calibrated published dB baseline",
+    "const float displayDb = static_cast<float> (calibratedDb)" in telemetry
+    and "publishedDb[band].store (displayDb" in telemetry
+    and "publishedActivity[band].store (activity" in telemetry,
 )
 check(
     "telemetry has no concrete queue lock allocation or FFT implementation",
@@ -100,12 +99,12 @@ check(
 )
 check("production engine no longer publishes analyzer sample queues", "programmeAnalyzer.push" not in engine)
 check(
-    "generated UI reads calibrated atomic bands without cosmetic EQ contour",
+    "generated UI reads calibrated levels and separate activity without cosmetic EQ contour",
     all(token in ui for token in (
         '#include "ProgrammeBandTelemetry.h"',
-        "programmeBandTelemetry.read", "updateFromTelemetry",
-        "PINK-FLAT BANDS", "PROGRAM ANALYZER",
-        "const float displayDb = rawDb[band]",
+        "programmeBandTelemetry.read", "programmeBandTelemetry.readActivity",
+        "updateFromTelemetry", "PINK-FLAT BANDS", "PROGRAM ANALYZER",
+        "const float displayDb = rawDb[band]", "rawActivity", "rhythm * 0.20f",
     ))
     and all(token not in ui for token in (
         "displayDb += 4.0f", "displayDb += 2.0f", "displayDb -= 1.5f",

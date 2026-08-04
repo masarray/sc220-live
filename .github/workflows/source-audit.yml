@@ -35,17 +35,17 @@ jobs:
         run: python qa/audit_sc220_dual_source_bus.py
       - name: Validate SC220 premium UX contract
         run: python qa/audit_sc220_premium_ux.py
-      - name: Validate aligned console and analyzer bridge
+      - name: Validate aligned console and snapshot spectralizer
         run: python qa/audit_sc220_console_alignment.py
       - name: Validate synthetic spectralizer response
         run: python qa/audit_sc220_spectralizer_response.py
-      - name: Validate direct WASAPI capture visual authority
-        run: python qa/audit_sc220_direct_pc_capture_visual.py
+      - name: Validate deterministic post-limiter snapshot
+        run: python qa/audit_sc220_programme_snapshot.py
       - name: Validate independent physical Monitor Bus
         run: python qa/audit_sc220_monitor_bus.py
       - name: Validate selectable PC endpoint and anti-loop routing
         run: python qa/audit_sc220_pc_endpoint_routing.py
-      - name: Validate PC music-only analyzer and safe cable source
+      - name: Validate PC music-only snapshot path and safe cable source
         run: python qa/audit_sc220_pc_music_only.py
       - name: Validate clean-build executable unlock order
         run: python qa/audit_sc220_clean_build.py

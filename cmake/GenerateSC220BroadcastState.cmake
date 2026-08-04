@@ -102,9 +102,10 @@ file(WRITE "${SC220_APP_GENERATED_SOURCE}" "${_app}")
 message(STATUS "SC220 Live broadcast-state source: ${SC220_APP_GENERATED_SOURCE}")
 
 # The monitor engine, UI and persisted application now exist. Add selectable
-# PC playback capture, safe PC-only routing, final layout, then rebuild the
-# visualizer from live meter telemetry instead of the fragile ScopeTap/FFT path.
+# PC playback capture, safe PC-only routing, final layout, the programme
+# spectralizer, and finally the direct WASAPI capture authority.
 include("${CMAKE_CURRENT_LIST_DIR}/GenerateSC220PcEndpointRouting.cmake")
 include("${CMAKE_CURRENT_LIST_DIR}/PolishSC220FinalUi.cmake")
 include("${CMAKE_CURRENT_LIST_DIR}/StabilizeSC220PcMusicMode.cmake")
 include("${CMAKE_CURRENT_LIST_DIR}/RebuildSC220ImpactVisualizer.cmake")
+include("${CMAKE_CURRENT_LIST_DIR}/GenerateSC220DirectPcCaptureVisualizer.cmake")

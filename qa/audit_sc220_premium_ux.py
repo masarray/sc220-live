@@ -32,8 +32,8 @@ check("final UI renders the new atomic programme analyzer", all(token in final_u
     "class SC220MainComponent::LiveSpectrumDisplay", "updateFromTelemetry",
     "programmeBandTelemetry.read", "bandCount = ProgrammeBandTelemetry::bandCount",
     "segmentCount = 14", '"PROGRAM ANALYZER"')))
-check("visualizer identifies direct post-limiter band authority", all(token in final_ui for token in (
-    '"POST-LIMITER BANDS', '"WAITING FOR ENGINE BANDS"',
+check("visualizer identifies pink-calibrated post-limiter authority", all(token in final_ui for token in (
+    '"PINK-FLAT BANDS', '"WAITING FOR ENGINE BANDS"',
     '"WAITING FOR POST-LIMITER AUDIO"')))
 check("all failed visual transport paths are absent", all(token not in final_ui for token in (
     "ProgrammeSpectrumSnapshot", "programmeSpectrumSnapshot",

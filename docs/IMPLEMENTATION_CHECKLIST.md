@@ -67,7 +67,7 @@ Status legend:
 - [x] Monitoring works independently from the `GO LIVE` Stream mute state
 - [x] Monitoring works when SC220 is absent and PC Music is the only source
 - [x] Monitor device, gain, mute state, and source mode are persisted
-- [x] Monitor no longer requires the physical endpoint to match the Stream sample rate
+- [x] Monitor no longer rejects a physical endpoint merely because its rate differs from Stream
 - [x] Monitor first tries the preferred Stream rate, then the endpoint native Windows rate
 - [x] Nearest supported endpoint rate is selected when Windows initially reports `0 Hz`
 - [x] Fixed preallocated stereo resampling buffers
@@ -76,7 +76,7 @@ Status legend:
 - [x] Monitor callback remains lock-free and allocation-free
 - [x] Monitor telemetry reports source rate, endpoint rate, resampling state, and correction ppm
 - [~] Direct headphone selection without entering Audio Setup needs Windows validation
-- [~] 44.1 kHz Stream to 48 kHz headphone and 48 kHz Stream to 44.1 kHz endpoint need listening tests
+- [~] 44.1 kHz source to 48 kHz headphone and 48 kHz source to 44.1 kHz endpoint need listening tests
 - [~] Long-duration monitor drift and underrun behaviour needs a soak test
 
 ## Programme analyzer and metering
@@ -148,8 +148,8 @@ Status legend:
 Draft PR #2 should remain unmerged until these checks pass locally:
 
 1. Windows Release build succeeds from a clean tree.
-2. A 44.1 kHz headphone endpoint can be selected while Stream runs at 48 kHz, without opening Audio Setup.
-3. A 48 kHz endpoint can monitor a 44.1 kHz Stream configuration.
+2. A 44.1 kHz physical endpoint can monitor a 48 kHz programme without opening Audio Setup.
+3. A 48 kHz physical endpoint can monitor a 44.1 kHz programme.
 4. Program Monitor and Music Cue both produce continuous audio without periodic clicks or FIFO resets.
 5. Music produces visibly stronger per-frequency attacks than the previous analyzer version.
 6. Pink noise remains visually flat after settling.

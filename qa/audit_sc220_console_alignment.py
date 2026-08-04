@@ -81,6 +81,13 @@ check(
     )),
 )
 check(
+    "telemetry includes fast per-frequency rhythm envelopes",
+    all(token in telemetry for token in (
+        "fastPower", "slowPower", "attackSeconds", "releaseSeconds",
+        "maximumTransientBoostDb", "transientEmphasis", "transientDb",
+    )),
+)
+check(
     "telemetry has no queue allocation lock or FFT implementation",
     all(token not in telemetry for token in (
         "std::vector", "std::deque", "std::queue", "juce::AbstractFifo",
@@ -117,14 +124,15 @@ check(
     )),
 )
 check(
-    "bar ballistics and peak hold remain deterministic",
+    "rhythmic visual expansion pulse and peak hold remain deterministic",
     all(token in generated_ui for token in (
-        "segmentCount = 14", "peakHoldFrames[band] = 18",
-        "* 0.76f", "levels[band] * 0.84f", "heldPeaks[band] - 0.024f",
+        "segmentCount = 16", "peakHoldFrames[band] = 14",
+        "expandedDb = -38.0f", "* 1.32f", "positiveRise",
+        "pulses[band]", "releaseMix", "heldPeaks[band] - 0.032f",
     )),
 )
 check(
-    "calibration pass removes the old visual contour",
+    "calibration pass removes the old visual EQ contour",
     all(token in calibrator for token in (
         "remove cosmetic analyzer contour", "PINK-FLAT BANDS",
     ))
@@ -147,7 +155,7 @@ check(
 )
 
 failed = [name for name, ok in checks if not ok]
-print("SC220 Live final console and pink-flat atomic analyzer audit")
+print("SC220 Live final console and rhythmic pink-flat analyzer audit")
 for name, ok in checks:
     print(f"[ {'PASS' if ok else 'FAIL'} ] {name}")
 print(f"Checks: {len(checks)}  Passed: {len(checks) - len(failed)}  Failed: {len(failed)}")

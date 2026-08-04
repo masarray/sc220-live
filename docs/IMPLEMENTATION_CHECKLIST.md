@@ -41,6 +41,7 @@ Status legend:
 - [x] The exact same endpoint or same virtual-cable family is blocked to prevent digital feedback
 - [x] Stream selector remains restricted to virtual-cable endpoints
 - [x] An older saved physical Stream output is recovered toward VB-CABLE routing
+- [x] WASAPI startup failures are displayed as `CAPTURE ERROR` with the actual error text
 - [~] PC endpoint enumeration, cable-family naming, switching, persistence, and anti-loop alerts need Windows validation
 - [ ] Adaptive asynchronous sample-rate and clock-drift correction for long broadcasts
 
@@ -75,19 +76,19 @@ Status legend:
 - [x] Incorrect `OLDER -> NOW` history visualizer removed
 - [x] Main visualizer is a real fixed-frequency OBS-style spectralizer
 - [x] Frequency position is fixed from bass on the left to treble on the right
-- [x] Protected post-master programme samples are the primary source
-- [x] Post-master tap is re-armed immediately before each publication
-- [x] Runtime timer re-arms all analyzer taps after device or UI lifecycle changes
-- [x] Music Signature tap is the first recovery source when post-master publication is starved
-- [x] Voice Signature tap is the second recovery source
-- [x] Runtime source label reports `POST-MASTER`, `MUSIC RECOVERY`, `VOICE RECOVERY`, or `NO FRAMES`
-- [x] Waiting text distinguishes missing analyzer frames from real programme silence
+- [x] Protected post-master programme samples remain the preferred visual source
+- [x] Music Signature and Voice Signature taps remain recovery sources
+- [x] Direct WASAPI PC capture is an independent recovery source before the DSP FIFO
+- [x] Direct capture has one producer and one UI consumer using a bounded lock-free queue
+- [x] A full DSP FIFO cannot suppress direct WASAPI visual publication
+- [x] Source priority is `POST-MASTER -> MUSIC RECOVERY -> PC CAPTURE -> VOICE RECOVERY`
+- [x] The visible source label reports which path is actually supplying frames
+- [x] `NO FRAMES` is distinguished from real signal silence
 - [x] Left and right channels are analysed separately and combined by stereo energy
 - [x] Anti-phase audio remains visible instead of cancelling through mono summing
 - [x] Lightweight `512`-point FFT
 - [x] FFT, smoothing, peak hold, and drawing run on the UI/message thread
-- [x] Audio callback adds only lock-free tap publication and one atomic enable store
-- [x] No FFT, windowing, memory allocation, mutex, or drawing runs in the audio callback
+- [x] No FFT, windowing, memory allocation, or visual processing is added to the audio callback
 - [x] `24` logarithmically spaced bands from approximately `35 Hz` to `16 kHz`
 - [x] `15` segmented cells per band, similar to common OBS visualizers
 - [x] Bass display receives a small visual contour boost without changing audio
@@ -96,9 +97,9 @@ Status legend:
 - [x] Independent `500 ms` peak hold for every band
 - [x] Approximately `30 fps` visual refresh
 - [x] Frequency labels include `40`, `100`, `250`, `1k`, `4k`, and `12k`
-- [~] Realtime movement using `POST-MASTER` requires confirmation in the Windows executable
-- [~] PC Music-only runtime must confirm either `POST-MASTER` or `MUSIC RECOVERY`
-- [~] SC220 voice runtime must confirm either `POST-MASTER` or `VOICE RECOVERY`
+- [~] Direct `PC CAPTURE` movement requires confirmation in the Windows executable
+- [~] Preferred post-master spectrum movement requires Windows runtime confirmation
+- [~] Realtime spectrum movement with SC220 voice requires hardware confirmation
 - [x] Stereo input, PC Audio, and Stream level meters
 - [x] Integrated loudness and true-peak programme telemetry
 
@@ -120,7 +121,7 @@ Status legend:
 - [x] Explicit `STREAM OUTPUT` and `MONITOR OUTPUT` labels
 - [x] Explicit `VB-CABLE / OBS` and `HEADPHONES / SPEAKERS` routing descriptions
 - [x] PC Audio source dropdown represents the selected Windows playback endpoint
-- [x] PC Audio status distinguishes active capture, startup, and routing-blocked states
+- [x] PC Audio status distinguishes active capture, startup, routing blocked, and capture error
 - [~] Final layout needs visual confirmation at `1180x720`, `1600x900`, and maximised size
 - [ ] Embed the final application typeface instead of relying on Windows fallback
 - [ ] Replace remaining legacy typography/assets in the mini controller
@@ -132,14 +133,12 @@ Status legend:
 - [x] Safe muted Stream startup
 - [x] Clean build closes the preview executable before removing the build tree
 - [x] Bounded retry and lock-owner diagnostics for Windows clean builds
-- [x] CMake audit confirms the generated engine and final generated UI are compiled by the normal target
-- [x] Repository audits cover ASK-P authority, dual-source routing, premium UX, console geometry, Monitor Bus, endpoint routing, PC-music-only mode, safe virtual-cable routing, and redundant spectralizer publication
-- [x] CI verifies FFT exists only in generated UI and is absent from the engine source
-- [x] CI verifies post-master publication is re-armed before `programmeAnalyzer.push`
-- [x] CI verifies programme, Music, and Voice taps are consumed in that order
-- [x] CI verifies the old one-tap and time-history visualizers are removed
-- [x] Synthetic tone audit confirms bass, mid, and treble map left-to-right
-- [x] Synthetic anti-phase audit confirms stereo energy remains visible
+- [x] Normal CMake builds compile the generated PC capture authority and mark the base source header-only
+- [x] Repository audits cover ASK-P authority, routing, UX, console geometry, Monitor Bus, PC-only operation, spectral response, anti-phase response, and direct WASAPI publication
+- [x] CI verifies direct visual publication occurs before DSP FIFO free-space handling
+- [x] CI verifies the FFT exists only in generated UI and not in capture/audio engine sources
+- [x] CI verifies that the time-history visualizer is fully removed
+- [x] GitHub Actions source-audit run `#178` passed
 - [~] Full Windows/MSVC Release compile must pass locally after the latest commit
 - [~] PC Music-only + distinct VB-CABLE source/stream + physical monitor test
 - [~] SC220 `MIXER` + PC Music + VB-CABLE + physical monitor end-to-end test
@@ -169,14 +168,13 @@ Status legend:
 Draft PR #2 should remain unmerged until these minimum checks pass:
 
 1. Windows Release build succeeds from a clean tree.
-2. `PROGRAM SPECTRUM` displays fixed bass-to-treble bars.
-3. With PC Music playing, the source label must not remain `NO FRAMES`.
-4. Preferred source is `POST-MASTER`; `MUSIC RECOVERY` is an accepted recovery state that must still animate correctly.
-5. With SC220 voice, `POST-MASTER` or `VOICE RECOVERY` must animate correctly.
-6. Bass, mids, and treble must produce visibly different bar patterns.
-7. Peak markers hold briefly and then fall without sticking.
-8. A safe virtual source configuration works, for example Cable A as PC Music and Cable B as Stream.
-9. Selecting the same cable for PC Music and Stream is blocked with a clear warning.
-10. Enhanced PC Music is audible through Program Monitor and Music Cue.
-11. SC220 is automatically added when `MIXER` becomes available.
-12. A minimum one-hour live soak test completes without dropouts, FIFO growth, routing feedback, or visualizer-induced CPU spikes.
+2. The PC Audio state becomes `PLAYBACK CAPTURE ACTIVE` or shows a specific `CAPTURE ERROR`.
+3. With capture active, `PROGRAM SPECTRUM` must show `POST-MASTER`, `MUSIC RECOVERY`, or `PC CAPTURE`, never permanent `NO FRAMES`.
+4. Bass, mids, and treble produce visibly different fixed-frequency patterns.
+5. Peak markers hold briefly and then fall without sticking.
+6. Toggling Smart Enhancer power must audibly change the monitored app path, proving audio is not merely the Windows direct path.
+7. A safe virtual source configuration works, for example Cable A as PC Music and Cable B as Stream.
+8. Selecting the same cable for PC Music and Stream is blocked with a clear warning.
+9. Enhanced PC Music is audible through Program Monitor and Music Cue.
+10. SC220 is automatically added when `MIXER` becomes available.
+11. A minimum one-hour live soak test completes without dropouts, FIFO growth, routing feedback, or visualizer-induced CPU spikes.

@@ -111,7 +111,7 @@ check(
 check(
     "stereo-energy filters retain anti-phase programme audio",
     float(np.max(anti_bands)) > 0.5,
-    f"band peak={float(np.max(anti_bands)):.3f}",
+    f"band peak={float(np.max(anti_bands))):.3f}",
 )
 check(
     "anti-phase tone peaks at 1.25 kHz band",
@@ -119,24 +119,26 @@ check(
     f"peak index={int(np.argmax(anti_bands))}",
 )
 check(
-    "telemetry source contains proportional bands and pink calibration",
+    "telemetry source contains proportional bands pink calibration and rhythm envelopes",
     all(token in TELEMETRY for token in (
         "bandCount = 14", "lowerBoundary", "upperBoundary",
         "nominal / bandwidth", "calculatePinkNoiseCalibration",
         "integrationPoints = 4096", "pinkCalibrationDb",
         "50.0f, 80.0f, 125.0f", "1250.0f", "8000.0f", "16000.0f",
-        "processSample",
+        "processSample", "fastPower", "slowPower", "attackSeconds",
+        "releaseSeconds", "transientDb", "transientEmphasis",
     )),
-    "sample-rate-aware pink-flat filter-bank contract",
+    "sample-rate-aware pink-flat rhythmic filter-bank contract",
 )
 check(
-    "generated UI uses calibrated atomic 14-band contract",
+    "generated UI uses calibrated lively atomic 14-band contract",
     all(token in SOURCE for token in (
-        "programmeBandTelemetry.read", "segmentCount = 14",
-        "peakHoldFrames[band] = 18", "PROGRAM ANALYZER",
+        "programmeBandTelemetry.read", "segmentCount = 16",
+        "peakHoldFrames[band] = 14", "PROGRAM ANALYZER",
         "PINK-FLAT BANDS", "const float displayDb = rawDb[band]",
+        "expandedDb = -38.0f", "positiveRise", "pulses[band]",
     )),
-    "generated pink-flat UI contract",
+    "generated rhythmic pink-flat UI contract",
 )
 check(
     "FFT snapshot and history implementations are absent",
@@ -149,7 +151,7 @@ check(
 )
 
 failed = [name for name, ok, _ in checks if not ok]
-print("SC220 Live synthetic proportional filter-bank response audit")
+print("SC220 Live synthetic proportional rhythmic filter-bank response audit")
 for name, ok, detail in checks:
     print(f"[ {'PASS' if ok else 'FAIL'} ] {name}: {detail}")
 print(f"Checks: {len(checks)}  Passed: {len(checks) - len(failed)}  Failed: {len(failed)}")

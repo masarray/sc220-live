@@ -125,8 +125,11 @@ check(
         "nominal / bandwidth", "calculatePinkNoiseCalibration",
         "integrationPoints = 4096", "pinkCalibrationDb",
         "50.0f, 80.0f, 125.0f", "1250.0f", "8000.0f", "16000.0f",
-        "processSample", "fastPower", "slowPower", "attackSeconds",
-        "releaseSeconds", "transientDb", "transientEmphasis",
+        "processSample", "envelopePower", "attackSeconds",
+        "releaseSeconds", "envelopeSeconds", "coefficient",
+    ))
+    and all(token not in TELEMETRY for token in (
+        "slowPower", "transientDb", "transientEmphasis",
     )),
     "sample-rate-aware pink-flat rhythmic filter-bank contract",
 )

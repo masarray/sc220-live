@@ -163,9 +163,11 @@ juce::String MonitorOutputClient::selectOutputDevice (const juce::String& name,
 
     if (error.isNotEmpty())
     {
-        setError ("Unable to open monitor endpoint at its supported Windows sample rate: "
-                  + error);
-        return errorMessage;
+        const juce::String message =
+            "Unable to open monitor endpoint at its supported Windows sample rate: "
+            + error;
+        setError (message);
+        return message;
     }
 
     device = deviceManager.getCurrentAudioDevice();

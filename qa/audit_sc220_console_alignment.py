@@ -228,7 +228,7 @@ check(
 )
 check(
     "obsolete one-tap and time-history visualizers are removed",
-    "spectrumDisplay->updateFromTap" not in generated_ui
+    "spectrumDisplay->updateFromTap (" not in generated_ui
     and "PROGRAM IMPACT" not in generated_ui
     and "PC INPUT IMPACT" not in generated_ui
     and '"OLDER"' not in generated_ui

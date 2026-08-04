@@ -64,6 +64,7 @@ public:
     LiveSpectrumDisplay()
     {
         levels.fill (0.0f);
+        pulses.fill (0.0f);
         heldPeaks.fill (0.0f);
         peakHoldFrames.fill (0);
     }
@@ -103,16 +104,31 @@ public:
                 displayDb -= 1.5f;
 
             strongestDb = juce::jmax (strongestDb, displayDb);
-            const float target = normaliseDb (displayDb, -72.0f);
-            if (target > levels[band])
-                levels[band] += (target - levels[band]) * 0.76f;
+
+            // Expand only the visual dynamic range around a neutral pivot. A
+            // flat pink-noise spectrum remains flat because every band receives
+            // the same transform, while musical attacks travel farther.
+            const float expandedDb = -38.0f + (displayDb + 38.0f) * 1.32f;
+            const float target = juce::jlimit (0.0f, 1.0f,
+                                               (expandedDb + 64.0f) / 52.0f);
+            const float previous = levels[band];
+            const float bandPosition = static_cast<float> (band)
+                                     / static_cast<float> (bandCount - 1);
+            const float releaseMix = 0.14f + 0.10f * bandPosition;
+
+            if (target > previous)
+                levels[band] = previous + (target - previous) * 0.90f;
             else
-                levels[band] = levels[band] * 0.84f + target * 0.16f;
+                levels[band] = previous * (1.0f - releaseMix) + target * releaseMix;
+
+            const float positiveRise = juce::jmax (0.0f, target - previous);
+            pulses[band] = juce::jmax (pulses[band] * 0.66f,
+                                       juce::jmin (1.0f, positiveRise * 3.4f));
 
             if (levels[band] >= heldPeaks[band])
             {
                 heldPeaks[band] = levels[band];
-                peakHoldFrames[band] = 18; // 600 ms at 30 Hz.
+                peakHoldFrames[band] = 14; // About 470 ms at 30 Hz.
             }
             else if (peakHoldFrames[band] > 0)
             {
@@ -121,7 +137,7 @@ public:
             else
             {
                 heldPeaks[band] = juce::jmax (levels[band],
-                                              heldPeaks[band] - 0.024f);
+                                              heldPeaks[band] - 0.032f);
             }
         }
 
@@ -148,9 +164,9 @@ public:
             g.drawHorizontalLine (juce::roundToInt (y), graph.getX(), graph.getRight());
         }
 
-        constexpr int segmentCount = 14;
-        constexpr float barGap = 6.0f;
-        constexpr float segmentGap = 2.0f;
+        constexpr int segmentCount = 16;
+        constexpr float barGap = 5.0f;
+        constexpr float segmentGap = 1.8f;
         const float barWidth = (graph.getWidth()
             - barGap * static_cast<float> (bandCount - 1))
             / static_cast<float> (bandCount);
@@ -164,6 +180,7 @@ public:
                 + static_cast<float> (band) * (barWidth + barGap);
             const int litSegments = juce::jlimit (0, segmentCount,
                 juce::roundToInt (levels[band] * static_cast<float> (segmentCount)));
+            const float pulse = pulses[band];
 
             for (int segment = 0; segment < segmentCount; ++segment)
             {
@@ -176,10 +193,21 @@ public:
                 const auto activeColour = heightNormal > 0.84f ? palette::red
                                         : heightNormal > 0.65f ? palette::amber
                                                                : palette::green;
+                const float activeAlpha = juce::jmin (1.0f, 0.90f + pulse * 0.10f);
                 g.setColour (segment < litSegments
-                    ? activeColour.withAlpha (0.96f)
-                    : activeColour.withAlpha (0.095f));
+                    ? activeColour.withAlpha (activeAlpha)
+                    : activeColour.withAlpha (0.080f));
                 g.fillRoundedRectangle (cell, juce::jmin (1.8f, barWidth * 0.28f));
+            }
+
+            if (litSegments > 0 && pulse > 0.035f)
+            {
+                const float transientY = graph.getBottom()
+                    - levels[band] * graph.getHeight();
+                g.setColour (juce::Colours::white.withAlpha (0.18f + pulse * 0.55f));
+                g.fillRoundedRectangle (x, transientY - 2.0f,
+                                        barWidth, 3.0f,
+                                        juce::jmin (1.2f, barWidth * 0.25f));
             }
 
             if (heldPeaks[band] > 0.025f)
@@ -242,12 +270,13 @@ private:
     {
         for (size_t band = 0; band < bandCount; ++band)
         {
-            levels[band] *= 0.88f;
+            levels[band] *= 0.84f;
+            pulses[band] *= 0.58f;
             if (peakHoldFrames[band] > 0)
                 --peakHoldFrames[band];
             else
                 heldPeaks[band] = juce::jmax (levels[band],
-                                              heldPeaks[band] - 0.024f);
+                                              heldPeaks[band] - 0.032f);
         }
         hasSignal = std::any_of (levels.begin(), levels.end(),
             [] (float value) { return value > 0.018f; });
@@ -255,6 +284,7 @@ private:
 
     static constexpr size_t bandCount = ProgrammeBandTelemetry::bandCount;
     std::array<float, bandCount> levels {};
+    std::array<float, bandCount> pulses {};
     std::array<float, bandCount> heldPeaks {};
     std::array<int, bandCount> peakHoldFrames {};
     std::uint64_t lastGeneration = 0;
@@ -321,8 +351,10 @@ foreach(_required IN ITEMS
         "POST-LIMITER BANDS"
         "PROGRAM ANALYZER"
         "14 BAND"
-        "segmentCount = 14"
-        "peakHoldFrames[band] = 18")
+        "segmentCount = 16"
+        "peakHoldFrames[band] = 14"
+        "pulses[band]"
+        "positiveRise")
     string(FIND "${_ui}${_engine}" "${_required}" _position)
     if(_position EQUAL -1)
         message(FATAL_ERROR "SC220 atomic band authority missing: ${_required}")
@@ -357,4 +389,4 @@ endforeach()
 
 file(WRITE "${SC220_UI_MONITOR_GENERATED_SOURCE}" "${_ui}")
 file(WRITE "${SC220_ENGINE_GENERATED_SOURCE}" "${_engine}")
-message(STATUS "SC220 Live atomic post-limiter filter-bank visualizer generated")
+message(STATUS "SC220 Live rhythmic atomic post-limiter filter-bank visualizer generated")

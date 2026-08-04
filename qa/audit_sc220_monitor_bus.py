@@ -77,13 +77,60 @@ check(
     ),
 )
 check(
-    "monitor endpoint enforces nominal stream sample rate",
+    "monitor opens the endpoint native rate instead of rejecting 44.1 versus 48 kHz",
     all(
         token in monitor_cpp
         for token in (
-            "setup.sampleRate = preferredSampleRate",
-            "std::abs (actualRate - expectedRate) > 1.0",
-            "must support the stream sample rate",
+            "auto tryOpen",
+            "error = tryOpen (preferred)",
+            "error = tryOpen (0.0)",
+            "getAvailableSampleRates",
+            "nearestDistance",
+            "supported Windows sample rate",
+        )
+    )
+    and "must support the stream sample rate" not in monitor_cpp,
+)
+check(
+    "monitor owns fixed preallocated stereo resampling scratch",
+    all(
+        token in monitor_h + monitor_cpp
+        for token in (
+            "resampleScratchCapacity = 32768",
+            "juce::AudioBuffer<float> resampleInput",
+            "juce::AudioBuffer<float> resampleOutput",
+            "juce::LagrangeInterpolator leftInterpolator",
+            "juce::LagrangeInterpolator rightInterpolator",
+            "resampleInput.setSize",
+            "resampleOutput.setSize",
+        )
+    ),
+)
+check(
+    "monitor performs adaptive nominal-rate conversion and clock-drift control",
+    all(
+        token in monitor_cpp
+        for token in (
+            "baseRatio = sourceSampleRate / monitorSampleRate",
+            "fillError",
+            "correctionPpm",
+            "adaptiveRatio",
+            "leftInterpolator.process",
+            "rightInterpolator.process",
+            "currentDriftCorrectionPpm.store",
+        )
+    ),
+)
+check(
+    "monitor status exposes source/output rate and resampling health",
+    all(
+        token in monitor_h + monitor_cpp
+        for token in (
+            "sourceSampleRate",
+            "resampling",
+            "driftCorrectionPpm",
+            "rateConversionActive",
+            "currentDriftCorrectionPpm",
         )
     ),
 )
@@ -235,7 +282,7 @@ check(
 )
 
 failed = [name for name, ok in checks if not ok]
-print("SC220 Live independent Monitor Bus contract audit")
+print("SC220 Live independent Monitor Bus and adaptive-rate contract audit")
 for name, ok in checks:
     print(f"[ {'PASS' if ok else 'FAIL'} ] {name}")
 print(f"Checks: {len(checks)}  Passed: {len(checks) - len(failed)}  Failed: {len(failed)}")

@@ -111,7 +111,7 @@ check(
 check(
     "stereo-energy filters retain anti-phase programme audio",
     float(np.max(anti_bands)) > 0.5,
-    f"band peak={float(np.max(anti_bands))):.3f}",
+    f"band peak={float(np.max(anti_bands)):.3f}",
 )
 check(
     "anti-phase tone peaks at 1.25 kHz band",

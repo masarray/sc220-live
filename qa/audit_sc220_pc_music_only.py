@@ -5,14 +5,13 @@ generated_root = ROOT / "generated" / "sc220-monitor"
 engine_path = generated_root / "LiveAudioEngine_Monitor.cpp"
 ui_path = generated_root / "SC220MainComponent_Monitor.cpp"
 stabilizer_path = ROOT / "cmake" / "StabilizeSC220PcMusicMode.cmake"
-spectralizer_path = ROOT / "cmake" / "RebuildSC220ImpactVisualizer.cmake"
+snapshot_path = ROOT / "live" / "ProgrammeSpectrumSnapshot.h"
 state_path = ROOT / "cmake" / "GenerateSC220BroadcastState.cmake"
 
 engine = engine_path.read_text(encoding="utf-8") if engine_path.exists() else ""
 ui = ui_path.read_text(encoding="utf-8") if ui_path.exists() else ""
 stabilizer = stabilizer_path.read_text(encoding="utf-8")
-spectralizer = spectralizer_path.read_text(encoding="utf-8")
-stabilizer_words = " ".join(stabilizer.lower().replace("#", " ").split())
+snapshot = snapshot_path.read_text(encoding="utf-8")
 state = state_path.read_text(encoding="utf-8")
 
 checks: list[tuple[str, bool]] = []
@@ -23,19 +22,14 @@ def check(name: str, condition: bool) -> None:
 
 
 check(
-    "PC Music stabilizer runs after final UI polish",
+    "PC Music stabilizer runs before snapshot visualizer",
     'include("${CMAKE_CURRENT_LIST_DIR}/StabilizeSC220PcMusicMode.cmake")' in state
-    and state.find("PolishSC220FinalUi.cmake")
-    < state.find("StabilizeSC220PcMusicMode.cmake"),
-)
-check(
-    "spectralizer rebuild runs after PC Music stabilizer",
-    'include("${CMAKE_CURRENT_LIST_DIR}/RebuildSC220ImpactVisualizer.cmake")' in state
+    and 'include("${CMAKE_CURRENT_LIST_DIR}/RebuildSC220ImpactVisualizer.cmake")' in state
     and state.find("StabilizeSC220PcMusicMode.cmake")
     < state.find("RebuildSC220ImpactVisualizer.cmake"),
 )
 check(
-    "programme graph opens output-first and does not require SC220 input",
+    "programme graph opens output-first without SC220",
     "deviceManager.initialise (0, 2, savedDeviceState, true)" in engine
     and "deviceManager.initialise (2, 2, savedDeviceState, true)" not in engine,
 )
@@ -48,7 +42,7 @@ check(
     )),
 )
 check(
-    "SC220 is still auto-selected when MIXER becomes available",
+    "SC220 remains optional and auto-selectable",
     all(token in engine for token in (
         "looksLikeSc220Endpoint",
         "for (const auto& name : getInputDeviceNames())",
@@ -56,17 +50,17 @@ check(
     )),
 )
 check(
-    "zero-input callback clears Voice but continues into PC Music processing",
+    "zero-input callback still processes PC Music",
     all(token in engine for token in (
         "if (numInputChannels > 0",
         "voiceBlock.clear",
         "pcLoopback.read (musicBlock, numSamples)",
         "musicEnhancerBridge.process (musicBlock, musicMidi)",
-        "programmeAnalyzer.push",
+        "masterLimiter.process (masterContext)",
     )),
 )
 check(
-    "different VB-CABLE families are distinguishable",
+    "safe VB-CABLE families remain distinguishable",
     all(token in engine for token in (
         'return "VBCABLEA"',
         'return "VBCABLEB"',
@@ -76,15 +70,7 @@ check(
     )),
 )
 check(
-    "PC Audio list allows virtual sources except the exact Stream cable",
-    "if (pcEndpointConflictsWithStream (endpoint.name, streamOutput))" in engine
-    and "isUnsafeVirtualEndpoint (endpoint.name)" not in engine[
-        engine.find("juce::StringArray LiveAudioEngine::getPcAudioEndpointNames"):
-        engine.find("juce::String LiveAudioEngine::selectPcAudioEndpoint")
-    ],
-)
-check(
-    "same endpoint or same virtual cable family is blocked",
+    "same endpoint or cable family remains blocked",
     all(token in engine for token in (
         "PcAudioLoopbackCapture::endpointNamesMatch (source, streamOutput)",
         "sourceCable.isNotEmpty() && sourceCable == streamCable",
@@ -92,94 +78,60 @@ check(
     )),
 )
 check(
-    "post-master tap is re-armed immediately before every publication",
-    all(token in engine for token in (
-        "masterLimiter.process (masterContext);",
-        "programmeAnalyzer.setEnabled (true);",
-        "programmeAnalyzer.push",
-    ))
-    and engine.find("programmeAnalyzer.setEnabled (true);",
-                    engine.find("masterLimiter.process (masterContext);"))
-    < engine.find("programmeAnalyzer.push",
-                  engine.find("masterLimiter.process (masterContext);")),
+    "post-limiter snapshot publication follows PC Music processing",
+    engine.find("musicEnhancerBridge.process (musicBlock, musicMidi)")
+    < engine.find("masterLimiter.process (masterContext)")
+    < engine.find("programmeSpectrumSnapshot.push"),
 )
 check(
-    "PC Music recovery tap remains enabled after DSP prepare",
-    "getMusicEnhancerBridge().setVisualTapEnabled (true)" in ui
-    and "getMusicEnhancerBridge().analysisTap()" in ui
-    and "musicTap.consumeLatest" in ui,
-)
-check(
-    "spectralizer source order is programme then Music then Voice",
-    ui.find("programmeTap.consumeLatest")
-    < ui.find("musicTap.consumeLatest")
-    < ui.find("voiceTap.consumeLatest"),
-)
-check(
-    "PC-only fallback is visible and diagnosable",
+    "visible spectrum consumes only the post-limiter snapshot",
     all(token in ui for token in (
-        "CaptureSource::musicRecovery",
-        'sourceText = "MUSIC RECOVERY"',
-        'sourceText = "NO FRAMES"',
-        "WAITING FOR ANALYZER FRAMES",
-        "PROGRAM SILENCE",
-    )),
-)
-check(
-    "runtime timer re-arms programme music and voice paths",
-    all(token in ui for token in (
-        "audioEngine.setProgrammeAnalyzerEnabled (true);",
-        "audioEngine.getMusicEnhancerBridge().setVisualTapEnabled (true);",
-        "audioEngine.getVoiceEnhancerBridge().setVisualTapEnabled (true);",
-        "spectrumDisplay->updateFromTaps",
-    )),
-)
-check(
-    "fixed-frequency spectralizer analyses stereo energy",
-    all(token in ui for token in (
-        "fftOrder = 9",
-        "bandCount = 24",
-        "performFrequencyOnlyForwardTransform",
-        "stereoPower += 0.5f",
+        "updateFromSnapshot",
+        "programmeSpectrumSnapshot.consumeLatest",
+        "POST-LIMITER SNAPSHOT",
         "PROGRAM SPECTRUM",
     )),
 )
 check(
-    "spectralizer has fast attack smooth release and per-band hold",
-    all(token in ui for token in (
-        "* 0.82f",
-        "levels[band] * 0.88f",
-        "peakHoldFrames[band] = 15",
-        "heldPeaks[band] - 0.026f",
+    "snapshot is complete-frame and allocation-free",
+    all(token in snapshot for token in (
+        "frameSize = 512",
+        "std::array<Bank, 2>",
+        "std::memcpy",
+        "publishedGeneration",
+        "sequenceBefore",
+        "sequenceAfter",
+    ))
+    and "new " not in snapshot
+    and "mutex" not in snapshot.lower(),
+)
+check(
+    "old analyzer sources cannot mask PC-only operation",
+    all(token not in ui for token in (
+        "programmeTap.consumeLatest",
+        "musicTap.consumeLatest",
+        "voiceTap.consumeLatest",
+        "PcAudioLoopbackCapture::consumeLatestVisual",
+        "MUSIC RECOVERY",
+        "VOICE RECOVERY",
+        "PC CAPTURE",
+        "NO FRAMES",
     )),
 )
 check(
-    "obsolete one-tap and history paths are removed",
-    "spectrumDisplay->updateFromTap (" not in ui
-    and "PROGRAM IMPACT" not in ui
-    and "PC INPUT IMPACT" not in ui
-    and '"OLDER"' not in ui
-    and '"NOW"' not in ui
-    and "historySize = 32" not in ui,
+    "spectralizer remains lightweight and UI-thread only",
+    "fftOrder = 9" in ui
+    and "bandCount = 24" in ui
+    and "performFrequencyOnlyForwardTransform" in ui
+    and "performFrequencyOnlyForwardTransform" not in engine,
 )
 check(
     "generated final sources exist",
-    engine_path.exists() and ui_path.exists(),
-)
-check(
-    "stabilizer documents safe virtual source and PC-only intent",
-    "different cable" in stabilizer_words
-    and "without an sc220 input device" in stabilizer_words,
-)
-check(
-    "spectralizer generator documents redundant lock-free recovery",
-    "redundant runtime" in spectralizer.lower()
-    and "post-signature" in spectralizer.lower()
-    and "lock-free spsc" in spectralizer.lower(),
+    engine_path.exists() and ui_path.exists() and snapshot_path.exists(),
 )
 
 failed = [name for name, ok in checks if not ok]
-print("SC220 Live PC Music-only routing and redundant spectralizer audit")
+print("SC220 Live PC Music-only and post-limiter snapshot audit")
 for name, ok in checks:
     print(f"[ {'PASS' if ok else 'FAIL'} ] {name}")
 print(f"Checks: {len(checks)}  Passed: {len(checks) - len(failed)}  Failed: {len(failed)}")

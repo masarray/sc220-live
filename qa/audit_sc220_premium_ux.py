@@ -15,14 +15,10 @@ def check(name: str, condition: bool) -> None:
 
 
 check("custom titlebar supports window dragging", all(token in header + source for token in (
-    "juce::ComponentDragger windowDragger",
-    "void SC220MainComponent::mouseDown",
-    "void SC220MainComponent::mouseDrag",
-    "startDraggingComponent",
-    "dragComponent")))
+    "juce::ComponentDragger windowDragger", "void SC220MainComponent::mouseDown",
+    "void SC220MainComponent::mouseDrag", "startDraggingComponent", "dragComponent")))
 check("header double-click toggles maximise", all(token in source for token in (
-    "void SC220MainComponent::mouseDoubleClick",
-    "windowActions.toggleMaximise")))
+    "void SC220MainComponent::mouseDoubleClick", "windowActions.toggleMaximise")))
 check("titlebar uses Lucide minimise maximise close", all(token in header for token in (
     'LucideIconButton minimiseButton { "Minimise", "minimize_2_svg"',
     'LucideIconButton maximiseButton { "Maximise", "maximize_2_svg"',
@@ -32,71 +28,45 @@ check("Smart Enhancer power icon exists", all(token in header + source for token
     'LucideIconButton enhancerPowerButton { "Smart Enhancer", "power_svg"',
     "enhancerPowerButton.setClickingTogglesState",
     "audioEngine.setBypassed (! enhancerPowerButton.getToggleState())")))
-check("final UI renders a fixed-frequency programme spectrum", all(token in final_ui for token in (
-    "class SC220MainComponent::LiveSpectrumDisplay",
-    "updateFromSnapshot",
-    "programmeSpectrumSnapshot.consumeLatest",
-    "performFrequencyOnlyForwardTransform",
-    "bandCount = 24",
-    "segmentCount = 15",
-    '"PROGRAM SPECTRUM"')))
-check("visualizer identifies deterministic post-limiter authority", all(token in final_ui for token in (
-    '"POST-LIMITER SNAPSHOT',
-    '"WAITING FOR POST-LIMITER AUDIO"',
-    "programmeSpectrumSnapshot.generation()")))
-check("old analyzer recovery paths are absent", all(token not in final_ui for token in (
-    "updateFromTaps",
-    "programmeTap.consumeLatest",
-    "musicTap.consumeLatest",
-    "voiceTap.consumeLatest",
-    "PcAudioLoopbackCapture::consumeLatestVisual",
-    "MUSIC RECOVERY",
-    "VOICE RECOVERY",
-    "PC CAPTURE",
-    "NO FRAMES")))
+check("final UI renders the new atomic programme analyzer", all(token in final_ui for token in (
+    "class SC220MainComponent::LiveSpectrumDisplay", "updateFromTelemetry",
+    "programmeBandTelemetry.read", "bandCount = ProgrammeBandTelemetry::bandCount",
+    "segmentCount = 14", '"PROGRAM ANALYZER"')))
+check("visualizer identifies direct post-limiter band authority", all(token in final_ui for token in (
+    '"POST-LIMITER BANDS', '"WAITING FOR ENGINE BANDS"',
+    '"WAITING FOR POST-LIMITER AUDIO"')))
+check("all failed visual transport paths are absent", all(token not in final_ui for token in (
+    "ProgrammeSpectrumSnapshot", "programmeSpectrumSnapshot",
+    "performFrequencyOnlyForwardTransform", "updateFromSnapshot", "updateFromTaps",
+    "programmeTap.consumeLatest", "musicTap.consumeLatest", "voiceTap.consumeLatest",
+    "PcAudioLoopbackCapture::consumeLatestVisual", "MUSIC RECOVERY",
+    "VOICE RECOVERY", "PC CAPTURE", "NO FRAMES")))
 check("main surface uses native Windows premium typography", 'font.setTypefaceName ("Segoe UI Variable")' in source)
 check("hardware controls match approved dot-calibrated metal surface", all(token in source for token in (
-    "for (int i = 0; i <= 20; ++i)",
-    "const auto dotSize",
-    "g.fillEllipse (dot.x - dotSize * 0.5f",
-    "palette::metalHi",
-    "palette::metalMid",
-    "drawFaderScale",
-    "capGradient.addColour",
-    "sliderPos - 34.0f, 40.0f, 68.0f",
-    "const auto accentStart = endAngle - 0.38f",
-)))
+    "for (int i = 0; i <= 20; ++i)", "const auto dotSize",
+    "g.fillEllipse (dot.x - dotSize * 0.5f", "palette::metalHi",
+    "palette::metalMid", "drawFaderScale", "capGradient.addColour",
+    "sliderPos - 34.0f, 40.0f, 68.0f", "const auto accentStart = endAngle - 0.38f")))
 check("full-height fader caps remain inside endpoint bounds", all(token in source for token in (
-    "getSliderThumbRadius",
-    "slider.getSliderStyle() == juce::Slider::LinearVertical",
-    "return 34;",
-    "sliderPos - 34.0f, 40.0f, 68.0f",
-)))
+    "getSliderThumbRadius", "slider.getSliderStyle() == juce::Slider::LinearVertical",
+    "return 34;", "sliderPos - 34.0f, 40.0f, 68.0f")))
 check("macro controls preserve approved endpoint labels", all(token in source for token in (
-    'g.drawText ("0%"',
-    'g.drawText ("100%"',
-    "knob.setTextBoxStyle (juce::Slider::NoTextBox",
-)))
+    'g.drawText ("0%"', 'g.drawText ("100%"',
+    "knob.setTextBoxStyle (juce::Slider::NoTextBox")))
 check("SC220 device art uses a focused source crop", all(token in source for token in (
-    "const int sourceY",
-    "const int sourceWidth",
-    "g.drawImage (sc220Image",
-)))
+    "const int sourceY", "const int sourceWidth", "g.drawImage (sc220Image")))
 check("free-days button removed from main surface", all(token not in header + source for token in (
     "licenseButton", "FREE 365 DAYS")))
 check("license remains available from Settings", all(token in source for token in (
-    'menu.addItem (2, "License & Activation")',
-    "licensePanel->setVisible (true)")))
+    'menu.addItem (2, "License & Activation")', "licensePanel->setVisible (true)")))
 check("SC220 detection is based on real endpoint name", all(token in source for token in (
-    "looksLikeSc220Input",
-    'normalised == "MIXER"',
-    'normalised.startsWith ("MIXER (")',
-    '"SC220 NOT DETECTED"')))
+    "looksLikeSc220Input", 'normalised == "MIXER"',
+    'normalised.startsWith ("MIXER (")', '"SC220 NOT DETECTED"')))
 check("fake unconditional SC220 status removed", 'g.drawText ("SC220 CONNECTED"' not in source)
 check("Details button removed", all(token not in header + source for token in (
     "detailsButton", '"DETAILS"', "SC220 Live Details")))
 check("output READY label remains removed", '"READY" : "SELECT VB-CABLE"' not in source)
-check("old time-history visualizer is absent from final UI", all(token not in final_ui for token in (
+check("old time-history visualizer is absent", all(token not in final_ui for token in (
     "PROGRAM IMPACT", "PC INPUT IMPACT", '"OLDER"', '"NOW"', "historySize = 32")))
 
 failed = [name for name, ok in checks if not ok]

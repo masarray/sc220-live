@@ -1,7 +1,7 @@
 # SC220 Live implementation checklist
 
-Updated: 2026-08-03  
-Branch: `agent/dual-source-broadcast-engine`
+Updated: 2026-08-04  
+Branch: `fix/pc-cable-source-analyzer`
 
 Status legend:
 
@@ -20,6 +20,8 @@ Status legend:
 - [x] Protected Master Bus with final trim and `-1 dB` limiter
 - [x] Separate Voice, Music, and Master gain-reduction telemetry
 - [x] Separate Voice and Music DSP-latency telemetry
+- [x] Primary programme graph can run output-only without SC220 attached
+- [x] SC220 `MIXER` is auto-selected when it becomes available
 - [x] Dual Mono transport no longer discards SC220 channel 2
 - [ ] Independent gain, mute, pan, and meter controls for both Dual Mono channels
 
@@ -28,25 +30,28 @@ Status legend:
 - [x] SC220 presence is reported from the real endpoint name, not a fake connected state
 - [x] Device names matching `MIXER`, `SC220`, or `Recording Tech` are recognised as SC220
 - [~] Automatic selection of the SC220 `MIXER` input needs hardware validation
-- [x] PC System Mix is captured through Windows WASAPI loopback
+- [x] PC Music is captured through Windows WASAPI loopback
 - [x] Windows render endpoints are enumerated using stable endpoint IDs and friendly names
 - [x] Selectable PC playback/loopback endpoint in the main PC Audio dropdown
 - [x] `SYSTEM DEFAULT` remains available when it is safe relative to the Stream endpoint
 - [x] Selected PC playback endpoint is persisted and restored before the audio graph starts
-- [x] Obvious virtual-cable endpoints are excluded from the normal PC playback list
-- [x] Self-loop validation between the selected PC loopback endpoint and Stream endpoint
-- [x] Unsafe PC Audio/Stream combinations are blocked before capture or output reopen
-- [x] Stream selector is restricted to virtual-cable endpoints
+- [x] Physical playback endpoints can be selected as PC Music sources
+- [x] VB-CABLE and VB-CABLE A/B/C/D can be selected as PC Music sources
+- [x] Different virtual-cable families may be used for PC Music source and Stream Output
+- [x] The exact same endpoint or same virtual-cable family is blocked to prevent digital feedback
+- [x] Stream selector remains restricted to virtual-cable endpoints
 - [x] An older saved physical Stream output is recovered toward VB-CABLE routing
-- [~] PC endpoint enumeration, switching, persistence, and anti-loop alerts need Windows validation
+- [~] PC endpoint enumeration, cable-family naming, switching, persistence, and anti-loop alerts need Windows validation
 - [ ] Adaptive asynchronous sample-rate and clock-drift correction for long broadcasts
 
 ## Music, ducking, and broadcast workflow
 
+- [x] PC Music can operate without SC220 connected
 - [x] PC Music receives ASK-P enhancement
 - [x] Ducking is applied after Music Signature enhancement
-- [x] Ducking is keyed from the SC220 Voice lane
+- [x] Ducking is keyed from the SC220 Voice lane when SC220 is present
 - [x] Ducking amount is user-adjustable
+- [x] Enhanced PC Music can be heard through Program Monitor or Music Cue
 - [ ] Voice-band detector filter, hysteresis, and hold timing
 - [ ] Automatic/adaptive ducking threshold
 - [ ] Dedicated compact Music Signature editor on the main surface
@@ -60,6 +65,7 @@ Status legend:
 - [x] `PROGRAM` monitoring uses the protected final programme mix
 - [x] `MUSIC CUE` monitors enhanced PC Music before ducking
 - [x] Monitoring works independently from the `GO LIVE` Stream mute state
+- [x] Monitoring works when SC220 is absent and PC Music is the only active source
 - [x] Monitor device, gain, mute state, and source mode are persisted
 - [~] Physical monitoring requires listening tests with headphones/speakers
 - [ ] Asynchronous clock correction for the physical Monitor Bus
@@ -67,16 +73,21 @@ Status legend:
 ## Spectrum and metering
 
 - [x] Static response line removed
-- [x] Spectrum uses a real FFT implementation
+- [x] Spectrum uses a real stereo FFT implementation
+- [x] Left and right channels are analysed independently so anti-phase audio is preserved
 - [x] Spectrum source is the protected post-master programme bus
 - [x] Analyzer publication is lock-free and allocation-free on the audio callback
+- [x] Programme analyzer remains armed independently from window visibility
+- [x] Programme analyzer is re-armed when an audio device starts
+- [x] Spectrum no longer depends on SC220 input availability
 - [x] Lightweight `1024`-point FFT
 - [x] Approximately `15 fps` visual refresh
-- [x] `72` display bins
-- [~] Realtime spectrum movement still requires confirmation in the Windows executable with actual PC audio and SC220 input
+- [x] `32` display bands
+- [x] Synthetic anti-phase 1 kHz analyzer test
+- [~] Realtime spectrum movement with PC Music only still requires confirmation in the Windows executable
+- [~] Realtime spectrum movement with SC220 voice requires hardware confirmation
 - [x] Stereo input, PC Audio, and Stream level meters
-- [x] Loudness estimate and output peak display
-- [ ] Standards-compliant Integrated LUFS, Short-Term LUFS, LRA, and oversampled true peak
+- [x] Integrated loudness and true-peak programme telemetry
 
 ## UX and visual identity
 
@@ -95,11 +106,11 @@ Status legend:
 - [x] Stream and Monitor selectors use separate responsive columns
 - [x] Explicit `STREAM OUTPUT` and `MONITOR OUTPUT` labels
 - [x] Explicit `VB-CABLE / OBS` and `HEADPHONES / SPEAKERS` routing descriptions
-- [x] PC Audio source dropdown now represents the selected Windows playback endpoint
-- [x] PC Audio status distinguishes active capture, startup, and routing blocked states
+- [x] PC Audio source dropdown represents the selected Windows playback endpoint
+- [x] PC Audio status distinguishes active capture, startup, and routing-blocked states
 - [~] Final layout needs visual confirmation at `1180x720`, `1600x900`, and maximised size
-- [~] Inter is requested by the UI but is not embedded in the executable
-- [ ] Replace remaining Plus Jakarta assets/usages in the mini controller
+- [ ] Embed the final application typeface instead of relying on Windows fallback
+- [ ] Replace remaining legacy typography/assets in the mini controller
 
 ## Build, release, and quality assurance
 
@@ -108,9 +119,10 @@ Status legend:
 - [x] Safe muted Stream startup
 - [x] Clean build closes the preview executable before removing the build tree
 - [x] Bounded retry and lock-owner diagnostics for Windows clean builds
-- [x] Repository source audits for ASK-P authority, dual-source routing, premium UX, console geometry, Monitor Bus, clean build, PC endpoint selection, and anti-loop routing
-- [~] Full Windows/MSVC Release compile must pass on the local machine after the latest commit
-- [~] SC220 `MIXER` + selected PC playback endpoint + VB-CABLE + physical monitor end-to-end test
+- [x] Repository audits for ASK-P authority, dual-source routing, premium UX, console geometry, Monitor Bus, endpoint routing, PC-music-only mode, safe virtual-cable routing, and analyzer behaviour
+- [~] Full Windows/MSVC Release compile must pass locally after the latest commit
+- [~] PC Music-only + distinct VB-CABLE source/stream + physical monitor test
+- [~] SC220 `MIXER` + PC Music + VB-CABLE + physical monitor end-to-end test
 - [ ] One-click 10-minute transport stability test
 - [ ] Two-hour zero-dropout transport qualification
 - [ ] Eight-hour broadcast soak test
@@ -118,8 +130,6 @@ Status legend:
 - [ ] Installer and portable release packaging validation for this branch
 
 ## Next engineering milestone: Transport v2
-
-The next code milestone is the release-critical transport layer:
 
 - [ ] Independent capture/render clock-domain telemetry
 - [ ] Target FIFO-fill controller for PC Audio
@@ -136,13 +146,12 @@ The next code milestone is the release-critical transport layer:
 
 ## Current merge decision
 
-The branch should remain a Draft PR until these minimum checks pass:
+Draft PR #2 should remain unmerged until these minimum checks pass:
 
 1. Windows Release build succeeds from a clean tree.
-2. Spectrum moves with PC Music and SC220 input.
-3. PC Audio endpoint switching and persistence work on Windows.
-4. Selecting VB-CABLE or the active Stream endpoint as PC Audio is blocked with a clear warning.
-5. Stream output is VB-CABLE and Monitor output is a physical endpoint.
-6. Program and Music Cue monitoring are heard correctly.
-7. Layout is visually inspected at minimum, default, and maximised window sizes.
-8. A minimum one-hour live soak test completes without dropouts, FIFO growth, or routing feedback.
+2. Spectrum moves with PC Music while SC220 is disconnected.
+3. A safe virtual source configuration works, for example Cable A as PC Music and Cable B as Stream.
+4. Selecting the same cable for PC Music and Stream is blocked with a clear warning.
+5. Enhanced PC Music is audible through Program Monitor and Music Cue.
+6. SC220 is automatically added when `MIXER` becomes available.
+7. A minimum one-hour live soak test completes without dropouts, FIFO growth, or routing feedback.

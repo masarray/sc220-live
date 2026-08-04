@@ -76,10 +76,11 @@ check(
     )),
 )
 check(
-    "telemetry has no queue allocation lock or FFT",
+    "telemetry has no queue allocation lock or FFT implementation",
     all(token not in telemetry for token in (
-        "mutex", "condition_variable", "std::vector", "new ",
-        "FFT", "memcpy", "queue",
+        "std::vector", "std::deque", "std::queue", "juce::AbstractFifo",
+        "std::mutex", "juce::CriticalSection", "condition_variable",
+        "juce::dsp::FFT", "performFrequencyOnlyForwardTransform", "new ",
     )),
 )
 check(

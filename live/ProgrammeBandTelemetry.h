@@ -15,8 +15,9 @@ namespace askp::live {
 // Fourteen proportional-bandwidth biquads measure stereo power and publish only
 // atomic dB values. Filter bandwidth follows the logarithmic centre spacing and
 // each band is numerically normalised for equal-energy-per-octave pink noise at
-// the active sample rate. There is no copied sample frame, FFT, lock, allocation,
-// or lifecycle switch. The filters observe programme audio and never modify it.
+// the active sample rate. Fast/slow power envelopes add display-only transient
+// emphasis so musical attacks remain visible without changing programme audio.
+// There is no copied sample frame, FFT, lock, allocation, or lifecycle switch.
 class ProgrammeBandTelemetry final
 {
 public:
@@ -62,7 +63,8 @@ public:
             for (auto& state : channel)
                 state = {};
 
-        smoothedPower.fill (0.0);
+        fastPower.fill (0.0);
+        slowPower.fill (0.0);
         powerInitialised = false;
         for (auto& value : publishedDb)
             value.store (-120.0f, std::memory_order_relaxed);
@@ -95,19 +97,46 @@ public:
         }
 
         const double inverseSamples = 1.0 / static_cast<double> (samples);
-        const double smoothing = std::exp (
-            -static_cast<double> (samples) / (sampleRate * powerSmoothingSeconds));
         for (std::size_t band = 0; band < bandCount; ++band)
         {
             const double blockPower = energy[band] * inverseSamples;
-            smoothedPower[band] = powerInitialised
-                ? smoothing * smoothedPower[band] + (1.0 - smoothing) * blockPower
-                : blockPower;
+            const double position = static_cast<double> (band)
+                                  / static_cast<double> (bandCount - 1);
 
-            const float db = static_cast<float> (
-                10.0 * std::log10 (std::max (smoothedPower[band], 1.0e-18)))
-                + pinkCalibrationDb[band];
-            publishedDb[band].store (db, std::memory_order_relaxed);
+            // Bass receives a slightly longer release for weight, while upper
+            // bands move faster so percussion and articulation remain lively.
+            const double attackSeconds = 0.018 - 0.010 * position;
+            const double releaseSeconds = 0.220 - 0.100 * position;
+            const double envelopeSeconds = blockPower > fastPower[band]
+                ? attackSeconds : releaseSeconds;
+            const double fastCoefficient = std::exp (
+                -static_cast<double> (samples) / (sampleRate * envelopeSeconds));
+            const double slowCoefficient = std::exp (
+                -static_cast<double> (samples) / (sampleRate * slowReferenceSeconds));
+
+            if (! powerInitialised)
+            {
+                fastPower[band] = blockPower;
+                slowPower[band] = blockPower;
+            }
+            else
+            {
+                fastPower[band] = fastCoefficient * fastPower[band]
+                                + (1.0 - fastCoefficient) * blockPower;
+                slowPower[band] = slowCoefficient * slowPower[band]
+                                + (1.0 - slowCoefficient) * blockPower;
+            }
+
+            const double fastDb = 10.0 * std::log10 (
+                std::max (fastPower[band], 1.0e-18));
+            const double slowDb = 10.0 * std::log10 (
+                std::max (slowPower[band], 1.0e-18));
+            const double transientDb = std::clamp (
+                fastDb - slowDb, 0.0, maximumTransientBoostDb);
+            const float displayDb = static_cast<float> (
+                fastDb + transientDb * transientEmphasis + pinkCalibrationDb[band]);
+
+            publishedDb[band].store (displayDb, std::memory_order_relaxed);
         }
         powerInitialised = true;
         publishedGeneration.fetch_add (1, std::memory_order_release);
@@ -242,12 +271,15 @@ private:
         50.0f, 80.0f, 125.0f, 200.0f, 315.0f, 500.0f, 800.0f,
         1250.0f, 2000.0f, 3150.0f, 5000.0f, 8000.0f, 12000.0f, 16000.0f
     }};
-    static constexpr double powerSmoothingSeconds = 0.180;
+    static constexpr double slowReferenceSeconds = 0.420;
+    static constexpr double maximumTransientBoostDb = 6.0;
+    static constexpr double transientEmphasis = 0.72;
 
     double sampleRate = 48000.0;
     std::array<Coefficients, bandCount> coefficients {};
     std::array<std::array<State, bandCount>, 2> states {};
-    std::array<double, bandCount> smoothedPower {};
+    std::array<double, bandCount> fastPower {};
+    std::array<double, bandCount> slowPower {};
     std::array<float, bandCount> pinkCalibrationDb {};
     bool powerInitialised = false;
     std::array<std::atomic<float>, bandCount> publishedDb {};

@@ -49,20 +49,20 @@ check(
     )),
 )
 check(
-    "producer publishes rhythmic fast and slow atomic power telemetry",
+    "producer publishes frequency-dependent rhythmic atomic power telemetry",
     all(token in telemetry for token in (
         "std::array<std::atomic<float>, bandCount>",
-        "fastPower", "slowPower", "attackSeconds", "releaseSeconds",
-        "slowReferenceSeconds = 0.420", "maximumTransientBoostDb = 6.0",
-        "transientEmphasis = 0.72", "transientDb",
-        "publishedDb[band].store", "publishedGeneration.fetch_add",
+        "envelopePower", "attackSeconds", "releaseSeconds",
+        "envelopeSeconds", "coefficient", "publishedDb[band].store",
+        "publishedGeneration.fetch_add",
     )),
 )
 check(
-    "steady pink calibration is not modified by the transient display stage",
-    "fastDb - slowDb" in telemetry
-    and "std::clamp" in telemetry
-    and "pinkCalibrationDb[band]" in telemetry,
+    "steady pink calibration remains the only per-band level correction",
+    "pinkCalibrationDb[band]" in telemetry
+    and "transientDb" not in telemetry
+    and "transientEmphasis" not in telemetry
+    and "slowPower" not in telemetry,
 )
 check(
     "telemetry has no concrete queue lock allocation or FFT implementation",

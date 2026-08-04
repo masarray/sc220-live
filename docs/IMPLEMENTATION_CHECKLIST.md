@@ -76,7 +76,7 @@ Status legend:
 - [x] Monitor callback remains lock-free and allocation-free
 - [x] Monitor telemetry reports source rate, endpoint rate, resampling state, and correction ppm
 - [~] Direct headphone selection without entering Audio Setup needs Windows validation
-- [~] 44.1 kHz source to 48 kHz headphone and 48 kHz source to 44.1 kHz endpoint need listening tests
+- [~] Mismatched source/headphone sample rates need listening tests
 - [~] Long-duration monitor drift and underrun behaviour needs a soak test
 
 ## Programme analyzer and metering

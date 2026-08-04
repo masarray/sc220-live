@@ -22,11 +22,15 @@ def check(name: str, condition: bool) -> None:
 
 
 check(
-    "PC Music stabilizer runs before atomic band visualizer",
-    'include("${CMAKE_CURRENT_LIST_DIR}/StabilizeSC220PcMusicMode.cmake")' in state
-    and 'include("${CMAKE_CURRENT_LIST_DIR}/RebuildSC220ImpactVisualizer.cmake")' in state
+    "PC Music stabilizer runs before analyzer and calibration passes",
+    all(name in state for name in (
+        "StabilizeSC220PcMusicMode.cmake",
+        "RebuildSC220ImpactVisualizer.cmake",
+        "CalibrateSC220Meters.cmake",
+    ))
     and state.find("StabilizeSC220PcMusicMode.cmake")
-    < state.find("RebuildSC220ImpactVisualizer.cmake"),
+    < state.find("RebuildSC220ImpactVisualizer.cmake")
+    < state.find("CalibrateSC220Meters.cmake"),
 )
 check(
     "programme graph opens output-first without SC220",
@@ -79,19 +83,20 @@ check(
     < engine.find("programmeBandTelemetry.process"),
 )
 check(
-    "visible analyzer consumes atomic post-limiter bands",
+    "visible analyzer consumes calibrated atomic post-limiter bands",
     all(token in ui for token in (
         "updateFromTelemetry", "programmeBandTelemetry.read",
-        "POST-LIMITER BANDS", "PROGRAM ANALYZER",
+        "PINK-FLAT BANDS", "PROGRAM ANALYZER",
+        "const float displayDb = rawDb[band]",
     )),
 )
 check(
-    "band telemetry is fixed-size and allocation-free",
+    "band telemetry is fixed-size allocation-free and pink-calibrated",
     all(token in telemetry for token in (
         "bandCount = 14", "std::array<Coefficients, bandCount>",
         "std::array<std::array<State, bandCount>, 2>",
         "std::array<std::atomic<float>, bandCount>",
-        "publishedGeneration.fetch_add",
+        "publishedGeneration.fetch_add", "calculatePinkNoiseCalibration",
     ))
     and "std::vector" not in telemetry
     and "new " not in telemetry
@@ -118,7 +123,7 @@ check(
 )
 
 failed = [name for name, ok in checks if not ok]
-print("SC220 Live PC Music-only and atomic post-limiter band audit")
+print("SC220 Live PC Music-only and pink-flat atomic band audit")
 for name, ok in checks:
     print(f"[ {'PASS' if ok else 'FAIL'} ] {name}")
 print(f"Checks: {len(checks)}  Passed: {len(checks) - len(failed)}  Failed: {len(failed)}")

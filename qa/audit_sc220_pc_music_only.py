@@ -10,6 +10,7 @@ state_path = ROOT / "cmake" / "GenerateSC220BroadcastState.cmake"
 engine = engine_path.read_text(encoding="utf-8") if engine_path.exists() else ""
 ui = ui_path.read_text(encoding="utf-8") if ui_path.exists() else ""
 stabilizer = stabilizer_path.read_text(encoding="utf-8")
+stabilizer_words = " ".join(stabilizer.lower().replace("#", " ").split())
 state = state_path.read_text(encoding="utf-8")
 
 checks: list[tuple[str, bool]] = []
@@ -100,8 +101,8 @@ check(
 )
 check(
     "stabilizer documents safe virtual source and PC-only intent",
-    "different cable" in stabilizer.lower()
-    and "without an SC220 input device" in stabilizer,
+    "different cable" in stabilizer_words
+    and "without an sc220 input device" in stabilizer_words,
 )
 
 failed = [name for name, ok in checks if not ok]

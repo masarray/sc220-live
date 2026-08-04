@@ -4,6 +4,7 @@
 #include <juce_core/juce_core.h>
 
 #include <atomic>
+#include <cstdint>
 #include <memory>
 #include <vector>
 
@@ -38,6 +39,15 @@ public:
     static bool isUnsafeVirtualEndpoint (const juce::String& name) noexcept;
     static bool endpointWouldConflict (const juce::String& requestedEndpoint,
                                        const juce::String& streamOutput);
+
+    // Direct WASAPI visual authority. This is a separate SPSC queue whose only
+    // producer is the capture thread and whose only consumer is the UI thread.
+    // It remains independent of the DSP FIFO and the programme callback, so a
+    // working Windows capture can always animate the spectralizer.
+    static int consumeLatestVisual (float* leftDestination,
+                                    float* rightDestination,
+                                    int maximumSamples) noexcept;
+    static std::uint64_t capturedVisualSamples() noexcept;
 
     // Selection is retained across prepare/start cycles. An empty name or the
     // SYSTEM DEFAULT label follows the current Windows console render endpoint.

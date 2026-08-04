@@ -12,11 +12,10 @@ namespace askp::live {
 // Extremely small read-only programme analyser for the SC220 Live surface.
 //
 // The JUCE audio callback feeds the exact protected post-limiter stereo buffer.
-// Fourteen proportional-bandwidth biquads measure stereo power and publish only
-// atomic dB values. Filter bandwidth follows the logarithmic centre spacing and
-// each band is numerically normalised for equal-energy-per-octave pink noise at
-// the active sample rate. Frequency-dependent attack/release envelopes keep
-// musical rhythm visible while preserving the calibrated steady-state balance.
+// Fourteen proportional-bandwidth biquads measure stereo power. A calibrated
+// 180 ms envelope publishes the stable pink-flat band level. A second fast
+// envelope publishes only display activity, allowing musical attacks to feel
+// alive without biasing steady-state frequency balance or changing audio.
 // There is no copied sample frame, FFT, lock, allocation, or lifecycle switch.
 class ProgrammeBandTelemetry final
 {
@@ -63,10 +62,13 @@ public:
             for (auto& state : channel)
                 state = {};
 
-        envelopePower.fill (0.0);
+        calibratedPower.fill (0.0);
+        fastPower.fill (0.0);
         powerInitialised = false;
         for (auto& value : publishedDb)
             value.store (-120.0f, std::memory_order_relaxed);
+        for (auto& value : publishedActivity)
+            value.store (0.0f, std::memory_order_relaxed);
 
         publishedGeneration.store (0, std::memory_order_release);
     }
@@ -96,30 +98,52 @@ public:
         }
 
         const double inverseSamples = 1.0 / static_cast<double> (samples);
+        const double calibratedCoefficient = std::exp (
+            -static_cast<double> (samples) / (sampleRate * calibratedSmoothingSeconds));
+
         for (std::size_t band = 0; band < bandCount; ++band)
         {
             const double blockPower = energy[band] * inverseSamples;
             const double position = static_cast<double> (band)
                                   / static_cast<double> (bandCount - 1);
 
-            // Bass receives a slightly longer release for weight, while upper
-            // bands move faster so percussion and articulation remain lively.
-            // The same calibrated steady-state value is retained in every band.
-            const double attackSeconds = 0.018 - 0.010 * position;
-            const double releaseSeconds = 0.220 - 0.100 * position;
-            const double envelopeSeconds = blockPower > envelopePower[band]
-                ? attackSeconds : releaseSeconds;
-            const double coefficient = std::exp (
-                -static_cast<double> (samples) / (sampleRate * envelopeSeconds));
+            // Fast activity follows the musical role of each region: bass keeps
+            // a little weight; upper percussion reacts and releases faster.
+            const double fastAttackSeconds = 0.012 - 0.006 * position;
+            const double fastReleaseSeconds = 0.110 - 0.055 * position;
+            const double fastSeconds = blockPower > fastPower[band]
+                ? fastAttackSeconds : fastReleaseSeconds;
+            const double fastCoefficient = std::exp (
+                -static_cast<double> (samples) / (sampleRate * fastSeconds));
 
-            envelopePower[band] = powerInitialised
-                ? coefficient * envelopePower[band] + (1.0 - coefficient) * blockPower
-                : blockPower;
+            if (! powerInitialised)
+            {
+                calibratedPower[band] = blockPower;
+                fastPower[band] = blockPower;
+            }
+            else
+            {
+                calibratedPower[band] = calibratedCoefficient * calibratedPower[band]
+                                      + (1.0 - calibratedCoefficient) * blockPower;
+                fastPower[band] = fastCoefficient * fastPower[band]
+                                + (1.0 - fastCoefficient) * blockPower;
+            }
 
-            const float displayDb = static_cast<float> (
-                10.0 * std::log10 (std::max (envelopePower[band], 1.0e-18)))
-                + pinkCalibrationDb[band];
+            const double calibratedDb = 10.0 * std::log10 (
+                std::max (calibratedPower[band], 1.0e-18));
+            const double fastDb = 10.0 * std::log10 (
+                std::max (fastPower[band], 1.0e-18));
+            const float displayDb = static_cast<float> (calibratedDb)
+                                  + pinkCalibrationDb[band];
+
+            // Ignore ordinary stationary-noise ripple. Only a clear onset above
+            // the calibrated envelope becomes visual lift/pulse information.
+            const float activity = static_cast<float> (std::clamp (
+                (fastDb - calibratedDb - activityThresholdDb) / activityRangeDb,
+                0.0, 1.0));
+
             publishedDb[band].store (displayDb, std::memory_order_relaxed);
+            publishedActivity[band].store (activity, std::memory_order_relaxed);
         }
         powerInitialised = true;
         publishedGeneration.fetch_add (1, std::memory_order_release);
@@ -137,6 +161,12 @@ public:
 
         generation = publishedGeneration.load (std::memory_order_acquire);
         return generation != 0;
+    }
+
+    void readActivity (std::array<float, bandCount>& destination) const noexcept
+    {
+        for (std::size_t band = 0; band < bandCount; ++band)
+            destination[band] = publishedActivity[band].load (std::memory_order_relaxed);
     }
 
     std::uint64_t generation() const noexcept
@@ -254,14 +284,19 @@ private:
         50.0f, 80.0f, 125.0f, 200.0f, 315.0f, 500.0f, 800.0f,
         1250.0f, 2000.0f, 3150.0f, 5000.0f, 8000.0f, 12000.0f, 16000.0f
     }};
+    static constexpr double calibratedSmoothingSeconds = 0.180;
+    static constexpr double activityThresholdDb = 1.5;
+    static constexpr double activityRangeDb = 5.0;
 
     double sampleRate = 48000.0;
     std::array<Coefficients, bandCount> coefficients {};
     std::array<std::array<State, bandCount>, 2> states {};
-    std::array<double, bandCount> envelopePower {};
+    std::array<double, bandCount> calibratedPower {};
+    std::array<double, bandCount> fastPower {};
     std::array<float, bandCount> pinkCalibrationDb {};
     bool powerInitialised = false;
     std::array<std::atomic<float>, bandCount> publishedDb {};
+    std::array<std::atomic<float>, bandCount> publishedActivity {};
     std::atomic<std::uint64_t> publishedGeneration { 0 };
 };
 

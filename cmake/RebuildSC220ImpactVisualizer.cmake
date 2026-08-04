@@ -455,7 +455,7 @@ foreach(_forbidden IN ITEMS
         "OLDER"
         "NOW"
         "historySize = 32"
-        "spectrumDisplay->updateFromTap")
+        "spectrumDisplay->updateFromTap (")
     string(FIND "${_ui}" "${_forbidden}" _position)
     if(NOT _position EQUAL -1)
         message(FATAL_ERROR "SC220 obsolete visualizer remains: ${_forbidden}")

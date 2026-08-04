@@ -32,23 +32,28 @@ check("Smart Enhancer power icon exists", all(token in header + source for token
     'LucideIconButton enhancerPowerButton { "Smart Enhancer", "power_svg"',
     "enhancerPowerButton.setClickingTogglesState",
     "audioEngine.setBypassed (! enhancerPowerButton.getToggleState())")))
-check("final generated UI renders fixed-frequency programme spectrum", all(token in final_ui for token in (
+check("final UI renders a fixed-frequency programme spectrum", all(token in final_ui for token in (
     "class SC220MainComponent::LiveSpectrumDisplay",
-    "updateFromTaps",
+    "updateFromSnapshot",
+    "programmeSpectrumSnapshot.consumeLatest",
     "performFrequencyOnlyForwardTransform",
     "bandCount = 24",
     "segmentCount = 15",
     '"PROGRAM SPECTRUM"')))
-check("final visualizer has explicit runtime recovery sources", all(token in final_ui for token in (
+check("visualizer identifies deterministic post-limiter authority", all(token in final_ui for token in (
+    '"POST-LIMITER SNAPSHOT',
+    '"WAITING FOR POST-LIMITER AUDIO"',
+    "programmeSpectrumSnapshot.generation()")))
+check("old analyzer recovery paths are absent", all(token not in final_ui for token in (
+    "updateFromTaps",
     "programmeTap.consumeLatest",
     "musicTap.consumeLatest",
     "voiceTap.consumeLatest",
-    'sourceText = "POST-MASTER"',
-    'sourceText = "MUSIC RECOVERY"',
-    'sourceText = "VOICE RECOVERY"')))
-check("voice and music recovery taps remain enabled", all(token in final_ui for token in (
-    "getVoiceEnhancerBridge().setVisualTapEnabled (true)",
-    "getMusicEnhancerBridge().setVisualTapEnabled (true)")))
+    "PcAudioLoopbackCapture::consumeLatestVisual",
+    "MUSIC RECOVERY",
+    "VOICE RECOVERY",
+    "PC CAPTURE",
+    "NO FRAMES")))
 check("main surface uses native Windows premium typography", 'font.setTypefaceName ("Segoe UI Variable")' in source)
 check("hardware controls match approved dot-calibrated metal surface", all(token in source for token in (
     "for (int i = 0; i <= 20; ++i)",
@@ -61,7 +66,7 @@ check("hardware controls match approved dot-calibrated metal surface", all(token
     "sliderPos - 34.0f, 40.0f, 68.0f",
     "const auto accentStart = endAngle - 0.38f",
 )))
-check("full-height fader caps remain inside their endpoint bounds", all(token in source for token in (
+check("full-height fader caps remain inside endpoint bounds", all(token in source for token in (
     "getSliderThumbRadius",
     "slider.getSliderStyle() == juce::Slider::LinearVertical",
     "return 34;",

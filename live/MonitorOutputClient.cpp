@@ -1,6 +1,7 @@
 #include "MonitorOutputClient.h"
 
 #include <cmath>
+#include <limits>
 
 namespace askp::live {
 
@@ -8,6 +9,10 @@ MonitorOutputClient::MonitorOutputClient()
 {
     ringBuffer.setSize (2, fifoCapacitySamples, false, true, false);
     ringBuffer.clear();
+    resampleInput.setSize (2, resampleScratchCapacity, false, true, false);
+    resampleOutput.setSize (2, resampleScratchCapacity, false, true, false);
+    resampleInput.clear();
+    resampleOutput.clear();
 }
 
 MonitorOutputClient::~MonitorOutputClient()
@@ -45,12 +50,14 @@ void MonitorOutputClient::shutdown()
 void MonitorOutputClient::prepareSource (double sourceSampleRate,
                                          int sourceMaximumBlockSize)
 {
-    sourceRate.store (juce::jmax (1.0, sourceSampleRate));
-    sourceBlockSize.store (juce::jmax (1, sourceMaximumBlockSize));
+    const double safeRate = juce::jmax (1.0, sourceSampleRate);
+    const int safeBlock = juce::jmax (1, sourceMaximumBlockSize);
+    sourceRate.store (safeRate);
+    sourceBlockSize.store (safeBlock);
     primeTargetSamples.store (juce::jlimit (
-        sourceMaximumBlockSize * 2,
+        safeBlock * 3,
         fifoCapacitySamples / 2,
-        juce::roundToInt (sourceSampleRate * 0.030)));
+        juce::roundToInt (safeRate * 0.060)));
     flush();
 }
 
@@ -58,6 +65,12 @@ void MonitorOutputClient::flush() noexcept
 {
     fifo.reset();
     ringBuffer.clear();
+    resampleInput.clear();
+    resampleOutput.clear();
+    leftInterpolator.reset();
+    rightInterpolator.reset();
+    currentDriftCorrectionPpm.store (0.0);
+    rateConversionActive.store (false);
     primed.store (false);
 }
 
@@ -103,31 +116,63 @@ juce::String MonitorOutputClient::selectOutputDevice (const juce::String& name,
     setup.outputDeviceName = requestedName;
     setup.useDefaultInputChannels = false;
     setup.useDefaultOutputChannels = true;
-    setup.sampleRate = preferredSampleRate > 0.0 ? preferredSampleRate : sourceRate.load();
     setup.bufferSize = 0;
 
-    const auto error = deviceManager.setAudioDeviceSetup (setup, true);
+    const double preferred = preferredSampleRate > 0.0
+        ? preferredSampleRate : sourceRate.load();
+
+    auto tryOpen = [this, &setup] (double rate)
+    {
+        setup.sampleRate = rate;
+        return deviceManager.setAudioDeviceSetup (setup, true);
+    };
+
+    auto error = tryOpen (preferred);
     if (error.isNotEmpty())
     {
-        setError (error);
-        return error;
+        // Many consumer Bluetooth/USB endpoints expose only their Windows mix
+        // rate. Let JUCE open that native rate; the monitor resampler handles it.
+        deviceManager.closeAudioDevice();
+        error = tryOpen (0.0);
     }
 
     auto* device = deviceManager.getCurrentAudioDevice();
-    if (device == nullptr)
+    if (error.isEmpty() && device != nullptr
+        && device->getCurrentSampleRate() <= 1.0)
     {
-        const juce::String message = "The selected monitor endpoint did not open.";
-        setError (message);
-        return message;
+        const auto rates = device->getAvailableSampleRates();
+        double nearest = 0.0;
+        double nearestDistance = std::numeric_limits<double>::max();
+        for (const auto rate : rates)
+        {
+            const double distance = std::abs (rate - preferred);
+            if (rate > 1.0 && distance < nearestDistance)
+            {
+                nearest = rate;
+                nearestDistance = distance;
+            }
+        }
+
+        if (nearest > 1.0)
+        {
+            deviceManager.closeAudioDevice();
+            error = tryOpen (nearest);
+            device = deviceManager.getCurrentAudioDevice();
+        }
     }
 
-    const auto actualRate = device->getCurrentSampleRate();
-    const auto expectedRate = sourceRate.load();
-    if (expectedRate > 0.0 && std::abs (actualRate - expectedRate) > 1.0)
+    if (error.isNotEmpty())
     {
-        const juce::String message = "Monitor endpoint must support the stream sample rate ("
-            + juce::String (expectedRate, 0) + " Hz). Opened at "
-            + juce::String (actualRate, 0) + " Hz instead.";
+        setError ("Unable to open monitor endpoint at its supported Windows sample rate: "
+                  + error);
+        return errorMessage;
+    }
+
+    device = deviceManager.getCurrentAudioDevice();
+    if (device == nullptr || device->getCurrentSampleRate() <= 1.0)
+    {
+        const juce::String message =
+            "The selected monitor endpoint did not expose a usable playback sample rate.";
         deviceManager.closeAudioDevice();
         deviceOpen.store (false);
         running.store (false);
@@ -137,7 +182,7 @@ juce::String MonitorOutputClient::selectOutputDevice (const juce::String& name,
 
     {
         const juce::ScopedLock lock (statusLock);
-        currentDeviceName = requestedName;
+        currentDeviceName = device->getName();
         errorMessage.clear();
     }
     flush();
@@ -185,7 +230,10 @@ MonitorOutputClient::Status MonitorOutputClient::getStatus() const
     status.deviceOpen = deviceOpen.load();
     status.running = running.load();
     status.primed = primed.load();
+    status.resampling = rateConversionActive.load();
+    status.sourceSampleRate = sourceRate.load();
     status.sampleRate = outputRate.load();
+    status.driftCorrectionPpm = currentDriftCorrectionPpm.load();
     status.bufferSize = outputBlockSize.load();
     status.bufferedSamples = fifo.getNumReady();
     status.underflows = underflowCount.load();
@@ -215,40 +263,81 @@ void MonitorOutputClient::audioDeviceIOCallbackWithContext (
 
     if (! running.load (std::memory_order_acquire)
         || numOutputChannels <= 0
-        || numSamples <= 0)
+        || numSamples <= 0
+        || numSamples > resampleScratchCapacity)
         return;
 
+    const int targetFill = juce::jmax (1, primeTargetSamples.load());
+    const int readyBeforeRead = fifo.getNumReady();
     if (! primed.load (std::memory_order_acquire))
     {
-        if (fifo.getNumReady() < primeTargetSamples.load())
+        if (readyBeforeRead < targetFill)
             return;
         primed.store (true, std::memory_order_release);
     }
 
+    const double sourceSampleRate = juce::jmax (1.0, sourceRate.load());
+    const double monitorSampleRate = juce::jmax (1.0, outputRate.load());
+    const double baseRatio = sourceSampleRate / monitorSampleRate;
+    const double fillError = static_cast<double> (readyBeforeRead - targetFill)
+                           / static_cast<double> (targetFill);
+    const double correctionPpm = juce::jlimit (
+        -2500.0, 2500.0, fillError * 1400.0);
+    const double adaptiveRatio = baseRatio * (1.0 + correctionPpm * 1.0e-6);
+    currentDriftCorrectionPpm.store (correctionPpm, std::memory_order_relaxed);
+    rateConversionActive.store (
+        std::abs (baseRatio - 1.0) > 1.0e-6 || std::abs (correctionPpm) > 1.0,
+        std::memory_order_relaxed);
+
+    const int requiredInput = juce::jmin (
+        resampleScratchCapacity,
+        juce::jmax (8, static_cast<int> (std::ceil (
+            static_cast<double> (numSamples) * adaptiveRatio)) + 8));
+
+    if (readyBeforeRead < requiredInput)
+    {
+        underflowCount.fetch_add (1, std::memory_order_relaxed);
+        primed.store (false, std::memory_order_release);
+        return;
+    }
+
     int start1 = 0, size1 = 0, start2 = 0, size2 = 0;
-    fifo.prepareToRead (numSamples, start1, size1, start2, size2);
-    const int read = size1 + size2;
+    fifo.prepareToRead (requiredInput, start1, size1, start2, size2);
+    const int staged = size1 + size2;
+    if (staged < requiredInput)
+    {
+        fifo.finishedRead (staged);
+        underflowCount.fetch_add (1, std::memory_order_relaxed);
+        primed.store (false, std::memory_order_release);
+        return;
+    }
+
+    for (int channel = 0; channel < 2; ++channel)
+    {
+        if (size1 > 0)
+            resampleInput.copyFrom (channel, 0, ringBuffer, channel, start1, size1);
+        if (size2 > 0)
+            resampleInput.copyFrom (channel, size1, ringBuffer, channel, start2, size2);
+    }
+
+    const int consumedLeft = leftInterpolator.process (
+        adaptiveRatio, resampleInput.getReadPointer (0),
+        resampleOutput.getWritePointer (0), numSamples);
+    const int consumedRight = rightInterpolator.process (
+        adaptiveRatio, resampleInput.getReadPointer (1),
+        resampleOutput.getWritePointer (1), numSamples);
+    const int consumed = juce::jlimit (
+        0, staged, juce::jmin (consumedLeft, consumedRight));
+    fifo.finishedRead (consumed);
 
     for (int channel = 0; channel < numOutputChannels; ++channel)
     {
         if (outputChannelData[channel] == nullptr)
             continue;
         const int sourceChannel = juce::jmin (channel, 1);
-        if (size1 > 0)
-            juce::FloatVectorOperations::copy (
-                outputChannelData[channel],
-                ringBuffer.getReadPointer (sourceChannel, start1), size1);
-        if (size2 > 0)
-            juce::FloatVectorOperations::copy (
-                outputChannelData[channel] + size1,
-                ringBuffer.getReadPointer (sourceChannel, start2), size2);
-    }
-    fifo.finishedRead (read);
-
-    if (read < numSamples)
-    {
-        underflowCount.fetch_add (1, std::memory_order_relaxed);
-        primed.store (false, std::memory_order_release);
+        juce::FloatVectorOperations::copy (
+            outputChannelData[channel],
+            resampleOutput.getReadPointer (sourceChannel), numSamples);
     }
 
     const bool silent = muted.load (std::memory_order_acquire);
@@ -283,19 +372,24 @@ void MonitorOutputClient::audioDeviceAboutToStart (juce::AudioIODevice* device)
     if (device == nullptr)
         return;
 
-    outputRate.store (device->getCurrentSampleRate());
+    const double actualOutputRate = device->getCurrentSampleRate();
+    outputRate.store (actualOutputRate);
     outputBlockSize.store (device->getCurrentBufferSizeSamples());
-    gainLinear.reset (device->getCurrentSampleRate(), 0.020);
+    gainLinear.reset (actualOutputRate, 0.020);
     gainLinear.setCurrentAndTargetValue (
         juce::Decibels::decibelsToGain (gainDb.load()));
     primeTargetSamples.store (juce::jmax (
-        device->getCurrentBufferSizeSamples() * 2,
-        juce::roundToInt (device->getCurrentSampleRate() * 0.030)));
+        sourceBlockSize.load() * 3,
+        juce::roundToInt (sourceRate.load() * 0.060)));
+    leftInterpolator.reset();
+    rightInterpolator.reset();
+    currentDriftCorrectionPpm.store (0.0);
+    rateConversionActive.store (std::abs (sourceRate.load() - actualOutputRate) > 1.0);
     underflowCount.store (0);
     overflowCount.store (0);
     primed.store (false);
-    deviceOpen.store (true);
-    running.store (true);
+    deviceOpen.store (actualOutputRate > 1.0);
+    running.store (actualOutputRate > 1.0);
 
     const juce::ScopedLock lock (statusLock);
     currentDeviceName = device->getName();
@@ -307,6 +401,8 @@ void MonitorOutputClient::audioDeviceStopped()
     running.store (false);
     deviceOpen.store (false);
     primed.store (false);
+    rateConversionActive.store (false);
+    currentDriftCorrectionPpm.store (0.0);
     outputRate.store (0.0);
     outputBlockSize.store (0);
 }

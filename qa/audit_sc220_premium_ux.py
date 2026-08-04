@@ -28,10 +28,10 @@ check("Smart Enhancer power icon exists", all(token in header + source for token
     'LucideIconButton enhancerPowerButton { "Smart Enhancer", "power_svg"',
     "enhancerPowerButton.setClickingTogglesState",
     "audioEngine.setBypassed (! enhancerPowerButton.getToggleState())")))
-check("final UI renders the new atomic programme analyzer", all(token in final_ui for token in (
+check("final UI renders the rhythmic atomic programme analyzer", all(token in final_ui for token in (
     "class SC220MainComponent::LiveSpectrumDisplay", "updateFromTelemetry",
     "programmeBandTelemetry.read", "bandCount = ProgrammeBandTelemetry::bandCount",
-    "segmentCount = 14", '"PROGRAM ANALYZER"')))
+    "segmentCount = 16", "pulses[band]", "positiveRise", '"PROGRAM ANALYZER"')))
 check("visualizer identifies pink-calibrated post-limiter authority", all(token in final_ui for token in (
     '"PINK-FLAT BANDS', '"WAITING FOR ENGINE BANDS"',
     '"WAITING FOR POST-LIMITER AUDIO"')))

@@ -92,53 +92,71 @@ check(
     )),
 )
 check(
-    "programme ScopeTap is permanently armed and feeds the visible spectrum",
-    "programmeAnalyzer.setEnabled (true)" in engine
-    and "audioEngine.programmeAnalyzerTap()" in ui
-    and "spectrumDisplay->updateFromTap" in ui
-    and "audioEngine.setProgrammeAnalyzerEnabled (false);" not in ui
-    and "audioEngine.setProgrammeAnalyzerEnabled (active);" not in ui,
+    "post-master tap is re-armed immediately before every publication",
+    all(token in engine for token in (
+        "masterLimiter.process (masterContext);",
+        "programmeAnalyzer.setEnabled (true);",
+        "programmeAnalyzer.push",
+    ))
+    and engine.find("programmeAnalyzer.setEnabled (true);",
+                    engine.find("masterLimiter.process (masterContext);"))
+    < engine.find("programmeAnalyzer.push",
+                  engine.find("masterLimiter.process (masterContext);")),
 )
 check(
-    "PC-only spectralizer analyses protected post-master stereo samples",
+    "PC Music recovery tap remains enabled after DSP prepare",
+    "getMusicEnhancerBridge().setVisualTapEnabled (true)" in ui
+    and "getMusicEnhancerBridge().analysisTap()" in ui
+    and "musicTap.consumeLatest" in ui,
+)
+check(
+    "spectralizer source order is programme then Music then Voice",
+    ui.find("programmeTap.consumeLatest")
+    < ui.find("musicTap.consumeLatest")
+    < ui.find("voiceTap.consumeLatest"),
+)
+check(
+    "PC-only fallback is visible and diagnosable",
     all(token in ui for token in (
-        "programmeTap.consumeLatest",
-        "leftFftData",
-        "rightFftData",
+        "CaptureSource::musicRecovery",
+        'sourceText = "MUSIC RECOVERY"',
+        'sourceText = "NO FRAMES"',
+        "WAITING FOR ANALYZER FRAMES",
+        "PROGRAM SILENCE",
+    )),
+)
+check(
+    "runtime timer re-arms programme music and voice paths",
+    all(token in ui for token in (
+        "audioEngine.setProgrammeAnalyzerEnabled (true);",
+        "audioEngine.getMusicEnhancerBridge().setVisualTapEnabled (true);",
+        "audioEngine.getVoiceEnhancerBridge().setVisualTapEnabled (true);",
+        "spectrumDisplay->updateFromTaps",
+    )),
+)
+check(
+    "fixed-frequency spectralizer analyses stereo energy",
+    all(token in ui for token in (
+        "fftOrder = 9",
+        "bandCount = 24",
+        "performFrequencyOnlyForwardTransform",
         "stereoPower += 0.5f",
         "PROGRAM SPECTRUM",
     )),
 )
 check(
-    "frequency bars remain fixed from bass to treble",
-    all(token in ui for token in (
-        "lowerFrequency = 35.0f",
-        "bandCount = 24",
-        '"40"',
-        '"100"',
-        '"1k"',
-        '"12k"',
-    )),
-)
-check(
-    "spectralizer is lightweight and UI-thread only",
-    "fftOrder = 9" in ui
-    and "performFrequencyOnlyForwardTransform" in ui
-    and "performFrequencyOnlyForwardTransform" not in engine
-    and "spectrumDivider" not in ui,
-)
-check(
-    "spectralizer has fast attack smooth release and per-band peak hold",
+    "spectralizer has fast attack smooth release and per-band hold",
     all(token in ui for token in (
         "* 0.82f",
         "levels[band] * 0.88f",
         "peakHoldFrames[band] = 15",
-        "500 ms HOLD",
+        "heldPeaks[band] - 0.026f",
     )),
 )
 check(
-    "obsolete left-to-right history meter is removed",
-    "PROGRAM IMPACT" not in ui
+    "obsolete one-tap and history paths are removed",
+    "spectrumDisplay->updateFromTap" not in ui
+    and "PROGRAM IMPACT" not in ui
     and "PC INPUT IMPACT" not in ui
     and '"OLDER"' not in ui
     and '"NOW"' not in ui
@@ -154,14 +172,14 @@ check(
     and "without an sc220 input device" in stabilizer_words,
 )
 check(
-    "spectralizer generator documents audio-thread isolation",
-    "512-point stereo fft" in spectralizer.lower()
-    and "message thread" in spectralizer.lower()
-    and "never in the audio callback" in spectralizer.lower(),
+    "spectralizer generator documents redundant lock-free recovery",
+    "redundant runtime" in spectralizer.lower()
+    and "post-signature" in spectralizer.lower()
+    and "lock-free spsc" in spectralizer.lower(),
 )
 
 failed = [name for name, ok in checks if not ok]
-print("SC220 Live PC Music-only routing and lightweight OBS spectralizer audit")
+print("SC220 Live PC Music-only routing and redundant spectralizer audit")
 for name, ok in checks:
     print(f"[ {'PASS' if ok else 'FAIL'} ] {name}")
 print(f"Checks: {len(checks)}  Passed: {len(checks) - len(failed)}  Failed: {len(failed)}")

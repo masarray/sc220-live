@@ -13,13 +13,29 @@ CENTRES = np.array([
     50.0, 80.0, 125.0, 200.0, 315.0, 500.0, 800.0,
     1250.0, 2000.0, 3150.0, 5000.0, 8000.0, 12000.0, 16000.0,
 ])
-Q = 1.10
 SAMPLES = 4096
 
 
-def coefficients(frequency: float) -> tuple[float, float, float, float, float]:
+def band_q(index: int) -> float:
+    centre = float(CENTRES[index])
+    lower = (
+        centre / math.sqrt(float(CENTRES[1]) / centre)
+        if index == 0
+        else math.sqrt(float(CENTRES[index - 1]) * centre)
+    )
+    upper = (
+        centre * math.sqrt(centre / float(CENTRES[index - 1]))
+        if index + 1 == len(CENTRES)
+        else math.sqrt(centre * float(CENTRES[index + 1]))
+    )
+    return float(np.clip(centre / max(1.0, upper - lower), 0.55, 8.0))
+
+
+def coefficients(index: int) -> tuple[float, float, float, float, float]:
+    frequency = min(float(CENTRES[index]), SAMPLE_RATE * 0.42)
+    q = band_q(index)
     omega = 2.0 * math.pi * frequency / SAMPLE_RATE
-    alpha = math.sin(omega) / (2.0 * Q)
+    alpha = math.sin(omega) / (2.0 * q)
     a0 = 1.0 + alpha
     return (
         alpha / a0,
@@ -30,23 +46,23 @@ def coefficients(frequency: float) -> tuple[float, float, float, float, float]:
     )
 
 
-def filter_channel(signal: np.ndarray, frequency: float) -> np.ndarray:
-    b0, b1, b2, a1, a2 = coefficients(frequency)
+def filter_channel(signal: np.ndarray, index: int) -> np.ndarray:
+    b0, b1, b2, a1, a2 = coefficients(index)
     output = np.zeros_like(signal)
     x1 = x2 = y1 = y2 = 0.0
-    for index, sample in enumerate(signal):
+    for sample_index, sample in enumerate(signal):
         value = b0 * sample + b1 * x1 + b2 * x2 - a1 * y1 - a2 * y2
         x2, x1 = x1, float(sample)
         y2, y1 = y1, value
-        output[index] = value
+        output[sample_index] = value
     return output
 
 
 def analyse(left: np.ndarray, right: np.ndarray) -> np.ndarray:
     result = np.zeros(len(CENTRES), dtype=np.float64)
-    for index, frequency in enumerate(CENTRES):
-        filtered_left = filter_channel(left, float(frequency))
-        filtered_right = filter_channel(right, float(frequency))
+    for index in range(len(CENTRES)):
+        filtered_left = filter_channel(left, index)
+        filtered_right = filter_channel(right, index)
         stereo_energy = 0.5 * (filtered_left**2 + filtered_right**2)
         result[index] = math.sqrt(float(np.mean(stereo_energy)))
     return result
@@ -54,7 +70,7 @@ def analyse(left: np.ndarray, right: np.ndarray) -> np.ndarray:
 
 def tone(frequency: float) -> np.ndarray:
     time = np.arange(SAMPLES, dtype=np.float64) / SAMPLE_RATE
-    return np.sin (2.0 * np.pi * frequency * time)
+    return np.sin(2.0 * np.pi * frequency * time)
 
 
 checks: list[tuple[str, bool, str]] = []
@@ -74,7 +90,7 @@ for frequency in frequencies:
     check(
         f"{frequency:g} Hz tone peaks at its fixed band",
         math.isclose(float(CENTRES[peak]), frequency, rel_tol=0.01),
-        f"peak index={peak}, centre={CENTRES[peak]:.0f} Hz",
+        f"peak index={peak}, centre={CENTRES[peak]:.0f} Hz, Q={band_q(peak):.3f}",
     )
 
 check(
@@ -103,21 +119,24 @@ check(
     f"peak index={int(np.argmax(anti_bands))}",
 )
 check(
-    "telemetry source contains the audited centres and Q",
+    "telemetry source contains proportional bands and pink calibration",
     all(token in TELEMETRY for token in (
-        "bandCount = 14", "q = 1.10", "50.0f, 80.0f, 125.0f",
-        "1250.0f", "8000.0f", "16000.0f", "processSample",
+        "bandCount = 14", "lowerBoundary", "upperBoundary",
+        "nominal / bandwidth", "calculatePinkNoiseCalibration",
+        "integrationPoints = 4096", "pinkCalibrationDb",
+        "50.0f, 80.0f, 125.0f", "1250.0f", "8000.0f", "16000.0f",
+        "processSample",
     )),
-    "fixed filter-bank contract",
+    "sample-rate-aware pink-flat filter-bank contract",
 )
 check(
-    "generated UI uses atomic 14-band contract",
+    "generated UI uses calibrated atomic 14-band contract",
     all(token in SOURCE for token in (
         "programmeBandTelemetry.read", "segmentCount = 14",
         "peakHoldFrames[band] = 18", "PROGRAM ANALYZER",
-        "POST-LIMITER BANDS",
+        "PINK-FLAT BANDS", "const float displayDb = rawDb[band]",
     )),
-    "generated UI contract",
+    "generated pink-flat UI contract",
 )
 check(
     "FFT snapshot and history implementations are absent",
@@ -126,11 +145,11 @@ check(
         "programmeSpectrumSnapshot", "PROGRAM IMPACT", "PC INPUT IMPACT",
         '"OLDER"', '"NOW"', "historySize = 32",
     )),
-    "atomic bands only",
+    "atomic calibrated bands only",
 )
 
 failed = [name for name, ok, _ in checks if not ok]
-print("SC220 Live synthetic atomic filter-bank response audit")
+print("SC220 Live synthetic proportional filter-bank response audit")
 for name, ok, detail in checks:
     print(f"[ {'PASS' if ok else 'FAIL'} ] {name}: {detail}")
 print(f"Checks: {len(checks)}  Passed: {len(checks) - len(failed)}  Failed: {len(failed)}")

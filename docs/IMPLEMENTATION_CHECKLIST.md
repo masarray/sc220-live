@@ -138,7 +138,7 @@ Status legend:
 - [x] CI verifies direct visual publication occurs before DSP FIFO free-space handling
 - [x] CI verifies the FFT exists only in generated UI and not in capture/audio engine sources
 - [x] CI verifies that the time-history visualizer is fully removed
-- [x] GitHub Actions source-audit run `#178` passed
+- [x] GitHub Actions source audit has passed for the direct-capture implementation
 - [~] Full Windows/MSVC Release compile must pass locally after the latest commit
 - [~] PC Music-only + distinct VB-CABLE source/stream + physical monitor test
 - [~] SC220 `MIXER` + PC Music + VB-CABLE + physical monitor end-to-end test

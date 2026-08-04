@@ -148,10 +148,9 @@ Status legend:
 Draft PR #2 should remain unmerged until these checks pass locally:
 
 1. Windows Release build succeeds from a clean tree.
-2. A 44.1 kHz physical endpoint can monitor a 48 kHz programme without opening Audio Setup.
-3. A 48 kHz physical endpoint can monitor a 44.1 kHz programme.
-4. Program Monitor and Music Cue both produce continuous audio without periodic clicks or FIFO resets.
-5. Music produces visibly stronger per-frequency attacks than the previous analyzer version.
-6. Pink noise remains visually flat after settling.
-7. LUFS-M drives the needle/ring while LUFS-I remains the central value.
-8. A one-hour live test completes without monitor underflow growth, routing feedback, or analyzer-induced CPU spikes.
+2. A physical headphone endpoint with a different Windows mix rate can be selected without opening Audio Setup.
+3. Program Monitor and Music Cue both produce continuous audio without periodic clicks or FIFO resets.
+4. Music produces visibly stronger per-frequency attacks than the previous analyzer version.
+5. Pink noise remains visually flat after settling.
+6. LUFS-M drives the needle/ring while LUFS-I remains the central value.
+7. A one-hour live test completes without monitor underflow growth, routing feedback, or analyzer-induced CPU spikes.

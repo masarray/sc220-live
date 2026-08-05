@@ -6,6 +6,7 @@ state = (ROOT / "cmake/GenerateSC220BroadcastState.cmake").read_text(encoding="u
 polish = (ROOT / "cmake/PolishSC220FinalUi.cmake").read_text(encoding="utf-8")
 visualizer = (ROOT / "cmake/RebuildSC220ImpactVisualizer.cmake").read_text(encoding="utf-8")
 calibrator = (ROOT / "cmake/CalibrateSC220Meters.cmake").read_text(encoding="utf-8")
+release = (ROOT / "cmake/RefineSC220ReleaseUi.cmake").read_text(encoding="utf-8")
 telemetry = (ROOT / "live/ProgrammeBandTelemetry.h").read_text(encoding="utf-8")
 
 generated_root = ROOT / "build-sc220" / "generated" / "sc220-monitor"
@@ -33,11 +34,15 @@ check(
     )),
 )
 check(
-    "atomic analyzer and pink calibration are the final visual passes",
-    'include("${CMAKE_CURRENT_LIST_DIR}/RebuildSC220ImpactVisualizer.cmake")' in state
-    and 'include("${CMAKE_CURRENT_LIST_DIR}/CalibrateSC220Meters.cmake")' in state
+    "atomic analyzer calibration and release polish are ordered final passes",
+    all(token in state for token in (
+        'include("${CMAKE_CURRENT_LIST_DIR}/RebuildSC220ImpactVisualizer.cmake")',
+        'include("${CMAKE_CURRENT_LIST_DIR}/CalibrateSC220Meters.cmake")',
+        'include("${CMAKE_CURRENT_LIST_DIR}/RefineSC220ReleaseUi.cmake")',
+    ))
     and state.find("RebuildSC220ImpactVisualizer.cmake")
     < state.find("CalibrateSC220Meters.cmake")
+    < state.find("RefineSC220ReleaseUi.cmake")
     and "GenerateSC220DirectPcCaptureVisualizer.cmake" not in state,
 )
 check("final generated sources exist", generated_ui_path.exists() and generated_engine_path.exists())
@@ -108,13 +113,15 @@ check(
     > generated_engine.find("masterLimiter.process (masterContext);"),
 )
 check(
-    "UI reads pink-calibrated levels and separate activity without sample transport",
+    "UI reads calibrated levels and separate activity without sample transport",
     all(token in generated_ui for token in (
         "updateFromTelemetry", "programmeBandTelemetry.read",
         "programmeBandTelemetry.readActivity", "rawActivity", "rhythm * 0.20f",
-        "PINK-FLAT BANDS", "WAITING FOR ENGINE BANDS",
         "PROGRAM ANALYZER", "const float displayDb = rawDb[band]",
-    )),
+    ))
+    and "PINK-FLAT BANDS" not in generated_ui
+    and "WAITING FOR ENGINE BANDS" not in generated_ui
+    and "WAITING FOR POST-LIMITER AUDIO" not in generated_ui,
 )
 check(
     "deleted visualizer paths are absent",
@@ -145,6 +152,15 @@ check(
     )),
 )
 check(
+    "release pass removes analyzer engineering copy but preserves pause feedback",
+    all(token in release for token in (
+        "remove analyzer debug generation and fps text", 'g.drawText (\"PAUSED\"'))
+    and all(token not in generated_ui for token in (
+        "14 BAND  /  30 FPS", "PINK-FLAT BANDS  #", "WAITING FOR ENGINE BANDS",
+    ))
+    and '"PAUSED"' in generated_ui,
+)
+check(
     "obsolete time-history visualizer is absent",
     all(token not in generated_ui for token in (
         "PROGRAM IMPACT", "PC INPUT IMPACT", '"OLDER"', '"NOW"', "historySize = 32",
@@ -159,7 +175,7 @@ check(
 )
 
 failed = [name for name, ok in checks if not ok]
-print("SC220 Live final console and rhythmic pink-flat analyzer audit")
+print("SC220 Live final console and premium lean rhythmic analyzer audit")
 for name, ok in checks:
     print(f"[ {'PASS' if ok else 'FAIL'} ] {name}")
 print(f"Checks: {len(checks)}  Passed: {len(checks) - len(failed)}  Failed: {len(failed)}")

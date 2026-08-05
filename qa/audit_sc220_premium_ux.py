@@ -3,6 +3,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 header = (ROOT / "live/SC220MainComponent.h").read_text(encoding="utf-8")
 source = (ROOT / "live/SC220MainComponent.cpp").read_text(encoding="utf-8")
+band_telemetry = (ROOT / "live/ProgrammeBandTelemetry.h").read_text(encoding="utf-8")
+release_pass = (ROOT / "cmake/RefineSC220ReleaseUi.cmake").read_text(encoding="utf-8")
 generated_root = ROOT / "generated" / "sc220-monitor"
 generated_ui_path = generated_root / "SC220MainComponent_Monitor.cpp"
 final_ui = generated_ui_path.read_text(encoding="utf-8") if generated_ui_path.exists() else source
@@ -32,9 +34,11 @@ check("final UI renders the rhythmic atomic programme analyzer", all(token in fi
     "class SC220MainComponent::LiveSpectrumDisplay", "updateFromTelemetry",
     "programmeBandTelemetry.read", "bandCount = ProgrammeBandTelemetry::bandCount",
     "segmentCount = 16", "pulses[band]", "positiveRise", '"PROGRAM ANALYZER"')))
-check("visualizer identifies pink-calibrated post-limiter authority", all(token in final_ui for token in (
-    '"PINK-FLAT BANDS', '"WAITING FOR ENGINE BANDS"',
-    '"WAITING FOR POST-LIMITER AUDIO"')))
+check("pink calibration remains an engine contract rather than release copy", all(token in band_telemetry for token in (
+    "pinkCalibrationDb", "calibratePinkNoise", "pinkNoiseWeight"))
+    and '"PINK-FLAT BANDS' not in final_ui
+    and '"WAITING FOR ENGINE BANDS"' not in final_ui
+    and '"WAITING FOR POST-LIMITER AUDIO"' not in final_ui)
 check("all failed visual transport paths are absent", all(token not in final_ui for token in (
     "ProgrammeSpectrumSnapshot", "programmeSpectrumSnapshot",
     "performFrequencyOnlyForwardTransform", "updateFromSnapshot", "updateFromTaps",
@@ -50,9 +54,11 @@ check("hardware controls match approved dot-calibrated metal surface", all(token
 check("full-height fader caps remain inside endpoint bounds", all(token in source for token in (
     "getSliderThumbRadius", "slider.getSliderStyle() == juce::Slider::LinearVertical",
     "return 34;", "sliderPos - 34.0f, 40.0f, 68.0f")))
-check("macro controls preserve approved endpoint labels", all(token in source for token in (
-    'g.drawText ("0%"', 'g.drawText ("100%"',
-    "knob.setTextBoxStyle (juce::Slider::NoTextBox")))
+check("macro controls keep names and current values but remove endpoint clutter", all(token in final_ui for token in (
+    '"ENHANCE", "SMART BASS", "SMART TREBLE", "VOCAL BODY", "STEREO MAGIC"',
+    'juce::String (knob.getValue(), 0) + "%"'))
+    and 'g.drawText ("0%"' not in final_ui
+    and 'g.drawText ("100%"' not in final_ui)
 check("SC220 device art uses a focused source crop", all(token in source for token in (
     "const int sourceY", "const int sourceWidth", "g.drawImage (sc220Image")))
 check("free-days button removed from main surface", all(token not in header + source for token in (
@@ -68,9 +74,22 @@ check("Details button removed", all(token not in header + source for token in (
 check("output READY label remains removed", '"READY" : "SELECT VB-CABLE"' not in source)
 check("old time-history visualizer is absent", all(token not in final_ui for token in (
     "PROGRAM IMPACT", "PC INPUT IMPACT", '"OLDER"', '"NOW"', "historySize = 32")))
+check("release UI removes platform and engineering noise copy", all(token not in final_ui for token in (
+    "YT / TIKTOK", "TP <= -1", "MAS ARI SIGNATURE ENGINE",
+    "14 BAND  /  30 FPS", "SC220 + PC AUDIO", "VOICE / MUSIC SIGNATURE",
+    "SMART PROTECT  /  ON", "AUTO DUCK  /  SC220 KEY",
+    "VB-CABLE / OBS", "HEADPHONES / SPEAKERS", "ACTIVE: ")))
+check("release UI retains only essential operational hierarchy", all(token in final_ui for token in (
+    '"INPUT MIX"', '"PC AUDIO"', '"SMART ENHANCER"', '"PROGRAM ANALYZER"',
+    '"LOUDNESS"', '"STREAM OUTPUT"', '"MONITOR OUTPUT"', '"PROTECTED"',
+    '"PLAYBACK CAPTURE ACTIVE"', '"MONITOR ACTIVE"', '"LUFS-I"')))
+check("release refinement is chained after meter calibration", all(token in release_pass for token in (
+    "premium lean release UI", "remove platform target legend",
+    "remove analyzer debug generation and fps text",
+    "remove footer signal-chain breadcrumb")))
 
 failed = [name for name, ok in checks if not ok]
-print("SC220 Live premium UX contract audit")
+print("SC220 Live premium lean release UX contract audit")
 for name, ok in checks:
     print(f"[ {'PASS' if ok else 'FAIL'} ] {name}")
 print(f"Checks: {len(checks)}  Passed: {len(checks) - len(failed)}  Failed: {len(failed)}")

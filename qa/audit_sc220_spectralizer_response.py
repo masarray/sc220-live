@@ -7,6 +7,7 @@ ROOT = Path(__file__).resolve().parents[1]
 GENERATED = ROOT / "generated" / "sc220-monitor" / "SC220MainComponent_Monitor.cpp"
 SOURCE = GENERATED.read_text(encoding="utf-8") if GENERATED.exists() else ""
 TELEMETRY = (ROOT / "live/ProgrammeBandTelemetry.h").read_text(encoding="utf-8")
+RELEASE = (ROOT / "cmake/RefineSC220ReleaseUi.cmake").read_text(encoding="utf-8")
 
 SAMPLE_RATE = 48_000.0
 CENTRES = np.array([
@@ -132,15 +133,17 @@ check(
     "sample-rate-aware pink-flat level plus onset activity contract",
 )
 check(
-    "generated UI uses calibrated lively atomic 14-band contract",
+    "generated UI uses calibrated lively atomic 14-band function with lean copy",
     all(token in SOURCE for token in (
         "programmeBandTelemetry.read", "programmeBandTelemetry.readActivity",
         "segmentCount = 16", "peakHoldFrames[band] = 14",
-        "PROGRAM ANALYZER", "PINK-FLAT BANDS",
-        "const float displayDb = rawDb[band]", "rawActivity",
+        "PROGRAM ANALYZER", "const float displayDb = rawDb[band]", "rawActivity",
         "baseTarget + rhythm * 0.20f", "positiveRise", "pulses[band]",
-    )),
-    "generated rhythmic pink-flat UI contract",
+    ))
+    and "PINK-FLAT BANDS" not in SOURCE
+    and "14 BAND  /  30 FPS" not in SOURCE
+    and "remove analyzer debug generation and fps text" in RELEASE,
+    "generated rhythmic calibrated UI without engineering labels",
 )
 check(
     "FFT snapshot and history implementations are absent",
@@ -153,7 +156,7 @@ check(
 )
 
 failed = [name for name, ok, _ in checks if not ok]
-print("SC220 Live synthetic proportional rhythmic filter-bank response audit")
+print("SC220 Live synthetic proportional rhythmic filter-bank response and lean UI audit")
 for name, ok, detail in checks:
     print(f"[ {'PASS' if ok else 'FAIL'} ] {name}: {detail}")
 print(f"Checks: {len(checks)}  Passed: {len(checks) - len(failed)}  Failed: {len(failed)}")

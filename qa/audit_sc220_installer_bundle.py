@@ -6,11 +6,13 @@ iss_path = ROOT / "installer" / "SC220Live.iss"
 notice_path = ROOT / "installer" / "VB_AUDIO_NOTICE.txt"
 package_path = ROOT / "scripts" / "package-sc220-installer.ps1"
 workflow_path = ROOT / ".github" / "workflows" / "installer-bundle.yml"
+inspect_path = ROOT / ".github" / "workflows" / "inspect-vbcable-pack45.yml"
 
 iss = iss_path.read_text(encoding="utf-8")
 notice = notice_path.read_text(encoding="utf-8")
 package = package_path.read_text(encoding="utf-8")
 workflow = workflow_path.read_text(encoding="utf-8")
+inspect = inspect_path.read_text(encoding="utf-8")
 
 checks: list[tuple[str, bool]] = []
 
@@ -21,7 +23,7 @@ def check(name: str, condition: bool) -> None:
 
 check(
     "installer source files exist",
-    all(path.exists() for path in (iss_path, notice_path, package_path, workflow_path)),
+    all(path.exists() for path in (iss_path, notice_path, package_path, workflow_path, inspect_path)),
 )
 check(
     "bundle is restricted to Windows 10 or newer x64",
@@ -140,6 +142,26 @@ check(
         "Setup-win-x64.exe.sha256",
         "Setup-win-x64.manifest.json",
     )),
+)
+check(
+    "Pack45 inspection workflow reviews hash signatures and rejects extra cables",
+    all(token in inspect for token in (
+        "workflow_dispatch",
+        "VBCABLE_Driver_Pack45.zip",
+        "Get-FileHash -LiteralPath $zip -Algorithm SHA256",
+        "Get-AuthenticodeSignature -LiteralPath $setup.FullName",
+        "Invalid catalogue signature",
+        "A/B/C/D material",
+        "VBCABLE_PACK45_SHA256=$hash",
+        "Upload review report only",
+    )),
+)
+check(
+    "Pack45 inspection uploads report but not downloaded driver binaries",
+    "VBCABLE_Driver_Pack45.review.json" in inspect
+    and "path: ${{ steps.inspect.outputs.report }}" in inspect
+    and "path: VBCABLE_Driver_Pack45.zip" not in inspect
+    and "path: VBCABLE_Setup_x64.exe" not in inspect,
 )
 check(
     "donationware notice preserves origin choice restart and product separation",

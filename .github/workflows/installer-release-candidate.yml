@@ -40,10 +40,7 @@ jobs:
         shell: pwsh
         run: |
           if ([string]::IsNullOrWhiteSpace($env:ASKP_REPO_TOKEN)) {
-            throw @'
-Repository secret ASKP_REPO_TOKEN is required.
-Use a fine-grained GitHub token with read-only Contents access to masarray/askp-vst.
-'@
+            throw 'Repository secret ASKP_REPO_TOKEN is required. Use a fine-grained token with read-only Contents access to masarray/askp-vst.'
           }
           if ($env:RELEASE_VERSION -notmatch '^\d+\.\d+\.\d+$') {
             throw "Invalid semantic version: $env:RELEASE_VERSION"

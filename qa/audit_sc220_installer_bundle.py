@@ -45,6 +45,29 @@ check(
     )),
 )
 check(
+    "complete reviewed VB-CABLE package is staged together",
+    all(token in iss for token in (
+        'Source: "{#VBPackageSource}\\*"',
+        'DestDir: "{#VBTempDir}"',
+        "recursesubdirs",
+        "createallsubdirs",
+        "deleteafterinstall",
+        "Tasks: vbcable",
+        "INF, SYS, CAT",
+    ))
+    and "VBSetupSource" not in iss
+    and "ExtractTemporaryFile(" not in iss,
+)
+check(
+    "driver setup runs beside its support files",
+    all(token in iss for token in (
+        "SetupPath := ExpandConstant('{#VBTempDir}\\{#VBSetupName}')",
+        "FileExists(SetupPath)",
+        "Exec(SetupPath, '-i -h', ExtractFileDir(SetupPath)",
+        "complete VB-CABLE package",
+    )),
+)
+check(
     "driver install keeps Windows consent and restart semantics",
     all(token in iss for token in (
         "Exec(SetupPath, '-i -h'",
@@ -90,11 +113,22 @@ check(
         < package.find("Expand-Archive"),
 )
 check(
+    "packager requires setup INF SYS and CAT from one package root",
+    all(token in package for token in (
+        "$vbPackageRoot = $vbSetup.Directory.FullName",
+        "$vbPackageFiles = @(Get-ChildItem -LiteralPath $vbPackageRoot -Recurse -File)",
+        "foreach ($extension in @('.inf', '.sys', '.cat'))",
+        "missing required driver support files",
+        "Write-IsppDefine $defines 'VBPackageSource'",
+    ))
+    and "Write-IsppDefine $defines 'VBSetupSource'" not in package,
+)
+check(
     "driver executable and catalog signatures are validated",
     all(token in package for token in (
         "Get-AuthenticodeSignature -LiteralPath $vbSetup.FullName",
         "SignatureStatus]::Valid",
-        "Get-ChildItem -LiteralPath $expanded -Recurse -File -Filter '*.cat'",
+        "Get-ChildItem -LiteralPath $vbPackageRoot -Recurse -File -Filter '*.cat'",
         "catalogue signature is invalid",
     )),
 )
@@ -104,12 +138,14 @@ check(
     and "standard bundle unexpectedly contains A/B/C/D cable material" in package,
 )
 check(
-    "installer output has checksum and supply-chain manifest",
+    "installer output has checksum and complete-payload supply-chain manifest",
     all(token in package for token in (
         '$hashPath = "$installer.sha256"',
         "Setup-win-x64.manifest.json",
         "installer_sha256",
         "source_commit",
+        "embedded_file_count",
+        "required_support_files",
         "signer",
         "authenticode",
     )),

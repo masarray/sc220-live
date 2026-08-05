@@ -147,13 +147,24 @@ if (-not $vbSetup) {
     throw 'Official package does not contain VBCABLE_Setup_x64.exe.'
 }
 
+$vbPackageRoot = $vbSetup.Directory.FullName
+$vbPackageFiles = @(Get-ChildItem -LiteralPath $vbPackageRoot -Recurse -File)
+if ($vbPackageFiles.Count -lt 5) {
+    throw 'Official VB-CABLE package is incomplete beside VBCABLE_Setup_x64.exe.'
+}
+foreach ($extension in @('.inf', '.sys', '.cat')) {
+    if (-not ($vbPackageFiles | Where-Object { $_.Extension -ieq $extension } | Select-Object -First 1)) {
+        throw "Official VB-CABLE package is missing required driver support files: $extension"
+    }
+}
+
 $setupSignature = Get-AuthenticodeSignature -LiteralPath $vbSetup.FullName
 if ($setupSignature.Status -ne [System.Management.Automation.SignatureStatus]::Valid -or
     -not $setupSignature.SignerCertificate) {
     throw "VBCABLE_Setup_x64.exe does not have a valid Authenticode signature: $($setupSignature.Status)"
 }
 
-$catalogs = @(Get-ChildItem -LiteralPath $expanded -Recurse -File -Filter '*.cat')
+$catalogs = @(Get-ChildItem -LiteralPath $vbPackageRoot -Recurse -File -Filter '*.cat')
 if ($catalogs.Count -eq 0) {
     throw 'Official VB-CABLE package contains no Windows driver catalogue.'
 }
@@ -172,7 +183,7 @@ Write-IsppDefine $defines 'EulaSource' (Resolve-Path -LiteralPath (Join-Path $ro
 Write-IsppDefine $defines 'PurchaseTermsSource' (Resolve-Path -LiteralPath (Join-Path $root 'PURCHASE_TERMS.txt')).Path
 Write-IsppDefine $defines 'ThirdPartySource' (Resolve-Path -LiteralPath (Join-Path $root 'THIRD_PARTY_NOTICES.md')).Path
 Write-IsppDefine $defines 'VBNoticeSource' (Resolve-Path -LiteralPath $vbNotice).Path
-Write-IsppDefine $defines 'VBSetupSource' $vbSetup.FullName
+Write-IsppDefine $defines 'VBPackageSource' (Resolve-Path -LiteralPath $vbPackageRoot).Path
 Write-IsppDefine $defines 'OutputDir' (Resolve-Path -LiteralPath $dist).Path
 [void]$defines.AppendLine("#include `"$installerTemplate`"")
 Set-Content -LiteralPath $generatedIss -Value $defines.ToString() -Encoding UTF8
@@ -214,6 +225,9 @@ $manifest = [ordered]@{
         source = $officialVBCableUrl
         sha256 = $actualVBCableHash
         setup = 'VBCABLE_Setup_x64.exe'
+        embedded_package_root = [IO.Path]::GetFileName($vbPackageRoot)
+        embedded_file_count = $vbPackageFiles.Count
+        required_support_files = @('.inf', '.sys', '.cat')
         signer = $setupSignature.SignerCertificate.Subject
         authenticode = $setupSignature.Status.ToString()
         donationware_notice = 'installer/VB_AUDIO_NOTICE.txt'
@@ -223,10 +237,11 @@ $manifest = [ordered]@{
 $manifest | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $manifestPath -Encoding UTF8
 
 Write-Host "`nSC220 LIVE INSTALLER BUNDLE OK" -ForegroundColor Green
-Write-Host "Installer : $installer"
-Write-Host "SHA-256  : $installerHash"
-Write-Host "VB-CABLE : $actualVBCableHash"
-Write-Host "Signer   : $($setupSignature.SignerCertificate.Subject)"
+Write-Host "Installer       : $installer"
+Write-Host "SHA-256        : $installerHash"
+Write-Host "VB-CABLE       : $actualVBCableHash"
+Write-Host "Embedded files : $($vbPackageFiles.Count)"
+Write-Host "Signer         : $($setupSignature.SignerCertificate.Subject)"
 
 [pscustomobject]@{
     Installer = $installer

@@ -46,68 +46,78 @@ except AssertionError as exc:
 else:
     check("engine generator applies exactly once", True)
 
-# UI monitor generator consumes the already aligned source. Its specific anchors
-# are audited directly here; the aligned generator has a separate exact audit.
 check(
-    "monitor client owns a second output-only AudioDeviceManager",
-    "juce::AudioDeviceManager deviceManager" in monitor_h
-    and "deviceManager.initialise (0, 0" in monitor_cpp
-    and "deviceManager.addAudioCallback (this)" in monitor_cpp,
+    "monitor no longer depends on a second JUCE AudioDeviceManager",
+    "AudioDeviceManager" not in monitor_h + monitor_cpp
+    and "AudioIODeviceCallback" not in monitor_h + monitor_cpp
+    and "audioDeviceIOCallbackWithContext" not in monitor_cpp,
 )
 check(
-    "monitor transport is bounded and prefilled",
+    "monitor enumerates real active Windows render endpoints and stable IDs",
     all(
-        token in monitor_h + monitor_cpp
+        token in monitor_cpp
         for token in (
-            "juce::AbstractFifo fifo",
-            "fifoCapacitySamples",
-            "primeTargetSamples",
-            "fifo.prepareToWrite",
-            "fifo.prepareToRead",
-            "primed.store",
+            "IMMDeviceEnumerator",
+            "EnumAudioEndpoints (eRender, DEVICE_STATE_ACTIVE",
+            "PKEY_Device_FriendlyName",
+            "device->GetId",
+            "GetDefaultAudioEndpoint (eRender, eConsole",
+            "SYSTEM DEFAULT",
         )
     ),
 )
 check(
-    "monitor defaults muted and rejects virtual cable",
-    "std::atomic<bool> muted { true }" in monitor_h
-    and all(
-        token in monitor_cpp
-        for token in ("VB-Audio", "VB-CABLE", "CABLE Input", "CABLE Output")
-    ),
-)
-check(
-    "monitor opens the endpoint native rate instead of rejecting 44.1 versus 48 kHz",
+    "monitor opens the endpoint exactly like OBS shared-mode monitoring",
     all(
         token in monitor_cpp
         for token in (
-            "auto tryOpen",
-            "error = tryOpen (preferred)",
-            "error = tryOpen (0.0)",
-            "getAvailableSampleRates",
-            "nearestDistance",
-            "supported Windows sample rate",
+            "device->Activate (__uuidof (IAudioClient)",
+            "nextClient->GetMixFormat",
+            "AUDCLNT_SHAREMODE_SHARED",
+            "requestedBufferDuration100ns = 10000000",
+            "nextClient->GetBufferSize",
+            "__uuidof (IAudioRenderClient)",
+            "audioClient->GetCurrentPadding",
+            "renderClient->GetBuffer",
+            "renderClient->ReleaseBuffer",
+            "audioClient->Start",
+        )
+    ),
+)
+check(
+    "monitor uses endpoint native format instead of forcing stream sample rate",
+    all(
+        token in monitor_cpp
+        for token in (
+            "mixFormat->nSamplesPerSec",
+            "configureNativeFormat",
+            "WAVE_FORMAT_IEEE_FLOAT",
+            "WAVE_FORMAT_PCM",
+            "outputEncoding",
+            "WASAPI shared-mode monitor initialization failed",
         )
     )
     and "must support the stream sample rate" not in monitor_cpp,
 )
 check(
-    "monitor owns fixed preallocated stereo resampling scratch",
+    "monitor owns bounded preallocated source FIFO and resampling scratch",
     all(
-        token in monitor_h + monitor_cpp
+        token in monitor_cpp
         for token in (
-            "resampleScratchCapacity = 32768",
-            "juce::AudioBuffer<float> resampleInput",
-            "juce::AudioBuffer<float> resampleOutput",
-            "juce::LagrangeInterpolator leftInterpolator",
-            "juce::LagrangeInterpolator rightInterpolator",
+            "fifoCapacitySamples = 384000",
+            "resampleScratchCapacity = 65536",
+            "juce::AbstractFifo fifo",
+            "ringBuffer.setSize",
             "resampleInput.setSize",
             "resampleOutput.setSize",
+            "primeTargetSamples",
+            "fifo.prepareToWrite",
+            "fifo.prepareToRead",
         )
     ),
 )
 check(
-    "monitor performs adaptive nominal-rate conversion and clock-drift control",
+    "monitor performs nominal-rate conversion and bounded drift control",
     all(
         token in monitor_cpp
         for token in (
@@ -122,37 +132,96 @@ check(
     ),
 )
 check(
-    "monitor status exposes source/output rate and resampling health",
+    "monitor renders interleaved float and PCM endpoint formats",
     all(
-        token in monitor_h + monitor_cpp
+        token in monitor_cpp
         for token in (
-            "sourceSampleRate",
-            "resampling",
-            "driftCorrectionPpm",
-            "rateConversionActive",
-            "currentDriftCorrectionPpm",
+            "SampleEncoding::float32",
+            "SampleEncoding::pcm16",
+            "SampleEncoding::pcm24",
+            "SampleEncoding::pcm32",
+            "writeOneSample",
+            "writeInterleaved",
+            "AUDCLNT_BUFFERFLAGS_SILENT",
         )
     ),
 )
+check(
+    "monitor steady-state submission cannot block the broadcast callback",
+    "TryAcquireSRWLockExclusive" in monitor_cpp
+    and "ReleaseSRWLockExclusive" in monitor_cpp
+    and "push (const juce::AudioBuffer<float>& source" in monitor_cpp,
+)
 
-callback_match = re.search(
-    r"void MonitorOutputClient::audioDeviceIOCallbackWithContext.*?\n}\n\n"
-    r"void MonitorOutputClient::audioDeviceAboutToStart",
+push_match = re.search(
+    r"void MonitorOutputClient::push.*?\n}\n\nMonitorOutputClient::Status",
     monitor_cpp,
     flags=re.S,
 )
-callback = callback_match.group(0) if callback_match else ""
+push_path = push_match.group(0) if push_match else ""
+render_match = re.search(
+    r"void renderAvailableLocked.*?\n    }\n\n    SRWLOCK playbackLock",
+    monitor_cpp,
+    flags=re.S,
+)
+render_path = render_match.group(0) if render_match else ""
 check(
-    "monitor callback is lock-free and allocation-free",
-    bool(callback)
-    and "ScopedLock" not in callback
-    and "setSize" not in callback
-    and "new " not in callback
-    and "std::vector" not in callback,
+    "monitor realtime push/render paths allocate no buffers",
+    bool(push_path and render_path)
+    and all(token not in push_path + render_path for token in (
+        "setSize", "std::vector", "std::make_unique", "new ",
+        "CoTaskMemAlloc", "malloc", "calloc",
+    )),
 )
 check(
-    "monitor callback uses a deterministic smoothed gain ramp",
-    all(token in callback for token in ("gainLinear", "gainStep", "output[sample] *= gain")),
+    "monitor pre-fills then starts the real Windows endpoint",
+    all(
+        token in render_path
+        for token in (
+            "if (! endpointStarted && ready < primeTarget)",
+            "ReleaseBuffer",
+            "audioClient->Start",
+            "endpointStartedFlag.store (true",
+            "primed.store (true",
+        )
+    ),
+)
+check(
+    "monitor automatically recreates an invalidated WASAPI client",
+    all(
+        token in monitor_cpp
+        for token in (
+            "markForReconnectLocked",
+            "monitor will reconnect automatically",
+            "audioClient == nullptr && impl->selectedDisplayName.isNotEmpty()",
+            "now - impl->lastReconnectAttemptMs >= 1000.0",
+            "openSelectedEndpointLocked (getGainDb(), true)",
+            "reconnectCount.fetch_add",
+        )
+    ),
+)
+check(
+    "monitor defaults muted and rejects every VB-CABLE render family",
+    "std::atomic<bool> muted { true }" in monitor_h
+    and all(
+        token in monitor_cpp
+        for token in ("VB-Audio", "VB-CABLE", "CABLE Input", "CABLE Output")
+    ),
+)
+check(
+    "monitor status exposes native endpoint and reconnect health",
+    all(
+        token in monitor_h + monitor_cpp
+        for token in (
+            "endpointStarted",
+            "endpointPaddingFrames",
+            "sourceSampleRate",
+            "resampling",
+            "driftCorrectionPpm",
+            "reconnects",
+            "WASAPI SHARED / OBS-STYLE",
+        )
+    ),
 )
 
 check(
@@ -206,7 +275,7 @@ if generated_engine:
         and limiter < monitor_publish < stream_gate,
     )
     check(
-        "monitor FIFO is prepared and flushed with stream lifecycle",
+        "monitor transport is prepared and reset with stream lifecycle",
         all(
             token in generated_engine
             for token in (
@@ -282,7 +351,7 @@ check(
 )
 
 failed = [name for name, ok in checks if not ok]
-print("SC220 Live independent Monitor Bus and adaptive-rate contract audit")
+print("SC220 Live OBS-style native WASAPI Monitor Bus audit")
 for name, ok in checks:
     print(f"[ {'PASS' if ok else 'FAIL'} ] {name}")
 print(f"Checks: {len(checks)}  Passed: {len(checks) - len(failed)}  Failed: {len(failed)}")

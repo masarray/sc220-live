@@ -1,0 +1,21 @@
+VB-AUDIO VB-CABLE DONATIONWARE NOTICE
+
+SC220 Live can optionally install the standard VB-Audio VB-CABLE driver to create the virtual Stream Output used by OBS or another live application.
+
+VB-CABLE is a separate product developed and owned by VB-Audio Software. It is included unchanged from the official VBCABLE_Driver_Pack45.zip package downloaded from:
+
+https://vb-audio.com/Cable/
+
+VB-CABLE uses the VB-Audio donationware model. End users must be able to identify VB-CABLE as a VB-Audio product and remain free to donate or purchase a licence if they find it useful:
+
+https://shop.vb-audio.com/en/win-apps/11-vb-cable.html
+
+The optional VB-CABLE task:
+
+- requires Administrator permission;
+- may show a Windows driver-security confirmation dialog;
+- requires a Windows restart before the new CABLE Input and CABLE Output endpoints are fully available;
+- installs only the standard VB-CABLE driver, not VB-CABLE A+B or C+D;
+- can be deselected when VB-CABLE is already installed or when the user prefers to install it separately.
+
+SC220 Live and VB-CABLE remain separate products. Inclusion does not imply that VB-Audio sponsors, endorses, supports, or is affiliated with SC220 Live, Tutorial Mas Ari, MasArray, or Recording Tech.

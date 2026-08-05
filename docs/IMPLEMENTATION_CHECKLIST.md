@@ -33,16 +33,37 @@ Status legend:
 - [x] PC Music is captured through Windows WASAPI loopback
 - [x] Windows render endpoints are enumerated using stable endpoint IDs and friendly names
 - [x] Selectable PC playback/loopback endpoint in the main PC Audio dropdown
-- [x] `SYSTEM DEFAULT` remains available when safe relative to Stream Output
+- [x] `SYSTEM DEFAULT` remains available when safe relative to Stream and Monitor Output
 - [x] Selected PC playback endpoint is persisted and restored before audio starts
-- [x] Physical playback endpoints can be selected as PC Music sources
+- [x] Physical playback endpoints can be selected as PC Music sources when they are not also Monitor Output
 - [x] VB-CABLE and VB-CABLE A/B/C/D can be selected as PC Music sources
 - [x] Different virtual-cable families may be used for PC Music and Stream Output
 - [x] The same endpoint or same virtual-cable family is blocked to prevent feedback
+- [x] The active physical Monitor Output is withheld from the PC Audio source list
+- [x] The active PC Audio source endpoint is withheld from the Monitor Output list
+- [x] PC Audio Source = Monitor Output is rejected and monitoring is muted before recursive feedback can start
 - [x] Stream selector remains restricted to virtual-cable endpoints
-- [x] WASAPI startup failures display `CAPTURE ERROR` with the real error text
-- [~] PC endpoint switching, persistence, and anti-loop alerts need Windows validation
-- [ ] Adaptive asynchronous sample-rate and clock-drift correction for PC Audio capture
+- [x] WASAPI startup failures display `CAPTURE ERROR / RETRYING` with the real error text
+- [x] Event-driven WASAPI capture falls back to polling mode when an endpoint rejects event callback capture
+- [x] Runtime capture failures recreate the selected endpoint automatically
+- [x] PC capture FIFO, meter peaks, and monitor delay are cleared during endpoint switching
+- [x] PC meters decay to `-120 dB` when no capture frames arrive instead of freezing at their last value
+- [~] PC endpoint switching, persistence, reconnect, and anti-loop alerts need Windows hardware validation
+- [ ] Adaptive asynchronous clock-drift correction for long-duration PC Audio capture
+
+### Processed-monitor routing requirement
+
+A physical render endpoint cannot be both PC Audio Source and processed-only Monitor Output. Windows already plays the producing application directly to that endpoint. Returning the DSP result to the same endpoint creates a delayed second copy, and WASAPI loopback can capture the returned monitor audio again.
+
+Use distinct endpoint families:
+
+```text
+Audio-producing application -> VB-CABLE family A -> PC Audio Source
+SC220 Live DSP              -> physical headphone -> Monitor Output
+SC220 Live programme        -> VB-CABLE family B -> Stream Output / OBS
+```
+
+The producing application must be assigned to the chosen PC Audio source in Windows Volume Mixer or in the application's own output setting. Selecting a source inside SC220 Live chooses which endpoint to capture; it cannot redirect another application's Windows playback session.
 
 ## Music, ducking, and broadcast workflow
 
@@ -60,28 +81,26 @@ Status legend:
 ## Stream and physical monitoring
 
 - [x] Independent physical Monitor Bus
-- [x] Monitor endpoints exclude VB-CABLE and the active Stream endpoint
+- [x] Monitor endpoints exclude VB-CABLE, the active Stream endpoint, and the captured PC endpoint
 - [x] Monitor starts muted for safety
+- [x] Monitor power revalidates source-versus-monitor endpoint identity before unmuting
 - [x] `PROGRAM` monitoring uses the protected final programme mix
 - [x] `MUSIC CUE` monitors enhanced PC Music before ducking
 - [x] Monitoring works independently from the `GO LIVE` Stream mute state
 - [x] Monitoring works when SC220 is absent and PC Music is the only source
 - [x] Monitor device, gain, mute state, and source mode are persisted
-- [x] Monitor no longer rejects a physical endpoint merely because its rate differs from Stream
-- [x] Monitor first tries the preferred Stream rate, then the endpoint native Windows rate
-- [x] Nearest supported endpoint rate is selected when Windows initially reports `0 Hz`
+- [x] Native WASAPI shared-mode endpoint uses its real Windows mix format
 - [x] Fixed preallocated stereo resampling buffers
 - [x] Adaptive source/output sample-rate conversion using two Lagrange interpolators
-- [x] FIFO-fill clock-drift correction is bounded to ±2500 ppm
-- [x] Monitor callback remains lock-free and allocation-free
-- [x] Monitor telemetry reports source rate, endpoint rate, resampling state, and correction ppm
+- [x] FIFO-fill clock-drift correction is bounded
+- [x] Monitor callback avoids blocking the broadcast callback
+- [x] Monitor telemetry reports source rate, endpoint rate, resampling state, correction, underflow, and reconnect health
 - [~] Direct headphone selection without entering Audio Setup needs Windows validation
 - [~] Mismatched source/headphone sample rates need listening tests
 - [~] Long-duration monitor drift and underrun behaviour needs a soak test
 
 ## Programme analyzer and metering
 
-- [x] All failed `ScopeTap`, FFT, snapshot, and recovery visualizers removed
 - [x] Analyzer rebuilt as a fixed `14`-band post-limiter filter bank
 - [x] Fixed centre frequencies: `50`, `80`, `125`, `200`, `315`, `500`, `800`, `1.25k`, `2k`, `3.15k`, `5k`, `8k`, `12k`, `16k`
 - [x] Each band uses a proportional-bandwidth second-order band-pass biquad
@@ -89,23 +108,19 @@ Status legend:
 - [x] Left and right channels are combined by stereo energy, preserving anti-phase content
 - [x] Pink-noise calibration integrates 4096 log-frequency response points
 - [x] Stable calibrated level uses one identical `180 ms` envelope for all bands
-- [x] Separate per-band activity uses fast attack of approximately `6–12 ms`
-- [x] Separate per-band activity uses release of approximately `55–110 ms`
-- [x] Activity ignores normal stationary ripple below `1.5 dB`
-- [x] Activity can add up to approximately three temporary visual segments
+- [x] Separate per-band activity uses fast attack and frequency-dependent release
 - [x] Pink-flat baseline is never modified by transient activity
 - [x] UI applies equal dynamic-range expansion to all bands
-- [x] Per-band pulse cap and approximately `470 ms` peak hold
-- [x] `16` segmented cells per band at approximately `30 fps`
+- [x] Per-band pulse cap and peak hold
 - [x] No FFT, sample queue, lock, wait, allocation, or drawing in the audio callback
 - [x] Native pink-noise test spread: `0.348 dB`
 - [x] Native rhythm test: 80 Hz burst rises and releases on the correct band
 - [~] Musical rhythm response needs visual confirmation in the Windows executable
-- [~] Realtime analyzer response with SC220 voice requires hardware confirmation
 - [x] Stereo input, PC Audio, and Stream level meters
 - [x] Integrated LUFS-I and true-peak telemetry
 - [x] Needle and LED ring use responsive 400 ms LUFS-M
 - [x] Centre number remains gated LUFS-I
+- [x] Endpoint switching resets stale loudness history
 - [~] Loudness needle movement needs final Windows visual confirmation
 
 ## UX and visual identity
@@ -120,24 +135,23 @@ Status legend:
 - [x] License and Activation remain available from Settings
 - [x] One responsive grid controls SC220, PC Audio, and Stream fader geometry
 - [x] Stream and Monitor selectors use separate responsive columns
-- [x] PC Audio status distinguishes active capture, startup, routing blocked, and capture error
+- [x] PC Audio status distinguishes active capture, startup, routing blocked, and capture error/retry
+- [x] Monitor status explains when source and monitor resolve to the same endpoint
 - [~] Final layout needs visual confirmation at `1180x720`, `1600x900`, and maximised size
 - [ ] Embed the final application typeface instead of relying on Windows fallback
-- [ ] Replace remaining legacy typography/assets in the mini controller
 
 ## Build, release, and quality assurance
 
 - [x] Proprietary/binary-only release checks
-- [x] 365-day licence and checkout contract checks
-- [x] Safe muted Stream startup
+- [x] Safe muted Stream and Monitor startup
 - [x] Clean build closes the preview executable before removing the build tree
-- [x] Bounded retry and lock-owner diagnostics for Windows clean builds
-- [x] Normal CMake builds compile the generated engine and final generated UI
-- [x] CI validates pink-flat response, rhythm response, loudness movement, endpoint routing, and monitor-rate conversion contracts
-- [x] Source-audit milestone run #320 passes all repository checks
-- [~] Full Windows/MSVC Release compile must pass locally after the latest commit
+- [x] Normal CMake builds compile the generated engine, UI, capture recovery, and application state
+- [x] CI validates pink-flat response, rhythm response, loudness movement, endpoint routing, monitor conversion, and self-monitor safety
+- [x] Source-audit run #388 passes all repository checks
+- [x] Windows/MSVC run #388 compiles native `MonitorOutputClient.cpp` and generated `PcAudioLoopbackCapture_Recovery.cpp`
+- [x] Windows lifecycle smoke starts the capture recovery thread, reports retry state on a no-audio-device runner, and shuts down cleanly
 - [~] PC Music-only + distinct VB-CABLE source/stream + physical monitor test
-- [~] SC220 `MIXER` + PC Music + VB-CABLE + physical monitor end-to-end test
+- [~] SC220 `MIXER` + PC Music + distinct source/stream cables + physical monitor end-to-end test
 - [ ] One-click 10-minute transport stability test
 - [ ] Two-hour zero-dropout transport qualification
 - [ ] Eight-hour broadcast soak test
@@ -148,9 +162,10 @@ Status legend:
 Draft PR #2 should remain unmerged until these checks pass locally:
 
 1. Windows Release build succeeds from a clean tree.
-2. A physical headphone endpoint with a different Windows mix rate can be selected without opening Audio Setup.
-3. Program Monitor and Music Cue both produce continuous audio without periodic clicks or FIFO resets.
-4. Music produces visibly stronger per-frequency attacks than the previous analyzer version.
-5. Pink noise remains visually flat after settling.
-6. LUFS-M drives the needle/ring while LUFS-I remains the central value.
-7. A one-hour live test completes without monitor underflow growth, routing feedback, or analyzer-induced CPU spikes.
+2. The producing application is routed to a PC Audio endpoint different from both Monitor Output and Stream Output.
+3. Changing PC Audio Source restarts capture and reaches `PLAYBACK CAPTURE ACTIVE` without opening Audio Setup.
+4. When capture has no frame, PC meters fall to silence and the analyzer does not retain stale bars.
+5. Program Monitor and Music Cue both produce one continuous processed signal without doubling or recursive feedback.
+6. A 44.1/48 kHz source/monitor combination plays without clicks or sample-rate errors.
+7. Endpoint unplug/reconnect recovers automatically.
+8. A one-hour live test completes without growing underflows, routing feedback, or analyzer-induced CPU spikes.

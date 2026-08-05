@@ -16,9 +16,16 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(JUCE)
 
+set(SC220_PC_CAPTURE_SOURCE
+    "${CMAKE_CURRENT_LIST_DIR}/../../live/PcAudioLoopbackCapture.cpp")
+set(SC220_PC_CAPTURE_GENERATED_SOURCE
+    "${CMAKE_CURRENT_BINARY_DIR}/generated/PcAudioLoopbackCapture_Recovery.cpp")
+include("${CMAKE_CURRENT_LIST_DIR}/../../cmake/GenerateSC220PcCaptureRecovery.cmake")
+
 add_executable(SC220WasapiMonitorSmoke
     main.cpp
     ../../live/MonitorOutputClient.cpp
+    "${SC220_PC_CAPTURE_GENERATED_SOURCE}"
 )
 
 target_include_directories(SC220WasapiMonitorSmoke PRIVATE

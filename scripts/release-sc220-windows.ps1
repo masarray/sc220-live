@@ -80,6 +80,10 @@ if (([DateTime]::UtcNow - $validatedUtc).TotalHours -gt 72) {
     throw 'Validation receipt is older than 72 hours. Repeat the exact-commit release validation.'
 }
 
+if ($env:VBCABLE_PACK45_SHA256 -notmatch '^[A-Fa-f0-9]{64}$') {
+    throw 'Public release requires repository-reviewed environment variable VBCABLE_PACK45_SHA256.'
+}
+
 $releaseNotesTemplate = Join-Path $releaseRoot "docs\RELEASE_NOTES_v$Version.md"
 if (-not (Test-Path $releaseNotesTemplate)) {
     throw "Release notes are missing: $releaseNotesTemplate"
@@ -92,16 +96,21 @@ if (-not (Test-Path $releaseScreenshot)) {
 $licenceText = Get-Content -Raw -LiteralPath (Join-Path $releaseRoot 'LICENSE')
 $eulaText = Get-Content -Raw -LiteralPath (Join-Path $releaseRoot 'EULA.txt')
 $purchaseText = Get-Content -Raw -LiteralPath (Join-Path $releaseRoot 'PURCHASE_TERMS.txt')
+$thirdPartyText = Get-Content -Raw -LiteralPath (Join-Path $releaseRoot 'THIRD_PARTY_NOTICES.md')
 if ($licenceText -notmatch 'PROPRIETARY SOFTWARE' -or
     $eulaText -notmatch '365-DAY' -or
     $eulaText -notmatch 'Audio processing' -or
     $eulaText -notmatch 'designed to continue' -or
     $purchaseText -notmatch 'IDR 399,000' -or
-    $purchaseText -notmatch 'not a subscription') {
-    throw 'Proprietary licence, 365-day safe continuation, or purchase terms are incomplete.'
+    $purchaseText -notmatch 'not a subscription' -or
+    $thirdPartyText -notmatch 'VB-Audio VB-CABLE standard' -or
+    $thirdPartyText -notmatch 'donationware') {
+    throw 'Proprietary licence, 365-day safe continuation, purchase terms, or VB-CABLE notice are incomplete.'
 }
 
 & (Join-Path $PSScriptRoot 'check-sc220-release-contract.ps1')
+& python (Join-Path $releaseRoot 'qa\audit_sc220_installer_bundle.py')
+if ($LASTEXITCODE -ne 0) { throw 'Installer bundle contract audit failed.' }
 
 $healthJson = (& curl.exe --silent --show-error --fail --max-time 20 "$serviceBase/health")
 if ($LASTEXITCODE -ne 0 -or -not $healthJson) {
@@ -151,11 +160,24 @@ if ($LASTEXITCODE -eq 0) {
     throw "$publicRepository already has release $tag. Increase the version before publishing."
 }
 
-$packageArgs = @{ Version = $Version }
-if ($Clean) { $packageArgs.Clean = $true }
-$package = & (Join-Path $PSScriptRoot 'package-sc220-windows.ps1') @packageArgs
-if (-not $package -or -not (Test-Path $package.Zip) -or -not (Test-Path $package.HashFile)) {
-    throw 'Verified release package was not produced.'
+$portableArgs = @{ Version = $Version }
+if ($Clean) { $portableArgs.Clean = $true }
+$portablePackage = & (Join-Path $PSScriptRoot 'package-sc220-windows.ps1') @portableArgs
+if (-not $portablePackage -or
+    -not (Test-Path $portablePackage.Zip) -or
+    -not (Test-Path $portablePackage.HashFile)) {
+    throw 'Verified portable package was not produced.'
+}
+
+$installerPackage = & (Join-Path $PSScriptRoot 'package-sc220-installer.ps1') `
+    -Version $Version `
+    -VBCableSha256 $env:VBCABLE_PACK45_SHA256 `
+    -SkipBuild
+if (-not $installerPackage -or
+    -not (Test-Path $installerPackage.Installer) -or
+    -not (Test-Path $installerPackage.HashFile) -or
+    -not (Test-Path $installerPackage.Manifest)) {
+    throw 'Verified installer bundle was not produced.'
 }
 
 $headAfterBuild = (& git rev-parse HEAD).Trim()
@@ -178,12 +200,20 @@ Copy-Item -LiteralPath (Join-Path $releaseRoot 'assets\ui\recording_tech_logo.pn
 Copy-Item -LiteralPath $releaseScreenshot -Destination (Join-Path $publicCheckout 'sc220-live-console.png')
 Set-Content -LiteralPath (Join-Path $publicCheckout '.nojekyll') -Value '' -Encoding ASCII
 
-$zipName = [IO.Path]::GetFileName($package.Zip)
-$hashName = [IO.Path]::GetFileName($package.HashFile)
-$downloadUrl = "https://github.com/$publicRepository/releases/download/$tag/$zipName"
-$hashUrl = "https://github.com/$publicRepository/releases/download/$tag/$hashName"
+$installerName = [IO.Path]::GetFileName($installerPackage.Installer)
+$installerHashName = [IO.Path]::GetFileName($installerPackage.HashFile)
+$installerManifestName = [IO.Path]::GetFileName($installerPackage.Manifest)
+$portableName = [IO.Path]::GetFileName($portablePackage.Zip)
+$portableHashName = [IO.Path]::GetFileName($portablePackage.HashFile)
+
+$downloadUrl = "https://github.com/$publicRepository/releases/download/$tag/$installerName"
+$hashUrl = "https://github.com/$publicRepository/releases/download/$tag/$installerHashName"
+$manifestUrl = "https://github.com/$publicRepository/releases/download/$tag/$installerManifestName"
+$portableUrl = "https://github.com/$publicRepository/releases/download/$tag/$portableName"
+$portableHashUrl = "https://github.com/$publicRepository/releases/download/$tag/$portableHashName"
 $date = Get-Date -Format 'yyyy-MM-dd'
-$size = "{0:N1} MB" -f ((Get-Item -LiteralPath $package.Zip).Length / 1MB)
+$size = "{0:N1} MB" -f ((Get-Item -LiteralPath $installerPackage.Installer).Length / 1MB)
+$portableSize = "{0:N1} MB" -f ((Get-Item -LiteralPath $portablePackage.Zip).Length / 1MB)
 
 foreach ($templateFile in @('index.html','latest.json')) {
     $path = Join-Path $publicCheckout $templateFile
@@ -191,9 +221,14 @@ foreach ($templateFile in @('index.html','latest.json')) {
     $content = $content.Replace('{{VERSION}}', $Version)
     $content = $content.Replace('{{DATE}}', $date)
     $content = $content.Replace('{{SIZE}}', $size)
-    $content = $content.Replace('{{SHA256}}', $package.Sha256)
+    $content = $content.Replace('{{PORTABLE_SIZE}}', $portableSize)
+    $content = $content.Replace('{{SHA256}}', $installerPackage.Sha256)
+    $content = $content.Replace('{{VBCABLE_SHA256}}', $installerPackage.VBCableSha256)
     $content = $content.Replace('{{DOWNLOAD_URL}}', $downloadUrl)
     $content = $content.Replace('{{HASH_URL}}', $hashUrl)
+    $content = $content.Replace('{{MANIFEST_URL}}', $manifestUrl)
+    $content = $content.Replace('{{PORTABLE_URL}}', $portableUrl)
+    $content = $content.Replace('{{PORTABLE_HASH_URL}}', $portableHashUrl)
     Set-Content -LiteralPath $path -Value $content -Encoding UTF8
 }
 
@@ -221,11 +256,26 @@ try {
 
 $notesPath = Join-Path $releaseRoot 'dist\release-notes.md'
 $notes = Get-Content -Raw -LiteralPath $releaseNotesTemplate
-$notes += "`n`nSHA-256: ``$($package.Sha256)```nPrivate source commit: ``$sourceCommit```n"
+$notes += @"
+
+Installer SHA-256: ``$($installerPackage.Sha256)``
+VB-CABLE Pack45 SHA-256: ``$($installerPackage.VBCableSha256)``
+Portable SHA-256: ``$($portablePackage.Sha256)``
+Private source commit: ``$sourceCommit``
+"@
 Set-Content -LiteralPath $notesPath -Value $notes -Encoding UTF8
 
 Invoke-Checked 'Publishing binary-only GitHub release' {
-    gh release create $tag $package.Zip $package.HashFile --repo $publicRepository --title "SC220 Live $tag" --notes-file $notesPath --latest
+    gh release create $tag `
+        $installerPackage.Installer `
+        $installerPackage.HashFile `
+        $installerPackage.Manifest `
+        $portablePackage.Zip `
+        $portablePackage.HashFile `
+        --repo $publicRepository `
+        --title "SC220 Live $tag" `
+        --notes-file $notesPath `
+        --latest
 }
 
 & gh api "repos/$publicRepository/pages" *> $null
@@ -239,12 +289,22 @@ $releaseJson = gh release view $tag --repo $publicRepository --json assets,url,i
 if ($LASTEXITCODE -ne 0) { throw 'Published release could not be read back for verification.' }
 $releaseData = $releaseJson | ConvertFrom-Json
 $assetNames = @($releaseData.assets | ForEach-Object { $_.name })
-if ($zipName -notin $assetNames -or $hashName -notin $assetNames -or -not $releaseData.isLatest) {
-    throw 'Public release verification failed: expected assets or latest marker are missing.'
+$expectedAssets = @(
+    $installerName,
+    $installerHashName,
+    $installerManifestName,
+    $portableName,
+    $portableHashName
+)
+$missingAssets = @($expectedAssets | Where-Object { $_ -notin $assetNames })
+if ($missingAssets.Count -gt 0 -or -not $releaseData.isLatest) {
+    throw "Public release verification failed. Missing: $($missingAssets -join ', ')"
 }
 
 Write-Host "`nSC220 LIVE RELEASE VERIFIED" -ForegroundColor Green
-Write-Host "Private source : https://github.com/$sourceRepository/commit/$sourceCommit"
-Write-Host "Public release : $($releaseData.url)"
-Write-Host "Landing page   : https://masarray.github.io/sc220-download/"
-Write-Host "SHA-256        : $($package.Sha256)"
+Write-Host "Private source  : https://github.com/$sourceRepository/commit/$sourceCommit"
+Write-Host "Public release  : $($releaseData.url)"
+Write-Host "Landing page    : https://masarray.github.io/sc220-download/"
+Write-Host "Installer hash  : $($installerPackage.Sha256)"
+Write-Host "VB-CABLE hash   : $($installerPackage.VBCableSha256)"
+Write-Host "Portable hash   : $($portablePackage.Sha256)"

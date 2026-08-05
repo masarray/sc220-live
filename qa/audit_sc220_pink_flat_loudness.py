@@ -6,6 +6,7 @@ integrator = (ROOT / "live/ProgrammeLoudnessIntegrator.h").read_text(encoding="u
 live_loudness = (ROOT / "live/ProgrammeLiveLoudnessTelemetry.h").read_text(encoding="utf-8")
 state = (ROOT / "cmake/GenerateSC220BroadcastState.cmake").read_text(encoding="utf-8")
 calibrator = (ROOT / "cmake/CalibrateSC220Meters.cmake").read_text(encoding="utf-8")
+release = (ROOT / "cmake/RefineSC220ReleaseUi.cmake").read_text(encoding="utf-8")
 
 generated_root = ROOT / "generated" / "sc220-monitor"
 if not generated_root.exists():
@@ -40,7 +41,7 @@ check(
 check(
     "band power has sample-rate-independent smoothing",
     all(token in bands for token in (
-        "powerSmoothingSeconds = 0.180", "smoothedPower",
+        "calibratedSmoothingSeconds = 0.180", "calibratedPower",
         "std::exp", "blockPower", "10.0 * std::log10",
     )),
 )
@@ -59,10 +60,14 @@ check(
     )),
 )
 check(
-    "meter calibration runs after analyzer generation",
-    'include("${CMAKE_CURRENT_LIST_DIR}/CalibrateSC220Meters.cmake")' in state
+    "meter calibration and release refinement run after analyzer generation",
+    all(token in state for token in (
+        'include("${CMAKE_CURRENT_LIST_DIR}/CalibrateSC220Meters.cmake")',
+        'include("${CMAKE_CURRENT_LIST_DIR}/RefineSC220ReleaseUi.cmake")',
+    ))
     and state.find("RebuildSC220ImpactVisualizer.cmake")
-    < state.find("CalibrateSC220Meters.cmake"),
+    < state.find("CalibrateSC220Meters.cmake")
+    < state.find("RefineSC220ReleaseUi.cmake"),
 )
 check(
     "final UI has no cosmetic frequency contour",
@@ -72,8 +77,11 @@ check(
     )),
 )
 check(
-    "final analyzer identifies pink calibration",
-    "PINK-FLAT BANDS" in ui,
+    "pink calibration stays internal and release copy stays clean",
+    "PINK-FLAT BANDS" not in ui
+    and "pinkCalibrationDb" in bands
+    and "calculatePinkNoiseCalibration" in bands
+    and "remove analyzer debug generation and fps text" in release,
 )
 check(
     "engine publishes live momentary loudness after weighted frames",
@@ -87,14 +95,16 @@ check(
         "programmeLiveLoudnessTelemetry.read", "nextMomentary",
         "needleLufs", "displayLufs = needleInitialised",
         '"LUFS-I"', '"M " + juce::String',
-    )),
+    ))
+    and "YT / TIKTOK" not in ui
+    and "TP <= -1" not in ui,
 )
 check(
     "generated final sources exist",
     engine_path.exists() and ui_path.exists(),
 )
 check(
-    "calibration generator owns final engine and UI output",
+    "calibration generator owns engine meters before release presentation",
     all(token in calibrator for token in (
         'file(WRITE "${SC220_UI_MONITOR_GENERATED_SOURCE}" "${_ui}")',
         'file(WRITE "${SC220_ENGINE_GENERATED_SOURCE}" "${_engine}")',
@@ -103,7 +113,7 @@ check(
 )
 
 failed = [name for name, ok in checks if not ok]
-print("SC220 Live pink-flat analyzer and moving loudness audit")
+print("SC220 Live internal pink calibration and clean moving loudness audit")
 for name, ok in checks:
     print(f"[ {'PASS' if ok else 'FAIL'} ] {name}")
 print(f"Checks: {len(checks)}  Passed: {len(checks) - len(failed)}  Failed: {len(failed)}")

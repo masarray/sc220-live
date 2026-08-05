@@ -11,6 +11,7 @@ $sourceRepository = 'masarray/sc220-live'
 $publicRepository = 'masarray/sc220-download'
 $sourceUrl = 'https://github.com/masarray/sc220-live.git'
 $publicUrl = 'https://github.com/masarray/sc220-download.git'
+$serviceBase = 'https://masarray-license-api.masari.workers.dev'
 $releaseRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 $publicCheckout = Join-Path $releaseRoot '.release-public'
 
@@ -39,6 +40,55 @@ foreach ($command in @('git.exe','gh.exe','curl.exe')) {
     }
 }
 
+if (-not $Version) {
+    $projectLine = Select-String -Path (Join-Path $releaseRoot 'CMakeLists.txt') -Pattern '^project\(SC220Live VERSION ([0-9]+\.[0-9]+\.[0-9]+)' |
+        Select-Object -First 1
+    if (-not $projectLine) { throw 'Could not derive the product version from CMakeLists.txt.' }
+    $Version = $projectLine.Matches[0].Groups[1].Value
+}
+$tag = "v$Version"
+
+$currentBranch = (& git branch --show-current).Trim()
+if ($currentBranch -ne 'main') {
+    throw "Public release must run from main; current branch is '$currentBranch'. Merge the reviewed release candidate first."
+}
+
+& git diff --quiet
+if ($LASTEXITCODE -ne 0) { throw 'Working tree has unstaged changes. Public release requires a clean tree.' }
+& git diff --cached --quiet
+if ($LASTEXITCODE -ne 0) { throw 'Working tree has staged changes. Public release requires a clean tree.' }
+
+Invoke-Checked 'Fetching canonical private main branch' { git fetch origin main --quiet }
+$sourceCommit = (& git rev-parse HEAD).Trim()
+$remoteCommit = (& git rev-parse origin/main).Trim()
+if ($sourceCommit -ne $remoteCommit) {
+    throw "HEAD must exactly match origin/main. HEAD=$sourceCommit origin/main=$remoteCommit"
+}
+
+$receiptPath = Join-Path $releaseRoot 'dist\public-release-validation.json'
+if (-not (Test-Path $receiptPath)) {
+    throw 'Public release validation receipt is missing. Run scripts/approve-sc220-public-release.ps1 after completing docs/PUBLIC_RELEASE_GATE.md.'
+}
+$receipt = Get-Content -Raw -LiteralPath $receiptPath | ConvertFrom-Json
+if ($receipt.product -ne 'SC220 Live' -or
+    $receipt.version -ne $Version -or
+    $receipt.commit -ne $sourceCommit) {
+    throw 'Validation receipt does not match the exact product, version, and source commit being released.'
+}
+$validatedUtc = [DateTime]::Parse($receipt.validated_utc).ToUniversalTime()
+if (([DateTime]::UtcNow - $validatedUtc).TotalHours -gt 72) {
+    throw 'Validation receipt is older than 72 hours. Repeat the exact-commit release validation.'
+}
+
+$releaseNotesTemplate = Join-Path $releaseRoot "docs\RELEASE_NOTES_v$Version.md"
+if (-not (Test-Path $releaseNotesTemplate)) {
+    throw "Release notes are missing: $releaseNotesTemplate"
+}
+$releaseScreenshot = Join-Path $releaseRoot 'docs\SC220_LIVE_UX_LOCKED.png'
+if (-not (Test-Path $releaseScreenshot)) {
+    throw 'Final release screenshot docs/SC220_LIVE_UX_LOCKED.png is missing.'
+}
+
 $licenceText = Get-Content -Raw -LiteralPath (Join-Path $releaseRoot 'LICENSE')
 $eulaText = Get-Content -Raw -LiteralPath (Join-Path $releaseRoot 'EULA.txt')
 $purchaseText = Get-Content -Raw -LiteralPath (Join-Path $releaseRoot 'PURCHASE_TERMS.txt')
@@ -53,7 +103,6 @@ if ($licenceText -notmatch 'PROPRIETARY SOFTWARE' -or
 
 & (Join-Path $PSScriptRoot 'check-sc220-release-contract.ps1')
 
-$serviceBase = 'https://masarray-license-api.masari.workers.dev'
 $healthJson = (& curl.exe --silent --show-error --fail --max-time 20 "$serviceBase/health")
 if ($LASTEXITCODE -ne 0 -or -not $healthJson) {
     throw 'Licence service health could not be verified.'
@@ -84,18 +133,8 @@ $publicVisibility = (gh repo view $publicRepository --json visibility --jq .visi
 if ($privateVisibility -ne 'PRIVATE') { throw "$sourceRepository must be PRIVATE; found $privateVisibility." }
 if ($publicVisibility -ne 'PUBLIC') { throw "$publicRepository must be PUBLIC; found $publicVisibility." }
 
-if (-not $Version) {
-    $projectLine = Select-String -Path (Join-Path $releaseRoot 'CMakeLists.txt') -Pattern '^project\(SC220Live VERSION ([0-9]+\.[0-9]+\.[0-9]+)' |
-        Select-Object -First 1
-    if (-not $projectLine) { throw 'Could not derive the product version from CMakeLists.txt.' }
-    $Version = $projectLine.Matches[0].Groups[1].Value
-}
-$tag = "v$Version"
-
 $origin = (& git remote get-url origin 2>$null | Select-Object -First 1)
-if (-not $origin) {
-    Invoke-Checked 'Configuring private source remote' { git remote add origin $sourceUrl }
-} elseif ($origin.TrimEnd('/') -notin @($sourceUrl.TrimEnd('/'), 'git@github.com:masarray/sc220-live.git')) {
+if (-not $origin -or $origin.TrimEnd('/') -notin @($sourceUrl.TrimEnd('/'), 'git@github.com:masarray/sc220-live.git')) {
     throw "origin points to an unexpected repository: $origin"
 }
 
@@ -107,6 +146,11 @@ if (@($trackedForbidden).Count -gt 0) {
     throw "Private source repository contains generated or sensitive tracked files: $($trackedForbidden -join ', ')"
 }
 
+& gh release view $tag --repo $publicRepository *> $null
+if ($LASTEXITCODE -eq 0) {
+    throw "$publicRepository already has release $tag. Increase the version before publishing."
+}
+
 $packageArgs = @{ Version = $Version }
 if ($Clean) { $packageArgs.Clean = $true }
 $package = & (Join-Path $PSScriptRoot 'package-sc220-windows.ps1') @packageArgs
@@ -114,26 +158,14 @@ if (-not $package -or -not (Test-Path $package.Zip) -or -not (Test-Path $package
     throw 'Verified release package was not produced.'
 }
 
-Invoke-Checked 'Staging private source' { git add --all }
-$stagedForbidden = & git diff --cached --name-only | Where-Object {
-    $_ -match '(^|/)(build|dist|\.release-|\.env)(/|$)' -or
-    $_ -match '\.(exe|dll|pdb|obj|lib|exp|zip|pfx|p12|pem|key)$'
+$headAfterBuild = (& git rev-parse HEAD).Trim()
+if ($headAfterBuild -ne $sourceCommit) {
+    throw 'Source commit changed during release build.'
 }
-if (@($stagedForbidden).Count -gt 0) {
-    throw "Release staging found forbidden private artifacts: $($stagedForbidden -join ', ')"
-}
-
+& git diff --quiet
+if ($LASTEXITCODE -ne 0) { throw 'Release build modified tracked source files.' }
 & git diff --cached --quiet
-if ($LASTEXITCODE -ne 0) {
-    Invoke-Checked "Committing private source for $tag" { git commit -m "release: SC220 Live $tag" }
-}
-$sourceCommit = (& git rev-parse HEAD).Trim()
-Invoke-Checked 'Pushing private source authority' { git push -u origin HEAD:main }
-$remoteCommit = (& git ls-remote $sourceUrl refs/heads/main | ForEach-Object { ($_ -split '\s+')[0] }).Trim()
-if ($remoteCommit -ne $sourceCommit) { throw 'Private source push could not be verified against origin/main.' }
-
-& gh release view $tag --repo $publicRepository *> $null
-if ($LASTEXITCODE -eq 0) { throw "$publicRepository already has release $tag. Increase the version before publishing." }
+if ($LASTEXITCODE -ne 0) { throw 'Release build staged tracked source files.' }
 
 Remove-ReleaseCheckout
 Invoke-Checked 'Cloning isolated public download repository' { git clone $publicUrl $publicCheckout }
@@ -143,7 +175,7 @@ Copy-Item -LiteralPath (Join-Path $releaseRoot 'release-site\styles.css') -Desti
 Copy-Item -LiteralPath (Join-Path $releaseRoot 'release-site\README.md') -Destination $publicCheckout
 Copy-Item -LiteralPath (Join-Path $releaseRoot 'release-site\latest.json') -Destination $publicCheckout
 Copy-Item -LiteralPath (Join-Path $releaseRoot 'assets\ui\recording_tech_logo.png') -Destination (Join-Path $publicCheckout 'recording-tech-logo.png')
-Copy-Item -LiteralPath (Join-Path $releaseRoot 'docs\SC220_LIVE_UX_LOCKED.png') -Destination (Join-Path $publicCheckout 'sc220-live-console.png')
+Copy-Item -LiteralPath $releaseScreenshot -Destination (Join-Path $publicCheckout 'sc220-live-console.png')
 Set-Content -LiteralPath (Join-Path $publicCheckout '.nojekyll') -Value '' -Encoding ASCII
 
 $zipName = [IO.Path]::GetFileName($package.Zip)
@@ -178,25 +210,18 @@ if (@($publicForbidden).Count -gt 0) {
 Push-Location $publicCheckout
 try {
     Invoke-Checked 'Staging public landing page only' { git add --all }
-    Invoke-Checked "Committing public landing page for $tag" { git commit -m "release: SC220 Live $tag downloads" }
-    Invoke-Checked 'Pushing public landing page' { git push -u origin HEAD:main }
+    & git diff --cached --quiet
+    if ($LASTEXITCODE -ne 0) {
+        Invoke-Checked "Committing public landing page for $tag" { git commit -m "release: SC220 Live $tag downloads" }
+        Invoke-Checked 'Pushing public landing page' { git push -u origin HEAD:main }
+    }
 } finally {
     Pop-Location
 }
 
 $notesPath = Join-Path $releaseRoot 'dist\release-notes.md'
-$notes = @"
-## SC220 Live $tag
-
-- Native Windows x64 audio console for Recording Tech SC220
-- SC220 plus default Windows PC Audio loopback
-- SC220-keyed PC Audio ducking
-- ASK-P Signature DSP authority v0.5.23
-- Stream output intended for VB-CABLE
-
-SHA-256: ``$($package.Sha256)``
-Private source commit: ``$sourceCommit``
-"@
+$notes = Get-Content -Raw -LiteralPath $releaseNotesTemplate
+$notes += "`n`nSHA-256: ``$($package.Sha256)```nPrivate source commit: ``$sourceCommit```n"
 Set-Content -LiteralPath $notesPath -Value $notes -Encoding UTF8
 
 Invoke-Checked 'Publishing binary-only GitHub release' {

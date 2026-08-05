@@ -102,11 +102,20 @@ file(WRITE "${SC220_APP_GENERATED_SOURCE}" "${_app}")
 message(STATUS "SC220 Live broadcast-state source: ${SC220_APP_GENERATED_SOURCE}")
 
 # The monitor engine, UI and persisted application now exist. Add selectable
-# PC playback capture, safe PC-only routing and final layout. The analyzer is
-# rebuilt as atomic post-limiter bands, then calibrated for pink-noise flatness
-# and a responsive BS.1770 momentary loudness dial.
+# PC playback capture and safe PC-only routing, then apply the OBS-style
+# source-versus-monitor guard. The loopback implementation is regenerated with
+# event/polling fallback, automatic reconnect and honest silence telemetry.
+# Finally, rebuild atomic analyzer and loudness presentation.
 include("${CMAKE_CURRENT_LIST_DIR}/GenerateSC220PcEndpointRouting.cmake")
 include("${CMAKE_CURRENT_LIST_DIR}/PolishSC220FinalUi.cmake")
 include("${CMAKE_CURRENT_LIST_DIR}/StabilizeSC220PcMusicMode.cmake")
+include("${CMAKE_CURRENT_LIST_DIR}/GuardSC220PcMonitorRouting.cmake")
+
+set(SC220_PC_CAPTURE_SOURCE
+    "${CMAKE_CURRENT_SOURCE_DIR}/live/PcAudioLoopbackCapture.cpp")
+set(SC220_PC_CAPTURE_GENERATED_SOURCE
+    "${CMAKE_CURRENT_BINARY_DIR}/generated/sc220-monitor/PcAudioLoopbackCapture_Recovery.cpp")
+include("${CMAKE_CURRENT_LIST_DIR}/GenerateSC220PcCaptureRecovery.cmake")
+
 include("${CMAKE_CURRENT_LIST_DIR}/RebuildSC220ImpactVisualizer.cmake")
 include("${CMAKE_CURRENT_LIST_DIR}/CalibrateSC220Meters.cmake")

@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdint>
 #include <cstring>
 #include <limits>
 #include <vector>
@@ -235,6 +236,12 @@ struct MonitorOutputClient::Impl
         errorMessage.clear();
     }
 
+    juce::String getError() const
+    {
+        const juce::ScopedLock lock (statusLock);
+        return errorMessage;
+    }
+
     void resetTransportLocked() noexcept
     {
         fifo.reset();
@@ -299,9 +306,9 @@ struct MonitorOutputClient::Impl
         if (formatTag == WAVE_FORMAT_EXTENSIBLE
             && format.cbSize >= sizeof (WAVEFORMATEXTENSIBLE) - sizeof (WAVEFORMATEX))
         {
-            const auto& extensible = reinterpret_cast<const WAVEFORMATEXTENSIBLE&> (format);
-            formatTag = static_cast<WORD> (extensible.SubFormat.Data1);
-            outputValidBits = static_cast<int> (extensible.Samples.wValidBitsPerSample);
+            const auto* extensible = reinterpret_cast<const WAVEFORMATEXTENSIBLE*> (&format);
+            formatTag = static_cast<WORD> (extensible->SubFormat.Data1);
+            outputValidBits = static_cast<int> (extensible->Samples.wValidBitsPerSample);
         }
 
         if (formatTag == WAVE_FORMAT_IEEE_FLOAT && outputBitsPerSample == 32)
@@ -377,7 +384,7 @@ struct MonitorOutputClient::Impl
         }
 
         const auto actualFriendlyName = endpointFriendlyName (device.Get());
-        if (isUnsafeVirtualOutput (actualFriendlyName))
+        if (MonitorOutputClient::isUnsafeVirtualOutput (actualFriendlyName))
         {
             setError ("Monitor output must be a physical speaker or headphone endpoint, not VB-CABLE.");
             return false;
@@ -901,7 +908,7 @@ juce::String MonitorOutputClient::selectOutputDevice (const juce::String& name,
     impl->selectedDisplayName = useDefault ? juce::String (systemDefaultMonitorName)
                                            : endpoint.label;
     const bool opened = impl->openSelectedEndpointLocked (getGainDb(), false);
-    const auto error = opened ? juce::String() : impl->getStatus().lastError;
+    const auto error = opened ? juce::String() : impl->getError();
     ReleaseSRWLockExclusive (&impl->playbackLock);
     return error;
 #else

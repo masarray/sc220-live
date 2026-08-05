@@ -45,7 +45,7 @@ jobs:
         run: g++ -std=c++17 -O2 qa/programme_band_telemetry_test.cpp -o /tmp/programme-band-test
       - name: Run atomic band telemetry
         run: /tmp/programme-band-test
-      - name: Validate independent physical Monitor Bus
+      - name: Validate OBS-style native WASAPI Monitor Bus
         run: python qa/audit_sc220_monitor_bus.py
       - name: Validate selectable PC endpoint and anti-loop routing
         run: python qa/audit_sc220_pc_endpoint_routing.py
@@ -75,3 +75,24 @@ jobs:
       - name: Run current profile and DSP audit
         if: ${{ env.ASKP_REPO_TOKEN != '' }}
         run: /tmp/sonkupik-preset-profile-audit
+
+  windows-wasapi-monitor:
+    name: windows-wasapi-monitor
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: false
+      - name: Configure standalone WASAPI monitor smoke target
+        run: >-
+          cmake
+          -S qa/wasapi_monitor_smoke
+          -B build-wasapi-monitor
+          -G "Visual Studio 17 2022"
+          -A x64
+      - name: Compile native WASAPI monitor with MSVC
+        run: cmake --build build-wasapi-monitor --config Release --parallel 2
+      - name: Run native monitor lifecycle smoke test
+        shell: pwsh
+        run: .\build-wasapi-monitor\Release\SC220WasapiMonitorSmoke.exe

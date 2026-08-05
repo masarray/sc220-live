@@ -3,6 +3,11 @@
 #include <juce_audio_basics/juce_audio_basics.h>
 #include <juce_core/juce_core.h>
 
+#if JUCE_WINDOWS
+ #include <propkeydef.h>
+ #include <propsys.h>
+#endif
+
 #include <atomic>
 #include <memory>
 

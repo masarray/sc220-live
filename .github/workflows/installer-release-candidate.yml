@@ -115,12 +115,12 @@ jobs:
       - name: Build verified Windows x64 installer candidate
         shell: pwsh
         run: |
-          $arguments = @(
-            '-Version', $env:RELEASE_VERSION,
-            '-VBCableSha256', $env:VBCABLE_PACK45_SHA256
-          )
-          if ($env:CLEAN_BUILD -eq 'true') { $arguments += '-Clean' }
-          & .\scripts\package-sc220-installer.ps1 @arguments
+          $packageArgs = @{
+            Version = $env:RELEASE_VERSION
+            VBCableSha256 = $env:VBCABLE_PACK45_SHA256
+          }
+          if ($env:CLEAN_BUILD -eq 'true') { $packageArgs.Clean = $true }
+          & .\scripts\package-sc220-installer.ps1 @packageArgs
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Smoke install application payload without driver changes

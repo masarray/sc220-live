@@ -35,7 +35,8 @@ check("final UI renders the rhythmic atomic programme analyzer", all(token in fi
     "programmeBandTelemetry.read", "bandCount = ProgrammeBandTelemetry::bandCount",
     "segmentCount = 16", "pulses[band]", "positiveRise", '"PROGRAM ANALYZER"')))
 check("pink calibration remains an engine contract rather than release copy", all(token in band_telemetry for token in (
-    "pinkCalibrationDb", "calibratePinkNoise", "pinkNoiseWeight"))
+    "pinkCalibrationDb", "calculatePinkNoiseCalibration", "pinkWeightedPower",
+    "pinkCalibrationOffsetsDb"))
     and '"PINK-FLAT BANDS' not in final_ui
     and '"WAITING FOR ENGINE BANDS"' not in final_ui
     and '"WAITING FOR POST-LIMITER AUDIO"' not in final_ui)

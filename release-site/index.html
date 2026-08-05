@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <meta name="description" content="Unduh SC220 Live untuk Recording Tech SC220. Voice dan PC Audio Signature DSP, monitoring headphone, loudness, dan output VB-CABLE untuk live streaming.">
+  <meta name="description" content="Unduh SC220 Live untuk Windows 10/11 x64. Voice dan PC Audio Signature DSP, loudness, monitoring aman, serta installer dengan VB-Audio VB-CABLE standar opsional.">
   <title>SC220 Live - Recording Tech</title>
   <link rel="stylesheet" href="styles.css">
 </head>
@@ -19,13 +19,14 @@
       <div class="hero-copy">
         <div class="eyebrow"><span></span> WINDOWS AUDIO CONSOLE</div>
         <h1>Suara SC220 dan musik PC yang lebih hidup, rapi, dan siap siaran.</h1>
-        <p class="lead">Proses Voice dan PC Audio melalui ASK-P Signature, dengarkan hasilnya melalui headphone, lalu kirim programme yang sudah dilindungi ke OBS atau aplikasi live.</p>
+        <p class="lead">Proses Voice dan PC Audio melalui ASK-P Signature, lalu kirim programme yang sudah dilindungi ke OBS atau aplikasi live melalui VB-CABLE.</p>
         <div class="actions">
-          <a class="primary" href="{{DOWNLOAD_URL}}">Unduh SC220 Live</a>
+          <a class="primary" href="{{DOWNLOAD_URL}}">Unduh Installer</a>
+          <a class="secondary" href="{{PORTABLE_URL}}">Versi Portable</a>
           <a class="secondary" href="#setup">Cara pasang</a>
         </div>
         <div class="release-meta">
-          <span>Windows 10/11 x64</span><span>Portable</span><span>{{SIZE}}</span><span>SHA-256 tersedia</span>
+          <span>Windows 10/11 x64</span><span>Installer {{SIZE}}</span><span>Portable {{PORTABLE_SIZE}}</span><span>SHA-256 + manifest</span>
         </div>
       </div>
       <div class="hero-visual">
@@ -40,7 +41,7 @@
       <i>→</i>
       <article class="accent"><small>DSP</small><strong>ASK-P SIGNATURE</strong><p>Dua engine, ducking, dan protection</p></article>
       <i>→</i>
-      <article><small>OUTPUT</small><strong>STREAM + MONITOR</strong><p>VB-CABLE dan headphone fisik</p></article>
+      <article><small>STREAM</small><strong>VB-CABLE → OBS</strong><p>Programme final yang sudah diproses</p></article>
     </section>
 
     <section class="licence-band" aria-label="Lisensi SC220 Live">
@@ -51,30 +52,30 @@
 
     <section class="details" id="setup">
       <div>
-        <div class="eyebrow"><span></span> QUICK SETUP</div>
-        <h2>Routing aman tanpa suara ganda.</h2>
+        <div class="eyebrow"><span></span> QUICK STREAM</div>
+        <h2>Satu installer, satu kabel virtual, routing yang mudah dipahami.</h2>
       </div>
       <ol>
-        <li><b>Pasang VB-CABLE</b><span>Gunakan installer resmi VB-Audio. Dua keluarga cable disarankan untuk PC Audio dan Stream.</span></li>
-        <li><b>Arahkan aplikasi musik ke Cable A</b><span>Atur melalui Windows Volume Mixer atau pilihan output pada player.</span></li>
-        <li><b>Pilih Cable A sebagai PC Audio Source</b><span>SC220 Live menangkap, memproses, dan menampilkan respons musik.</span></li>
-        <li><b>Pilih Cable B sebagai Stream Output</b><span>Gunakan pasangan CABLE Output-nya di OBS atau aplikasi live.</span></li>
-        <li><b>Pilih headphone sebagai Monitor Output</b><span>Gunakan PROGRAM untuk final mix atau MUSIC CUE untuk musik sebelum ducking.</span></li>
+        <li><b>Jalankan installer sebagai Administrator</b><span>SC220 Live mendukung Windows 10/11 64-bit.</span></li>
+        <li><b>Pilih VB-Audio VB-CABLE</b><span>Komponen donationware ini opsional. Windows dapat menampilkan konfirmasi driver dan meminta restart.</span></li>
+        <li><b>Biarkan musik pada speaker/headphone Windows</b><span>Pilih endpoint tersebut sebagai PC Audio Source agar SC220 Live menangkap musik melalui loopback.</span></li>
+        <li><b>Pilih CABLE Input sebagai Stream Output</b><span>SC220 Live mengirim programme Voice + Music yang sudah diproses ke kabel virtual.</span></li>
+        <li><b>Pilih CABLE Output di OBS</b><span>Monitor SC220 Live harus tetap off bila menggunakan endpoint fisik yang sama dengan PC Audio Source.</span></li>
       </ol>
     </section>
 
     <section class="integrity">
       <div><small>RELEASE</small><strong>v{{VERSION}}</strong></div>
       <div><small>PUBLISHED</small><strong>{{DATE}}</strong></div>
-      <div class="hash"><small>SHA-256</small><code>{{SHA256}}</code></div>
-      <a href="{{HASH_URL}}">Unduh checksum</a>
+      <div class="hash"><small>INSTALLER SHA-256</small><code>{{SHA256}}</code></div>
+      <div><a href="{{HASH_URL}}">Checksum</a><br><a href="{{MANIFEST_URL}}">Supply-chain manifest</a></div>
     </section>
   </main>
 
   <footer>
     <span>© Recording Tech / MasArray</span>
-    <span>Aplikasi proprietary. Download publik hanya berisi binary dan dokumen pengguna.</span>
-    <span>Driver VB-CABLE tidak disertakan.</span>
+    <span>SC220 Live proprietary. VB-CABLE adalah produk donationware terpisah milik VB-Audio Software.</span>
+    <span>Installer memverifikasi hash dan signature driver.</span>
   </footer>
 </body>
 </html>

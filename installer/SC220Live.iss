@@ -16,8 +16,8 @@
 #ifndef VBNoticeSource
   #error VBNoticeSource must be defined by package-sc220-installer.ps1
 #endif
-#ifndef VBSetupSource
-  #error VBSetupSource must be defined by package-sc220-installer.ps1
+#ifndef VBPackageSource
+  #error VBPackageSource must be defined by package-sc220-installer.ps1
 #endif
 #ifndef OutputDir
   #error OutputDir must be defined by package-sc220-installer.ps1
@@ -27,6 +27,7 @@
 #define AppPublisher "Recording Tech / MasArray"
 #define AppExeName "SC220 Live.exe"
 #define VBSetupName "VBCABLE_Setup_x64.exe"
+#define VBTempDir "{tmp}\sc220-vbcable"
 
 [Setup]
 AppId={{A7A6126D-0574-45DE-8921-1937A41C0E4F}
@@ -73,12 +74,15 @@ Name: "vbcable"; Description: "Install or repair VB-Audio VB-CABLE (donationware
 Name: "desktopicon"; Description: "Create a desktop shortcut"; GroupDescription: "Shortcuts:"; Flags: unchecked
 
 [Files]
+; VB-Audio requires the setup executable to remain beside its INF, SYS, CAT,
+; icon, and support files. Copy the complete reviewed package to a temporary
+; directory only when the optional driver task is selected.
+Source: "{#VBPackageSource}\*"; DestDir: "{#VBTempDir}"; Flags: ignoreversion recursesubdirs createallsubdirs deleteafterinstall; Tasks: vbcable
 Source: "{#AppExeSource}"; DestDir: "{app}"; DestName: "{#AppExeName}"; Flags: ignoreversion
 Source: "{#EulaSource}"; DestDir: "{app}\Legal"; DestName: "EULA.txt"; Flags: ignoreversion
 Source: "{#PurchaseTermsSource}"; DestDir: "{app}\Legal"; DestName: "PURCHASE_TERMS.txt"; Flags: ignoreversion
 Source: "{#ThirdPartySource}"; DestDir: "{app}\Legal"; DestName: "THIRD_PARTY_NOTICES.md"; Flags: ignoreversion
 Source: "{#VBNoticeSource}"; DestDir: "{app}\Legal"; DestName: "VB_AUDIO_NOTICE.txt"; Flags: ignoreversion
-Source: "{#VBSetupSource}"; Flags: dontcopy
 
 [Icons]
 Name: "{group}\SC220 Live"; Filename: "{app}\{#AppExeName}"
@@ -152,13 +156,22 @@ var
 begin
   if (CurStep = ssPostInstall) and WizardIsTaskSelected('vbcable') then
   begin
-    ExtractTemporaryFile('{#VBSetupName}');
-    SetupPath := ExpandConstant('{tmp}\{#VBSetupName}');
+    SetupPath := ExpandConstant('{#VBTempDir}\{#VBSetupName}');
+    Log('Launching complete VB-CABLE package from: ' + SetupPath);
+
+    if not FileExists(SetupPath) then
+    begin
+      MsgBox(
+        'The complete VB-CABLE package was not extracted correctly. ' +
+        'SC220 Live was installed, but Stream Output is not ready.',
+        mbError, MB_OK);
+      Exit;
+    end;
 
     WizardForm.StatusLabel.Caption :=
       'Installing VB-Audio VB-CABLE. Approve the Windows driver prompt if shown...';
 
-    if not Exec(SetupPath, '-i -h', '', SW_SHOWNORMAL,
+    if not Exec(SetupPath, '-i -h', ExtractFileDir(SetupPath), SW_SHOWNORMAL,
       ewWaitUntilTerminated, ResultCode) then
     begin
       MsgBox(
@@ -170,8 +183,8 @@ begin
     begin
       MsgBox(
         'VB-CABLE setup returned exit code ' + IntToStr(ResultCode) + '. ' +
-        'SC220 Live was installed, but verify the VB-CABLE installation and ' +
-        'restart Windows before using Stream Output.',
+        'SC220 Live was installed, but VB-CABLE was not confirmed as installed. ' +
+        'Do not use Stream Output until a corrected installation succeeds.',
         mbError, MB_OK);
     end
     else

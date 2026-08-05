@@ -7,6 +7,7 @@ live_loudness = (ROOT / "live/ProgrammeLiveLoudnessTelemetry.h").read_text(encod
 state = (ROOT / "cmake/GenerateSC220BroadcastState.cmake").read_text(encoding="utf-8")
 generator = (ROOT / "cmake/RebuildSC220ImpactVisualizer.cmake").read_text(encoding="utf-8")
 calibrator = (ROOT / "cmake/CalibrateSC220Meters.cmake").read_text(encoding="utf-8")
+release = (ROOT / "cmake/RefineSC220ReleaseUi.cmake").read_text(encoding="utf-8")
 
 generated_root = ROOT / "generated" / "sc220-monitor"
 if not generated_root.exists():
@@ -73,11 +74,15 @@ check(
     )),
 )
 check(
-    "atomic analyzer and final calibration passes are chained in order",
-    'include("${CMAKE_CURRENT_LIST_DIR}/RebuildSC220ImpactVisualizer.cmake")' in state
-    and 'include("${CMAKE_CURRENT_LIST_DIR}/CalibrateSC220Meters.cmake")' in state
+    "analyzer calibration and release passes are chained in order",
+    all(token in state for token in (
+        'include("${CMAKE_CURRENT_LIST_DIR}/RebuildSC220ImpactVisualizer.cmake")',
+        'include("${CMAKE_CURRENT_LIST_DIR}/CalibrateSC220Meters.cmake")',
+        'include("${CMAKE_CURRENT_LIST_DIR}/RefineSC220ReleaseUi.cmake")',
+    ))
     and state.find("RebuildSC220ImpactVisualizer.cmake")
     < state.find("CalibrateSC220Meters.cmake")
+    < state.find("RefineSC220ReleaseUi.cmake")
     and "GenerateSC220DirectPcCaptureVisualizer.cmake" not in state,
 )
 check(
@@ -99,16 +104,18 @@ check(
 )
 check("production engine no longer publishes analyzer sample queues", "programmeAnalyzer.push" not in engine)
 check(
-    "generated UI reads calibrated levels and separate activity without cosmetic EQ contour",
+    "generated UI reads calibrated levels and activity without cosmetic contour or debug copy",
     all(token in ui for token in (
         '#include "ProgrammeBandTelemetry.h"',
         "programmeBandTelemetry.read", "programmeBandTelemetry.readActivity",
-        "updateFromTelemetry", "PINK-FLAT BANDS", "PROGRAM ANALYZER",
+        "updateFromTelemetry", "PROGRAM ANALYZER",
         "const float displayDb = rawDb[band]", "rawActivity", "rhythm * 0.20f",
     ))
     and all(token not in ui for token in (
         "displayDb += 4.0f", "displayDb += 2.0f", "displayDb -= 1.5f",
-    )),
+        "PINK-FLAT BANDS", "14 BAND  /  30 FPS", "WAITING FOR ENGINE BANDS",
+    ))
+    and "remove analyzer debug generation and fps text" in release,
 )
 check(
     "generated UI expands movement equally across bands and adds transient caps",
@@ -149,10 +156,12 @@ check(
         "programmeLiveLoudnessTelemetry.read", "nextMomentary",
         "needleLufs", "displayLufs = needleInitialised",
         '"LUFS-I"', '"M " + juce::String',
-    )),
+    ))
+    and "YT / TIKTOK" not in ui
+    and "TP <= -1" not in ui,
 )
 check(
-    "calibration generator owns final engine and UI output",
+    "calibration generator owns engine meters before release presentation",
     all(token in calibrator for token in (
         'file(WRITE "${SC220_UI_MONITOR_GENERATED_SOURCE}" "${_ui}")',
         'file(WRITE "${SC220_ENGINE_GENERATED_SOURCE}" "${_engine}")',
@@ -162,7 +171,7 @@ check(
 check("generated final sources exist", engine_path.exists() and ui_path.exists())
 
 failed = [name for name, ok in checks if not ok]
-print("SC220 Live rhythmic pink-flat atomic bands and moving loudness audit")
+print("SC220 Live calibrated atomic bands moving loudness and clean release UI audit")
 for name, ok in checks:
     print(f"[ {'PASS' if ok else 'FAIL'} ] {name}")
 print(f"Checks: {len(checks)}  Passed: {len(checks) - len(failed)}  Failed: {len(failed)}")

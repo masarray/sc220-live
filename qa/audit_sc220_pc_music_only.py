@@ -7,12 +7,14 @@ ui_path = generated_root / "SC220MainComponent_Monitor.cpp"
 stabilizer_path = ROOT / "cmake" / "StabilizeSC220PcMusicMode.cmake"
 telemetry_path = ROOT / "live" / "ProgrammeBandTelemetry.h"
 state_path = ROOT / "cmake" / "GenerateSC220BroadcastState.cmake"
+release_path = ROOT / "cmake" / "RefineSC220ReleaseUi.cmake"
 
 engine = engine_path.read_text(encoding="utf-8") if engine_path.exists() else ""
 ui = ui_path.read_text(encoding="utf-8") if ui_path.exists() else ""
 stabilizer = stabilizer_path.read_text(encoding="utf-8")
 telemetry = telemetry_path.read_text(encoding="utf-8")
 state = state_path.read_text(encoding="utf-8")
+release = release_path.read_text(encoding="utf-8")
 
 checks: list[tuple[str, bool]] = []
 
@@ -22,15 +24,17 @@ def check(name: str, condition: bool) -> None:
 
 
 check(
-    "PC Music stabilizer runs before analyzer and calibration passes",
+    "PC Music stabilizer runs before analyzer calibration and release passes",
     all(name in state for name in (
         "StabilizeSC220PcMusicMode.cmake",
         "RebuildSC220ImpactVisualizer.cmake",
         "CalibrateSC220Meters.cmake",
+        "RefineSC220ReleaseUi.cmake",
     ))
     and state.find("StabilizeSC220PcMusicMode.cmake")
     < state.find("RebuildSC220ImpactVisualizer.cmake")
-    < state.find("CalibrateSC220Meters.cmake"),
+    < state.find("CalibrateSC220Meters.cmake")
+    < state.find("RefineSC220ReleaseUi.cmake"),
 )
 check(
     "programme graph opens output-first without SC220",
@@ -86,9 +90,12 @@ check(
     "visible analyzer consumes calibrated atomic post-limiter bands",
     all(token in ui for token in (
         "updateFromTelemetry", "programmeBandTelemetry.read",
-        "PINK-FLAT BANDS", "PROGRAM ANALYZER",
+        "programmeBandTelemetry.readActivity", "PROGRAM ANALYZER",
         "const float displayDb = rawDb[band]",
-    )),
+    ))
+    and "PINK-FLAT BANDS" not in ui
+    and "WAITING FOR ENGINE BANDS" not in ui
+    and "remove analyzer debug generation and fps text" in release,
 )
 check(
     "band telemetry is fixed-size allocation-free and pink-calibrated",
@@ -123,7 +130,7 @@ check(
 )
 
 failed = [name for name, ok in checks if not ok]
-print("SC220 Live PC Music-only and pink-flat atomic band audit")
+print("SC220 Live PC Music-only calibrated atomic band audit with clean release UI")
 for name, ok in checks:
     print(f"[ {'PASS' if ok else 'FAIL'} ] {name}")
 print(f"Checks: {len(checks)}  Passed: {len(checks) - len(failed)}  Failed: {len(failed)}")

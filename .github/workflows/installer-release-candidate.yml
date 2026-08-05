@@ -1,3 +1,4 @@
+# Rebuild trigger: complete VB-CABLE package payload validation
 name: SC220 Live installer release candidate
 
 on:

@@ -38,15 +38,30 @@ Copy-Item -LiteralPath (Join-Path $root 'PURCHASE_TERMS.txt') -Destination $stag
 $quickStart = @'
 SC220 LIVE - QUICK START
 
-1. Install VB-Audio VB-CABLE from its official publisher.
-2. Connect Recording Tech SC220 and close apps that use it exclusively.
-3. Open SC220 Live and press SETTINGS.
-4. Select SC220 as input and CABLE Input (VB-Audio Virtual Cable) as output.
-5. Keep GO LIVE off while setting levels. Avoid red meter segments.
-6. Enable GO LIVE, then select CABLE Output in OBS or TikTok Live Studio.
-7. PC AUDIO captures the default Windows playback mix. DUCK lowers it while SC220 is active.
+REQUIREMENTS
+- Windows 10/11 x64.
+- Install VB-Audio VB-CABLE separately from its official publisher.
+- For processed PC Audio monitoring, use one virtual-cable family as the PC Audio source and a different family as Stream Output.
 
-This portable build does not silently install drivers and is not a VB-CABLE distributor.
+RECOMMENDED ROUTING
+1. In Windows Volume Mixer or the music application's output setting, route the music/browser/player to VB-CABLE family A.
+2. Open SC220 Live.
+3. PC AUDIO SOURCE: select the same VB-CABLE family A.
+4. STREAM OUTPUT: select a different VB-CABLE family B used by OBS or the live application.
+5. MONITOR OUTPUT: select physical headphones or speakers.
+6. Select PROGRAM to hear the protected final mix, or MUSIC CUE to hear enhanced PC Music before ducking.
+7. Keep Stream and Monitor muted while setting levels. Avoid red meter segments.
+8. Enable Stream, then select the matching CABLE Output endpoint in OBS or the live application.
+
+SC220
+- Connect Recording Tech SC220 when Voice input is required.
+- SC220 Live recognises endpoints named MIXER, SC220, or Recording Tech.
+- PC Music can operate without SC220 connected.
+
+IMPORTANT ANTI-ECHO RULE
+Do not use the same physical endpoint as both PC AUDIO SOURCE and MONITOR OUTPUT. Windows would play the original sound directly and SC220 Live would return a delayed DSP copy, causing echo or feedback. The application blocks unsafe same-endpoint and same-cable-family routes where possible.
+
+This portable build does not install audio drivers and does not redistribute VB-CABLE.
 '@
 Set-Content -LiteralPath (Join-Path $stage 'QUICK_START.txt') -Value $quickStart -Encoding UTF8
 

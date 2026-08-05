@@ -1,0 +1,68 @@
+name: SC220 Live release candidate
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Semantic version to package
+        required: true
+        default: 0.1.0
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  windows-release-candidate:
+    runs-on: windows-2022
+    timeout-minutes: 90
+    env:
+      ASKP_REPO_TOKEN: ${{ secrets.ASKP_REPO_TOKEN }}
+      RELEASE_VERSION: ${{ inputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: false
+
+      - name: Require private ASK-P token
+        shell: pwsh
+        run: |
+          if ([string]::IsNullOrWhiteSpace($env:ASKP_REPO_TOKEN)) {
+            throw 'Repository secret ASKP_REPO_TOKEN is required for the full release-candidate build.'
+          }
+          if ($env:RELEASE_VERSION -notmatch '^\d+\.\d+\.\d+$') {
+            throw "Invalid release version: $env:RELEASE_VERSION"
+          }
+
+      - name: Checkout pinned private ASK-P authority
+        uses: actions/checkout@v4
+        with:
+          repository: masarray/askp-vst
+          ref: 5757119cab7a1a75f09dcf0edea6e3be97975439
+          token: ${{ secrets.ASKP_REPO_TOKEN }}
+          path: third_party/askp-vst
+
+      - name: Validate public release contract
+        shell: pwsh
+        run: .\scripts\check-sc220-release-contract.ps1
+
+      - name: Build and package clean Windows x64 portable candidate
+        shell: pwsh
+        run: .\scripts\package-sc220-windows.ps1 -Version $env:RELEASE_VERSION -Clean
+
+      - name: Record exact source commit
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path dist | Out-Null
+          Set-Content -LiteralPath dist\BUILD_COMMIT.txt -Value $env:GITHUB_SHA -Encoding ASCII
+
+      - name: Upload verified release candidate
+        uses: actions/upload-artifact@v4
+        with:
+          name: SC220-Live-v${{ inputs.version }}-release-candidate
+          if-no-files-found: error
+          retention-days: 14
+          path: |
+            dist/SC220-Live-v${{ inputs.version }}-win-x64-portable.zip
+            dist/SC220-Live-v${{ inputs.version }}-win-x64-portable.zip.sha256
+            dist/BUILD_COMMIT.txt

@@ -4,6 +4,10 @@
 #include <juce_core/juce_core.h>
 
 #if JUCE_WINDOWS
+ #ifndef NOMINMAX
+  #define NOMINMAX 1
+ #endif
+ #include <Windows.h>
  #include <propkeydef.h>
  #include <propsys.h>
 #endif

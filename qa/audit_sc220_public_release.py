@@ -71,15 +71,16 @@ check(
 check(
     "release script only publishes a clean canonical main commit",
     all(token in release for token in (
-        "git branch --show-current",
-        "current branch is '$currentBranch'",
-        "git diff --quiet",
-        "git diff --cached --quiet",
-        "git fetch origin main --quiet",
-        "git rev-parse origin/main",
+        "Public release must run from main",
+        "Working tree has unstaged changes",
+        "Working tree has staged changes",
+        "Fetching canonical private main branch",
+        "$sourceCommit = (& git rev-parse HEAD).Trim()",
+        "$remoteCommit = (& git rev-parse origin/main).Trim()",
+        "if ($sourceCommit -ne $remoteCommit)",
         "HEAD must exactly match origin/main",
     ))
-    and "HEAD:main" not in release,
+    and "git push -u origin HEAD:main" not in release,
 )
 check(
     "release script requires exact recent validation receipt",

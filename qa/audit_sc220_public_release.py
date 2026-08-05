@@ -69,7 +69,7 @@ check(
     )),
 )
 check(
-    "release script only publishes a clean canonical main commit",
+    "release script only accepts a clean canonical private main commit",
     all(token in release for token in (
         "Public release must run from main",
         "Working tree has unstaged changes",
@@ -80,7 +80,20 @@ check(
         "if ($sourceCommit -ne $remoteCommit)",
         "HEAD must exactly match origin/main",
     ))
-    and "git push -u origin HEAD:main" not in release,
+    and "Pushing private source authority" not in release
+    and "Committing private source" not in release,
+)
+check(
+    "public HEAD-to-main push is confined to isolated download checkout",
+    all(token in release for token in (
+        "Push-Location $publicCheckout",
+        "Pushing public landing page",
+        "git push -u origin HEAD:main",
+        "Pop-Location",
+    ))
+    and release.find("Push-Location $publicCheckout")
+        < release.find("git push -u origin HEAD:main")
+        < release.find("Pop-Location"),
 )
 check(
     "release script requires exact recent validation receipt",

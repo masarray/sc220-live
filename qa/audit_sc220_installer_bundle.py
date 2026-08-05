@@ -104,7 +104,7 @@ check(
 check(
     "installer output has checksum and supply-chain manifest",
     all(token in package for token in (
-        "Setup-win-x64.exe.sha256",
+        '$hashPath = "$installer.sha256"',
         "Setup-win-x64.manifest.json",
         "installer_sha256",
         "source_commit",

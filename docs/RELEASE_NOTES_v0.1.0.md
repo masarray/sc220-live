@@ -1,6 +1,6 @@
 # SC220 Live v0.1.0
 
-Initial public Windows x64 release candidate for Recording Tech SC220.
+Initial public Windows 10/11 x64 release candidate for Recording Tech SC220.
 
 ## Highlights
 
@@ -14,27 +14,43 @@ Initial public Windows x64 release candidate for Recording Tech SC220.
 - Fixed 14-band rhythmic programme analyzer with calibrated pink-noise baseline and peak hold.
 - Integrated LUFS-I, responsive LUFS-M movement, true peak, and stereo metering.
 - Premium lean release UI with engineering/debug copy removed from the main surface.
-- Portable binary-only ZIP with SHA-256 checksum, EULA, purchase terms, quick start, and third-party notices.
+- Windows x64 Inno Setup installer with optional standard VB-Audio VB-CABLE donationware installation.
+- Installer SHA-256 and supply-chain manifest recording the exact source commit and VB-CABLE package/signature identity.
+- Optional portable binary-only ZIP with SHA-256 checksum, EULA, purchase terms, quick start, and third-party notices.
 
-## Required routing
+## Quick Stream routing
 
-For processed PC Music monitoring without echo, use distinct endpoint families:
+The bundled standard VB-CABLE is used only as the processed Stream Output:
 
 ```text
-Music application -> VB-CABLE family A -> PC AUDIO SOURCE
-SC220 Live DSP     -> physical headphone -> MONITOR OUTPUT
-SC220 Live program -> VB-CABLE family B -> STREAM OUTPUT / OBS
+Music / browser / player
+  -> normal Windows speaker or headphone
+  -> SC220 Live captures that playback endpoint
+  -> ASK-P DSP, ducking, mix, and protection
+  -> CABLE Input
+  -> OBS or live application selects CABLE Output
 ```
 
-Do not select the same physical endpoint as both PC Audio Source and Monitor Output. The application blocks unsafe same-endpoint and same-cable-family routes where possible.
+The user hears normal Windows playback directly while the audience receives the processed SC220 Live programme. Keep the SC220 Monitor Bus off unless a genuinely different physical endpoint is selected. Returning processed audio to the same endpoint being captured would create direct-plus-DSP doubling or recursive feedback.
 
-## Platform
+## Installer and VB-CABLE
 
-- Windows 10/11 x64
-- Portable executable
-- VB-CABLE installed separately from the official VB-Audio publisher
-- No audio driver is installed or bundled by SC220 Live
+- Windows 10/11 x64 only.
+- VB-CABLE is developed and owned by VB-Audio Software and remains a separate donationware product.
+- The driver task is optional and can be deselected when VB-CABLE is already installed.
+- The build pipeline downloads only the official `VBCABLE_Driver_Pack45.zip`, verifies a reviewed SHA-256, validates the Authenticode setup signature and Windows driver catalogues, and embeds `VBCABLE_Setup_x64.exe` unchanged.
+- The bundle does not contain VB-CABLE A+B or C+D.
+- Administrator permission, Windows driver consent, and a restart are required when installing VB-CABLE.
+- Uninstalling SC220 Live does not silently uninstall VB-CABLE.
 
 ## Release qualification
 
-Publication is allowed only after the exact release commit passes the mandatory checks in `docs/PUBLIC_RELEASE_GATE.md`, including a clean full build with the pinned private ASK-P authority and a physical ten-minute routing/monitoring test.
+Publication is allowed only after the exact release commit passes every mandatory check in `docs/PUBLIC_RELEASE_GATE.md`, including:
+
+- clean full build with the pinned private ASK-P authority;
+- verified installer, checksum, and supply-chain manifest;
+- application-only installer smoke test;
+- physical Quick Stream routing test through standard VB-CABLE;
+- safe Monitor test on a different endpoint;
+- ten-minute playback, switching, silence-decay, and reconnect tests;
+- final current UI screenshot review.

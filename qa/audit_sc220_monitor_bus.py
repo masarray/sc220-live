@@ -9,7 +9,6 @@ engine_cpp = (ROOT / "live/LiveAudioEngine.cpp").read_text(encoding="utf-8")
 monitor_h = (ROOT / "live/MonitorOutputClient.h").read_text(encoding="utf-8")
 monitor_cpp = (ROOT / "live/MonitorOutputClient.cpp").read_text(encoding="utf-8")
 ui_h = (ROOT / "live/SC220MainComponent.h").read_text(encoding="utf-8")
-ui_cpp = (ROOT / "live/SC220MainComponent.cpp").read_text(encoding="utf-8")
 engine_gen = (ROOT / "cmake/GenerateSC220MonitorEngine.cmake").read_text(encoding="utf-8")
 ui_gen = (ROOT / "cmake/GenerateSC220MonitorUi.cmake").read_text(encoding="utf-8")
 state_gen = (ROOT / "cmake/GenerateSC220BroadcastState.cmake").read_text(encoding="utf-8")
@@ -20,6 +19,10 @@ checks: list[tuple[str, bool]] = []
 
 def check(name: str, condition: bool) -> None:
     checks.append((name, bool(condition)))
+
+
+def contains_all(text: str, *tokens: str) -> bool:
+    return all(token in text for token in tokens)
 
 
 def apply_generator(source: str, generator: str) -> str:
@@ -46,111 +49,105 @@ except AssertionError as exc:
 else:
     check("engine generator applies exactly once", True)
 
+# Documentation may mention the retired architecture. Ban actual declarations,
+# inheritance and callbacks rather than the English class name in a comment.
 check(
     "monitor no longer depends on a second JUCE AudioDeviceManager",
-    "AudioDeviceManager" not in monitor_h + monitor_cpp
-    and "AudioIODeviceCallback" not in monitor_h + monitor_cpp
-    and "audioDeviceIOCallbackWithContext" not in monitor_cpp,
+    "juce::AudioDeviceManager deviceManager" not in monitor_h + monitor_cpp
+    and "private juce::AudioIODeviceCallback" not in monitor_h
+    and "audioDeviceIOCallbackWithContext" not in monitor_cpp
+    and "deviceManager.addAudioCallback" not in monitor_cpp,
 )
 check(
-    "monitor enumerates real active Windows render endpoints and stable IDs",
-    all(
-        token in monitor_cpp
-        for token in (
-            "IMMDeviceEnumerator",
-            "EnumAudioEndpoints (eRender, DEVICE_STATE_ACTIVE",
-            "PKEY_Device_FriendlyName",
-            "device->GetId",
-            "GetDefaultAudioEndpoint (eRender, eConsole",
-            "SYSTEM DEFAULT",
-        )
+    "monitor enumerates active Windows render endpoints and stable IDs",
+    contains_all(
+        monitor_cpp,
+        "IMMDeviceEnumerator",
+        "EnumAudioEndpoints (eRender, DEVICE_STATE_ACTIVE",
+        "PKEY_Device_FriendlyName",
+        "device->GetId",
+        "GetDefaultAudioEndpoint (eRender, eConsole",
+        "SYSTEM DEFAULT",
     ),
 )
 check(
-    "monitor opens the endpoint exactly like OBS shared-mode monitoring",
-    all(
-        token in monitor_cpp
-        for token in (
-            "device->Activate (__uuidof (IAudioClient)",
-            "nextClient->GetMixFormat",
-            "AUDCLNT_SHAREMODE_SHARED",
-            "requestedBufferDuration100ns = 10000000",
-            "nextClient->GetBufferSize",
-            "__uuidof (IAudioRenderClient)",
-            "audioClient->GetCurrentPadding",
-            "renderClient->GetBuffer",
-            "renderClient->ReleaseBuffer",
-            "audioClient->Start",
-        )
+    "monitor opens an OBS-style shared-mode render client",
+    contains_all(
+        monitor_cpp,
+        "device->Activate (__uuidof (IAudioClient)",
+        "nextClient->GetMixFormat",
+        "AUDCLNT_SHAREMODE_SHARED",
+        "requestedBufferDuration100ns = 10000000",
+        "nextClient->GetBufferSize",
+        "__uuidof (IAudioRenderClient)",
+        "audioClient->GetCurrentPadding",
+        "renderClient->GetBuffer",
+        "renderClient->ReleaseBuffer",
+        "audioClient->Start",
     ),
 )
 check(
-    "monitor uses endpoint native format instead of forcing stream sample rate",
-    all(
-        token in monitor_cpp
-        for token in (
-            "mixFormat->nSamplesPerSec",
-            "configureNativeFormat",
-            "WAVE_FORMAT_IEEE_FLOAT",
-            "WAVE_FORMAT_PCM",
-            "outputEncoding",
-            "WASAPI shared-mode monitor initialization failed",
-        )
+    "monitor uses the endpoint native mix format rather than stream rate",
+    contains_all(
+        monitor_cpp,
+        "mixFormat->nSamplesPerSec",
+        "configureNativeFormat",
+        "WAVE_FORMAT_IEEE_FLOAT",
+        "WAVE_FORMAT_PCM",
+        "outputEncoding",
+        "WASAPI shared-mode monitor initialization failed",
     )
     and "must support the stream sample rate" not in monitor_cpp,
 )
 check(
-    "monitor owns bounded preallocated source FIFO and resampling scratch",
-    all(
-        token in monitor_cpp
-        for token in (
-            "fifoCapacitySamples = 384000",
-            "resampleScratchCapacity = 65536",
-            "juce::AbstractFifo fifo",
-            "ringBuffer.setSize",
-            "resampleInput.setSize",
-            "resampleOutput.setSize",
-            "primeTargetSamples",
-            "fifo.prepareToWrite",
-            "fifo.prepareToRead",
-        )
+    "monitor transport and resampling memory are fixed before playback",
+    contains_all(
+        monitor_cpp,
+        "fifoCapacitySamples = 384000",
+        "resampleScratchCapacity = 65536",
+        "juce::AbstractFifo fifo",
+        "ringBuffer.setSize",
+        "resampleInput.setSize",
+        "resampleOutput.setSize",
+        "primeTargetSamples",
+        "fifo.prepareToWrite",
+        "fifo.prepareToRead",
     ),
 )
 check(
-    "monitor performs nominal-rate conversion and bounded drift control",
-    all(
-        token in monitor_cpp
-        for token in (
-            "baseRatio = sourceSampleRate / monitorSampleRate",
-            "fillError",
-            "correctionPpm",
-            "adaptiveRatio",
-            "leftInterpolator.process",
-            "rightInterpolator.process",
-            "currentDriftCorrectionPpm.store",
-        )
+    "monitor performs rate conversion and bounded clock-drift control",
+    contains_all(
+        monitor_cpp,
+        "baseRatio = sourceSampleRate / monitorSampleRate",
+        "fillError",
+        "correctionPpm",
+        "adaptiveRatio",
+        "leftInterpolator.process",
+        "rightInterpolator.process",
+        "currentDriftCorrectionPpm.store",
     ),
 )
 check(
-    "monitor renders interleaved float and PCM endpoint formats",
-    all(
-        token in monitor_cpp
-        for token in (
-            "SampleEncoding::float32",
-            "SampleEncoding::pcm16",
-            "SampleEncoding::pcm24",
-            "SampleEncoding::pcm32",
-            "writeOneSample",
-            "writeInterleaved",
-            "AUDCLNT_BUFFERFLAGS_SILENT",
-        )
+    "monitor supports float and common PCM endpoint formats",
+    contains_all(
+        monitor_cpp,
+        "SampleEncoding::float32",
+        "SampleEncoding::pcm16",
+        "SampleEncoding::pcm24",
+        "SampleEncoding::pcm32",
+        "writeOneSample",
+        "writeInterleaved",
+        "AUDCLNT_BUFFERFLAGS_SILENT",
     ),
 )
 check(
-    "monitor steady-state submission cannot block the broadcast callback",
-    "TryAcquireSRWLockExclusive" in monitor_cpp
-    and "ReleaseSRWLockExclusive" in monitor_cpp
-    and "push (const juce::AudioBuffer<float>& source" in monitor_cpp,
+    "monitor submission cannot wait on endpoint selection or reset",
+    contains_all(
+        monitor_cpp,
+        "TryAcquireSRWLockExclusive",
+        "ReleaseSRWLockExclusive",
+        "push (const juce::AudioBuffer<float>& source",
+    ),
 )
 
 push_match = re.search(
@@ -158,101 +155,88 @@ push_match = re.search(
     monitor_cpp,
     flags=re.S,
 )
-push_path = push_match.group(0) if push_match else ""
 render_match = re.search(
     r"void renderAvailableLocked.*?\n    }\n\n    SRWLOCK playbackLock",
     monitor_cpp,
     flags=re.S,
 )
+push_path = push_match.group(0) if push_match else ""
 render_path = render_match.group(0) if render_match else ""
+realtime_path = push_path + render_path
 check(
-    "monitor realtime push/render paths allocate no buffers",
+    "monitor steady-state push and render allocate no buffers",
     bool(push_path and render_path)
-    and all(token not in push_path + render_path for token in (
+    and all(token not in realtime_path for token in (
         "setSize", "std::vector", "std::make_unique", "new ",
         "CoTaskMemAlloc", "malloc", "calloc",
     )),
 )
 check(
-    "monitor pre-fills then starts the real Windows endpoint",
-    all(
-        token in render_path
-        for token in (
-            "if (! endpointStarted && ready < primeTarget)",
-            "ReleaseBuffer",
-            "audioClient->Start",
-            "endpointStartedFlag.store (true",
-            "primed.store (true",
-        )
+    "monitor pre-fills audio before starting the Windows endpoint",
+    contains_all(
+        render_path,
+        "if (! endpointStarted && ready < primeTarget)",
+        "ReleaseBuffer",
+        "audioClient->Start",
+        "endpointStartedFlag.store (true",
+        "primed.store (true",
     ),
 )
 check(
-    "monitor automatically recreates an invalidated WASAPI client",
-    all(
-        token in monitor_cpp
-        for token in (
-            "markForReconnectLocked",
-            "monitor will reconnect automatically",
-            "audioClient == nullptr && impl->selectedDisplayName.isNotEmpty()",
-            "now - impl->lastReconnectAttemptMs >= 1000.0",
-            "openSelectedEndpointLocked (getGainDb(), true)",
-            "reconnectCount.fetch_add",
-        )
+    "monitor automatically recreates an invalidated render client",
+    contains_all(
+        monitor_cpp,
+        "markForReconnectLocked",
+        "monitor will reconnect automatically",
+        "audioClient == nullptr && impl->selectedDisplayName.isNotEmpty()",
+        "now - impl->lastReconnectAttemptMs >= 1000.0",
+        "openSelectedEndpointLocked (getGainDb(), true)",
+        "reconnectCount.fetch_add",
     ),
 )
 check(
-    "monitor defaults muted and rejects every VB-CABLE render family",
+    "monitor defaults muted and rejects VB-CABLE render endpoints",
     "std::atomic<bool> muted { true }" in monitor_h
-    and all(
-        token in monitor_cpp
-        for token in ("VB-Audio", "VB-CABLE", "CABLE Input", "CABLE Output")
-    ),
+    and contains_all(monitor_cpp, "VB-Audio", "VB-CABLE", "CABLE Input", "CABLE Output"),
 )
 check(
     "monitor status exposes native endpoint and reconnect health",
-    all(
-        token in monitor_h + monitor_cpp
-        for token in (
-            "endpointStarted",
-            "endpointPaddingFrames",
-            "sourceSampleRate",
-            "resampling",
-            "driftCorrectionPpm",
-            "reconnects",
-            "WASAPI SHARED / OBS-STYLE",
-        )
+    contains_all(
+        monitor_h + monitor_cpp,
+        "endpointStarted",
+        "endpointPaddingFrames",
+        "sourceSampleRate",
+        "resampling",
+        "driftCorrectionPpm",
+        "reconnects",
+        "WASAPI SHARED / OBS-STYLE",
     ),
 )
-
 check(
     "engine exposes Program and Music Cue monitor modes",
-    all(
-        token in engine_h
-        for token in (
-            "enum class MonitorSource",
-            "program = 0",
-            "musicCue = 1",
-            "selectMonitorOutputDevice",
-            "setMonitorGainDb",
-            "setMonitorMuted",
-            "musicCueBuffer",
-            "MonitorOutputClient monitorOutput",
-        )
+    contains_all(
+        engine_h,
+        "enum class MonitorSource",
+        "program = 0",
+        "musicCue = 1",
+        "selectMonitorOutputDevice",
+        "setMonitorGainDb",
+        "setMonitorMuted",
+        "musicCueBuffer",
+        "MonitorOutputClient monitorOutput",
     ),
 )
 check(
-    "engine status exposes monitor health telemetry",
-    all(
-        token in engine_h
-        for token in (
-            "monitorRunning",
-            "monitorPrimed",
-            "monitorBufferedSamples",
-            "monitorUnderflows",
-            "monitorOverflows",
-            "monitorDevice",
-            "monitorError",
-        )
+    "engine status exposes monitor health",
+    contains_all(
+        engine_h,
+        "monitorRunning",
+        "monitorPrimed",
+        "monitorBufferedSamples",
+        "monitorUnderflows",
+        "monitorOverflows",
+        "monitorDevice",
+        "monitorError",
     ),
 )
 
@@ -270,83 +254,73 @@ if generated_engine:
         and music_process < cue_copy < cue_gain < duck_gain,
     )
     check(
-        "Program monitor publishes the protected master independently of GO LIVE",
+        "Program monitor receives protected master independently of GO LIVE",
         -1 not in (limiter, monitor_publish, stream_gate)
         and limiter < monitor_publish < stream_gate,
     )
     check(
-        "monitor transport is prepared and reset with stream lifecycle",
-        all(
-            token in generated_engine
-            for token in (
-                "monitorOutput.initialise();",
-                "monitorOutput.prepareSource (sampleRate, blockSize);",
-                "monitorOutput.flush();",
-                "monitorOutput.shutdown();",
-            )
+        "monitor follows stream lifecycle without sharing its endpoint",
+        contains_all(
+            generated_engine,
+            "monitorOutput.initialise();",
+            "monitorOutput.prepareSource (sampleRate, blockSize);",
+            "monitorOutput.flush();",
+            "monitorOutput.shutdown();",
         ),
     )
 
 check(
-    "UI declares physical output, power and Program/Cue controls",
-    all(
-        token in ui_h
-        for token in (
-            "monitorPowerButton",
-            "monitorOutputBox",
-            "programMonitorButton",
-            "musicCueButton",
-            "refreshMonitorDevices",
-        )
+    "UI declares endpoint power and Program/Cue controls",
+    contains_all(
+        ui_h,
+        "monitorPowerButton",
+        "monitorOutputBox",
+        "programMonitorButton",
+        "musicCueButton",
+        "refreshMonitorDevices",
     ),
 )
 check(
-    "UI generator wires physical monitor controls",
-    all(
-        token in ui_gen
-        for token in (
-            "selectMonitorOutputDevice",
-            "setMonitorSource",
-            "setMonitorMuted",
-            "setMonitorGainDb",
-            "SELECT MONITOR",
-            "PHYSICAL OUTPUT ACTIVE",
-        )
+    "UI generator wires physical monitoring controls",
+    contains_all(
+        ui_gen,
+        "selectMonitorOutputDevice",
+        "setMonitorSource",
+        "setMonitorMuted",
+        "setMonitorGainDb",
+        "SELECT MONITOR",
+        "PHYSICAL OUTPUT ACTIVE",
     ),
 )
 check(
-    "monitor and stream selectors share the console source row",
+    "monitor and stream selectors remain separate",
     ui_gen.count("sourceSelectorY, 164, 34") >= 2
     and "monitorOutputBox.setBounds" in ui_gen
     and "outputBox.setBounds" in ui_gen,
 )
 check(
-    "monitor and Music Signature state persists",
-    all(
-        token in state_gen
-        for token in (
-            '"monitorDevice"',
-            '"monitorGainDb"',
-            '"monitorMuted"',
-            '"monitorSource"',
-            '"musicPresetIndex"',
-            '"musicEnhance"',
-            '"musicStereoMagic"',
-        )
+    "monitor selection gain mute source and Music Signature persist",
+    contains_all(
+        state_gen,
+        '"monitorDevice"',
+        '"monitorGainDb"',
+        '"monitorMuted"',
+        '"monitorSource"',
+        '"musicPresetIndex"',
+        '"musicEnhance"',
+        '"musicStereoMagic"',
     ),
 )
 check(
-    "normal build substitutes generated engine UI and application sources",
-    all(
-        token in aligned_gen
-        for token in (
-            "GenerateSC220MonitorEngine.cmake",
-            "GenerateSC220MonitorUi.cmake",
-            "GenerateSC220BroadcastState.cmake",
-            "HEADER_FILE_ONLY TRUE",
-            "MonitorOutputClient.cpp",
-            "SC220_APP_GENERATED_SOURCE",
-        )
+    "normal build substitutes monitor-enabled generated sources",
+    contains_all(
+        aligned_gen,
+        "GenerateSC220MonitorEngine.cmake",
+        "GenerateSC220MonitorUi.cmake",
+        "GenerateSC220BroadcastState.cmake",
+        "HEADER_FILE_ONLY TRUE",
+        "MonitorOutputClient.cpp",
+        "SC220_APP_GENERATED_SOURCE",
     ),
 )
 

@@ -40,18 +40,18 @@ SC220 LIVE - QUICK START
 
 REQUIREMENTS
 - Windows 10/11 x64.
-- Install VB-Audio VB-CABLE separately from its official publisher.
-- For processed PC Audio monitoring, use one virtual-cable family as the PC Audio source and a different family as Stream Output.
+- Install the standard VB-Audio VB-CABLE separately when using this portable package.
+- The regular public setup installer can install standard VB-CABLE as an optional donationware component.
 
-RECOMMENDED ROUTING
-1. In Windows Volume Mixer or the music application's output setting, route the music/browser/player to VB-CABLE family A.
+QUICK STREAM ROUTING
+1. Keep music, browser, or player audio on the normal Windows speaker or headphone.
 2. Open SC220 Live.
-3. PC AUDIO SOURCE: select the same VB-CABLE family A.
-4. STREAM OUTPUT: select a different VB-CABLE family B used by OBS or the live application.
-5. MONITOR OUTPUT: select physical headphones or speakers.
-6. Select PROGRAM to hear the protected final mix, or MUSIC CUE to hear enhanced PC Music before ducking.
-7. Keep Stream and Monitor muted while setting levels. Avoid red meter segments.
-8. Enable Stream, then select the matching CABLE Output endpoint in OBS or the live application.
+3. PC AUDIO SOURCE: select that same normal Windows playback endpoint.
+4. STREAM OUTPUT: select CABLE Input (VB-Audio Virtual Cable).
+5. In OBS or the live application, select CABLE Output as the audio source.
+6. Keep the SC220 Monitor Bus off when it would return processed audio to the same physical endpoint being captured.
+7. A genuinely different physical endpoint may be used for PROGRAM or MUSIC CUE monitoring.
+8. Keep Stream and Monitor muted while setting levels. Avoid red meter segments.
 
 SC220
 - Connect Recording Tech SC220 when Voice input is required.
@@ -61,7 +61,13 @@ SC220
 IMPORTANT ANTI-ECHO RULE
 Do not use the same physical endpoint as both PC AUDIO SOURCE and MONITOR OUTPUT. Windows would play the original sound directly and SC220 Live would return a delayed DSP copy, causing echo or feedback. The application blocks unsafe same-endpoint and same-cable-family routes where possible.
 
-This portable build does not install audio drivers and does not redistribute VB-CABLE.
+VB-CABLE
+- VB-CABLE is developed and owned by VB-Audio Software.
+- It is distributed under the VB-Audio donationware model.
+- Information and download: https://vb-audio.com/Cable/
+- Restart Windows after installing or uninstalling the driver.
+
+This portable build does not install audio drivers.
 '@
 Set-Content -LiteralPath (Join-Path $stage 'QUICK_START.txt') -Value $quickStart -Encoding UTF8
 

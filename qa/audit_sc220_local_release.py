@@ -187,12 +187,12 @@ check(
 )
 check(
     "command wrappers elevate only reviewed scripts",
-    "net session" in setup_cmd
+    "fltmc" in setup_cmd
     and "setup-sc220-local-runner.ps1" in setup_cmd
     and "configure-sc220-runner-service.ps1" in setup_cmd
     and "verify-sc220-runner-host.ps1" in setup_cmd
     and setup_cmd.count("-ExecutionPolicy Bypass") == 4
-    and "net session" in release_cmd
+    and "fltmc" in release_cmd
     and "start-sc220-local-release.ps1" in release_cmd
     and release_cmd.count("-ExecutionPolicy Bypass") == 2,
 )

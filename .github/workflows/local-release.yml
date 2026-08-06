@@ -51,23 +51,14 @@ jobs:
       RELEASE_NOTES: ${{ inputs.release_notes }}
 
     steps:
-      - name: Safety gate and encrypted-secret check
+      - name: Validate manual release request
         shell: pwsh
-        env:
-          ASKP_TOKEN_CHECK: ${{ secrets.ASKP_REPO_TOKEN }}
-          DOWNLOAD_TOKEN_CHECK: ${{ secrets.SC220_DOWNLOAD_TOKEN }}
         run: |
           if ($env:RELEASE_VERSION -notmatch '^\d+\.\d+\.\d+$') {
             throw "Invalid semantic version: $env:RELEASE_VERSION"
           }
           if ([string]::IsNullOrWhiteSpace($env:SOURCE_REF)) {
             throw 'source_ref cannot be empty.'
-          }
-          if ([string]::IsNullOrWhiteSpace($env:ASKP_TOKEN_CHECK)) {
-            throw 'ASKP_REPO_TOKEN is missing. Run SETUP-LOCAL-RUNNER.cmd.'
-          }
-          if ([string]::IsNullOrWhiteSpace($env:DOWNLOAD_TOKEN_CHECK)) {
-            throw 'SC220_DOWNLOAD_TOKEN is missing. Run SETUP-LOCAL-RUNNER.cmd.'
           }
           if ($env:RELEASE_CHANNEL -notin @('stable', 'prerelease')) {
             throw "Invalid release channel: $env:RELEASE_CHANNEL"
@@ -134,8 +125,7 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          $required = @('git.exe', 'cmake.exe', 'gh.exe')
-          foreach ($command in $required) {
+          foreach ($command in @('git.exe', 'cmake.exe', 'gh.exe')) {
             if (-not (Get-Command $command -ErrorAction SilentlyContinue)) {
               throw "$command is not available to the runner service. Re-run SETUP-LOCAL-RUNNER.cmd."
             }
@@ -151,9 +141,7 @@ jobs:
             (Join-Path $env:ProgramFiles 'Inno Setup 6\ISCC.exe')
           ) | Where-Object { $_ -and (Test-Path -LiteralPath $_ -PathType Leaf) } |
             Select-Object -First 1
-          if (-not $iscc) {
-            throw 'Inno Setup 6 is not installed for the local runner.'
-          }
+          if (-not $iscc) { throw 'Inno Setup 6 is not installed for the local runner.' }
 
           $vswhere = @(
             (Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio\Installer\vswhere.exe'),
@@ -172,11 +160,15 @@ jobs:
         run: |
           $ErrorActionPreference = 'Stop'
           .\scripts\check-sc220-release-contract.ps1
-          if (Get-Command py.exe -ErrorAction SilentlyContinue) {
-            & py.exe -3 .\qa\audit_sc220_installer_bundle.py
+          $python = if (Get-Command py.exe -ErrorAction SilentlyContinue) {
+            @('py.exe', '-3')
           } else {
-            & python.exe .\qa\audit_sc220_installer_bundle.py
+            @('python.exe')
           }
+
+          & $python[0] @($python[1..($python.Count - 1)]) .\qa\audit_sc220_installer_bundle.py
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          & $python[0] @($python[1..($python.Count - 1)]) .\qa\audit_sc220_local_release.py
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Build verified smart installer locally
@@ -265,10 +257,12 @@ jobs:
           "## Public release`n`nhttps://github.com/masarray/sc220-download/releases/tag/v$env:RELEASE_VERSION" |
             Add-Content -LiteralPath $env:GITHUB_STEP_SUMMARY -Encoding UTF8
 
-      - name: Remove temporary prerequisite downloads
+      - name: Remove temporary release and private-authority files
         if: always()
         shell: pwsh
         run: |
-          if (Test-Path -LiteralPath .\.release-work) {
-            Remove-Item -LiteralPath .\.release-work -Recurse -Force -ErrorAction SilentlyContinue
+          foreach ($path in @('.\.release-work', '.\third_party\askp-vst')) {
+            if (Test-Path -LiteralPath $path) {
+              Remove-Item -LiteralPath $path -Recurse -Force -ErrorAction SilentlyContinue
+            }
           }

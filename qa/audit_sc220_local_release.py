@@ -70,7 +70,7 @@ check(
 )
 check(
     "smoke install avoids changing VB-CABLE drivers",
-    '/TASKS=\"!vbcable,!desktopicon\"' in workflow
+    '/TASKS="!vbcable,!desktopicon"' in workflow
     and "SC220PrerequisiteProbe.ps1" in workflow
     and "unins000.exe" in workflow,
 )

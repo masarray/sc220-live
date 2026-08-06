@@ -6,8 +6,8 @@ if ([string]::IsNullOrWhiteSpace($machinePath)) {
     throw 'The Windows machine PATH is empty.'
 }
 
-# The runner is installed as a Windows service. Verify against machine-level
-# paths rather than relying on the interactive user's PATH.
+# The runner is a Windows service. Verify against machine-level paths rather
+# than relying on the interactive user's PATH.
 $env:Path = $machinePath
 
 $missing = [System.Collections.Generic.List[string]]::new()
@@ -44,26 +44,48 @@ if (-not $cpp) { $missing.Add('Visual Studio C++ Build Tools') }
 $runner = Get-Service -Name 'actions.runner.*' -ErrorAction SilentlyContinue |
     Where-Object { $_.Name -match '(?i)sc220|masarray' } |
     Select-Object -First 1
+$runnerInfo = $null
 if (-not $runner) {
     $missing.Add('SC220 GitHub Actions runner service')
-} elseif ($runner.Status -ne 'Running') {
-    try {
-        Start-Service -Name $runner.Name
-        $runner = Get-Service -Name $runner.Name
-    } catch {
-        $missing.Add("SC220 runner service Running state ($($runner.Name))")
+} else {
+    $runnerInfo = Get-CimInstance Win32_Service -Filter "Name='$($runner.Name)'"
+    if (-not $runnerInfo) {
+        $missing.Add('SC220 runner service configuration')
+    } else {
+        if ($runnerInfo.StartName -notin @('LocalSystem', 'NT AUTHORITY\SYSTEM')) {
+            $missing.Add("LocalSystem runner account (actual: $($runnerInfo.StartName))")
+        }
+        if ($runnerInfo.StartMode -ne 'Manual') {
+            $missing.Add("Manual runner startup mode (actual: $($runnerInfo.StartMode))")
+        }
+    }
+
+    if ($runner.Status -ne 'Running') {
+        try {
+            Start-Service -Name $runner.Name
+            $runner = Get-Service -Name $runner.Name
+            $runner.WaitForStatus('Running', [TimeSpan]::FromSeconds(30))
+        } catch {
+            $missing.Add("SC220 runner service Running state ($($runner.Name))")
+        }
     }
 }
 
-if ($missing.Count -gt 0) {
-    if ($runner -and $runner.Status -eq 'Running') {
+try {
+    if ($missing.Count -gt 0) {
+        throw "Local runner host is incomplete:`n - $($missing -join "`n - ")`nRe-run SETUP-LOCAL-RUNNER.cmd after correcting the listed component(s)."
+    }
+
+    Write-Host 'SC220 LOCAL RUNNER HOST READY' -ForegroundColor Green
+    Write-Host "Runner : $($runner.Name) [$($runner.Status)]"
+    Write-Host "Account: $($runnerInfo.StartName)"
+    Write-Host 'Startup: Manual / release-only'
+    Write-Host "MSVC   : $($cpp.Trim())"
+    Write-Host "Inno   : $inno"
+    Write-Host "Ninja  : $((Get-Command ninja.exe).Source)"
+}
+finally {
+    if ($runner -and (Get-Service -Name $runner.Name).Status -ne 'Stopped') {
         Stop-Service -Name $runner.Name -Force -ErrorAction SilentlyContinue
     }
-    throw "Local runner host is incomplete:`n - $($missing -join "`n - ")`nRe-run SETUP-LOCAL-RUNNER.cmd after correcting the listed component(s)."
 }
-
-Write-Host 'SC220 LOCAL RUNNER HOST READY' -ForegroundColor Green
-Write-Host "Runner : $($runner.Name) [$($runner.Status)]"
-Write-Host "MSVC   : $($cpp.Trim())"
-Write-Host "Inno   : $inno"
-Write-Host "Ninja  : $((Get-Command ninja.exe).Source)"

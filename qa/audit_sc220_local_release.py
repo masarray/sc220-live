@@ -5,6 +5,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 workflow_path = ROOT / ".github" / "workflows" / "local-release.yml"
 setup_path = ROOT / "scripts" / "setup-sc220-local-runner.ps1"
+verify_host_path = ROOT / "scripts" / "verify-sc220-runner-host.ps1"
 start_path = ROOT / "scripts" / "start-sc220-local-release.ps1"
 publish_path = ROOT / "scripts" / "publish-sc220-download.ps1"
 setup_cmd_path = ROOT / "SETUP-LOCAL-RUNNER.cmd"
@@ -13,6 +14,7 @@ release_cmd_path = ROOT / "RELEASE-SC220.cmd"
 required_paths = (
     workflow_path,
     setup_path,
+    verify_host_path,
     start_path,
     publish_path,
     setup_cmd_path,
@@ -21,6 +23,7 @@ required_paths = (
 
 workflow = workflow_path.read_text(encoding="utf-8")
 setup = setup_path.read_text(encoding="utf-8")
+verify_host = verify_host_path.read_text(encoding="utf-8")
 start = start_path.read_text(encoding="utf-8")
 publish = publish_path.read_text(encoding="utf-8")
 setup_cmd = setup_cmd_path.read_text(encoding="utf-8")
@@ -42,6 +45,11 @@ check(
 check(
     "workflow is pinned to the repository-only SC220 Windows label",
     "runs-on: [self-hosted, Windows, X64, sc220-build]" in workflow,
+)
+check(
+    "workflow uses stock Windows PowerShell",
+    "shell: pwsh" not in workflow
+    and workflow.count("shell: powershell") >= 6,
 )
 check(
     "workflow serializes public releases",
@@ -118,6 +126,14 @@ check(
     and "Set-Content" not in setup,
 )
 check(
+    "post-setup verifier checks service-level machine tools",
+    "[Environment]::GetEnvironmentVariable('Path', 'Machine')" in verify_host
+    and all(command in verify_host for command in ("git.exe", "gh.exe", "cmake.exe", "ninja.exe"))
+    and "Visual Studio C++ Build Tools" in verify_host
+    and "Inno Setup 6" in verify_host
+    and "actions.runner.*" in verify_host,
+)
+check(
     "release launcher refuses dirty or unpushed source",
     "git.exe status --porcelain" in start
     and "Local files are not clean" in start
@@ -164,14 +180,17 @@ check(
     and "Use an unused version or explicit replacement" in publish,
 )
 check(
-    "command wrappers bypass local PowerShell policy only for reviewed scripts",
+    "command wrappers bypass policy only for reviewed local scripts",
     "setup-sc220-local-runner.ps1" in setup_cmd
+    and "verify-sc220-runner-host.ps1" in setup_cmd
     and "start-sc220-local-release.ps1" in release_cmd
-    and setup_cmd.count("-ExecutionPolicy Bypass") == 1
+    and setup_cmd.count("-ExecutionPolicy Bypass") == 2
     and release_cmd.count("-ExecutionPolicy Bypass") == 1,
 )
 
-combined = "\n".join((workflow, setup, start, publish, setup_cmd, release_cmd))
+combined = "\n".join(
+    (workflow, setup, verify_host, start, publish, setup_cmd, release_cmd)
+)
 check(
     "repository contains no obvious literal credential",
     not re.search(

@@ -58,10 +58,9 @@ check(
     and "5757119cab7a1a75f09dcf0edea6e3be97975439" in workflow,
 )
 check(
-    "public release token is scoped only to preflight and publish steps",
-    workflow.count("SC220_DOWNLOAD_TOKEN") == 2
+    "public release token is exposed only to the publish step",
+    workflow.count("SC220_DOWNLOAD_TOKEN") == 1
     and "GH_TOKEN: ${{ secrets.SC220_DOWNLOAD_TOKEN }}" in workflow
-    and "DOWNLOAD_TOKEN_CHECK: ${{ secrets.SC220_DOWNLOAD_TOKEN }}" in workflow
     and not re.search(r"(?m)^\s{4}GH_TOKEN:", workflow),
 )
 check(

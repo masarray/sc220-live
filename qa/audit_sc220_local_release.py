@@ -121,8 +121,16 @@ check(
     "release launcher refuses dirty or unpushed source",
     "git.exe status --porcelain" in start
     and "Local files are not clean" in start
-    and "origin/$SourceRef" in start
+    and "git.exe rev-parse FETCH_HEAD" in start
+    and "Remote source ref" in start
     and "Type RELEASE to build, test, and publish" in start,
+)
+check(
+    "release launcher uses a stable workflow ref and separate build ref",
+    "[string]$WorkflowRef = 'main'" in start
+    and "contents/.github/workflows/local-release.yml?ref=$WorkflowRef" in start
+    and "'--ref', $WorkflowRef" in start
+    and '"source_ref=$SourceRef"' in start,
 )
 check(
     "release launcher verifies the local runner before dispatch",

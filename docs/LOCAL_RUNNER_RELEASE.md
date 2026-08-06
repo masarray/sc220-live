@@ -20,6 +20,12 @@ Alur ini memindahkan kompilasi installer SC220 Live dari runner Windows milik Gi
 - `scripts/publish-sc220-download.ps1` — validasi dan publikasi release.
 - `qa/audit_sc220_local_release.py` — menjaga kontrak keamanan alur release.
 
+## Syarat sebelum release pertama
+
+File `.github/workflows/local-release.yml` harus sudah tersedia pada default branch `main`. Launcher selalu menjalankan definisi workflow yang stabil dari `main`, tetapi input `source_ref` boleh menunjuk branch atau tag lain yang sudah di-push.
+
+Dengan pemisahan ini, branch pengembangan yang dipilih tetap dapat dibangun tanpa mengambil definisi workflow dari branch tersebut. Merge perubahan local-runner ke `main` terlebih dahulu sebelum menjalankan `RELEASE-SC220.cmd` untuk pertama kali.
+
 ## Setup pertama kali
 
 Checkout branch yang memuat fitur ini, lalu double-click:
@@ -70,7 +76,8 @@ RELEASE-SC220.cmd
 Launcher akan:
 
 - menolak working tree yang masih kotor;
-- memastikan branch lokal sama dengan branch remote;
+- memastikan source lokal sama dengan source remote yang dipilih;
+- memastikan workflow release tersedia pada `main`;
 - membaca versi terbaru dari `sc220-download/latest.json`;
 - menyarankan patch version berikutnya;
 - memeriksa runner `sc220-build` sedang online;
@@ -98,6 +105,7 @@ Jika salah satu tahap gagal, script publikasi tidak dijalankan dan `latest.json`
 ## Batas keamanan
 
 - Workflow hanya memiliki trigger `workflow_dispatch`; tidak berjalan pada push atau pull request.
+- Definisi workflow selalu diambil dari branch `main`, sedangkan source build diberikan sebagai input terpisah.
 - Runner terdaftar pada satu repository, bukan seluruh organisasi.
 - Checkout tidak menyimpan credential GitHub ke konfigurasi Git lokal.
 - `SC220_DOWNLOAD_TOKEN` hanya diberikan kepada step publikasi.

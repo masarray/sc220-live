@@ -1,6 +1,7 @@
 param(
     [string]$Repository = 'masarray/sc220-live',
     [string]$DownloadRepository = 'masarray/sc220-download',
+    [string]$WorkflowRef = 'main',
     [string]$Version = '',
     [string]$SourceRef = '',
     [ValidateSet('stable', 'prerelease')]
@@ -51,7 +52,7 @@ function Test-RunnerOnline {
         return $matching | Select-Object -First 1
     }
     catch {
-        Write-Warning 'Runner status could not be queried. The workflow can still be queued, but GitHub login may need repo administration access.'
+        Write-Warning 'Runner status could not be queried. GitHub login may need repository administration access.'
         return $null
     }
 }
@@ -89,7 +90,8 @@ $dirty
 "@
 }
 
-$currentBranch = (& git.exe branch --show-current | Select-Object -First 1).Trim()
+$currentBranchText = (& git.exe branch --show-current | Select-Object -First 1)
+$currentBranch = if ($currentBranchText) { $currentBranchText.Trim() } else { '' }
 if (-not $SourceRef) {
     $SourceRef = if ($currentBranch) { $currentBranch } else { 'main' }
 }
@@ -97,15 +99,24 @@ if (-not $SourceRef) {
 Write-Host "Checking remote source ref: $SourceRef"
 & git.exe fetch origin $SourceRef --quiet
 if ($LASTEXITCODE -ne 0) {
-    throw "Remote source ref origin/$SourceRef was not found. Push the branch before releasing."
+    throw "Remote source ref $SourceRef was not found. Push the branch or tag before releasing."
 }
+$remoteSourceCommit = (& git.exe rev-parse FETCH_HEAD | Select-Object -First 1).Trim()
 
 if ($currentBranch -eq $SourceRef) {
     $localHead = (& git.exe rev-parse HEAD | Select-Object -First 1).Trim()
-    $remoteHead = (& git.exe rev-parse "origin/$SourceRef" | Select-Object -First 1).Trim()
-    if ($localHead -ne $remoteHead) {
-        throw "Local HEAD ($localHead) is not the pushed origin/$SourceRef ($remoteHead). Push or pull before releasing."
+    if ($localHead -ne $remoteSourceCommit) {
+        throw "Local HEAD ($localHead) is not the pushed source ref ($remoteSourceCommit). Push or pull before releasing."
     }
+}
+
+& gh.exe api "repos/$Repository/contents/.github/workflows/local-release.yml?ref=$WorkflowRef" *> $null
+if ($LASTEXITCODE -ne 0) {
+    throw @"
+The local-release workflow is not available on $Repository@$WorkflowRef.
+Merge the local-runner workflow into the default branch before the first release,
+or pass -WorkflowRef with a branch already recognized by GitHub Actions.
+"@
 }
 
 $currentRelease = $null
@@ -159,6 +170,8 @@ else {
 
 Write-Section 'Release confirmation'
 Write-Host "Source       : $Repository@$SourceRef"
+Write-Host "Source SHA   : $remoteSourceCommit"
+Write-Host "Workflow ref : $WorkflowRef"
 Write-Host "Version      : v$Version"
 Write-Host "Channel      : $Channel"
 Write-Host "Destination  : $DownloadRepository"
@@ -170,12 +183,11 @@ if ($confirm -cne 'RELEASE') {
     throw 'Release cancelled by user.'
 }
 
-$workflowRef = $SourceRef
 $dispatchStarted = [DateTime]::UtcNow
 $workflowArguments = @(
     'workflow', 'run', 'local-release.yml',
     '--repo', $Repository,
-    '--ref', $workflowRef,
+    '--ref', $WorkflowRef,
     '-f', "version=$Version",
     '-f', "source_ref=$SourceRef",
     '-f', 'clean=true',
@@ -191,7 +203,7 @@ for ($attempt = 0; $attempt -lt 20 -and -not $run; $attempt++) {
     $runs = @(Get-GhJson run list `
         --repo $Repository `
         --workflow 'local-release.yml' `
-        --branch $workflowRef `
+        --branch $WorkflowRef `
         --event workflow_dispatch `
         --limit 10 `
         --json 'databaseId,createdAt,status,url,headBranch,displayTitle')

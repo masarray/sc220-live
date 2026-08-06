@@ -233,8 +233,8 @@ begin
   InitialCoreProbeCode := RunPrerequisiteProbe('Core');
   InitialVBCableProbeCode := RunPrerequisiteProbe('VB-Cable');
 
-  ; Interactive users receive the smart default. Silent automation keeps any
-  ; explicit /TASKS or /MERGETASKS selection unchanged.
+  // Interactive users receive the smart default. Silent automation keeps any
+  // explicit /TASKS or /MERGETASKS selection unchanged.
   if not WizardSilent then
   begin
     if InitialVBCableProbeCode = 0 then

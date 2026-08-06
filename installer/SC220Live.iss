@@ -143,8 +143,8 @@ begin
   try
     ExtractTemporaryFile('{#PrerequisiteProbeName}');
     ScriptPath := ExpandConstant('{tmp}\{#PrerequisiteProbeName}');
-    Parameters := '-NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "' +
-      ScriptPath + '" -Mode "' + Mode + '"';
+    Parameters := '-NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File ' +
+      AddQuotes(ScriptPath) + ' -Mode ' + AddQuotes(Mode);
 
     if Exec(PowerShellPath, Parameters, '', SW_HIDE, ewWaitUntilTerminated, ResultCode) then
       Result := ResultCode
@@ -312,7 +312,7 @@ begin
   end;
 
   if not Exec(SetupPath,
-      '/install /passive /norestart /log "' + LogPath + '"',
+      '/install /passive /norestart /log ' + AddQuotes(LogPath),
       ExtractFileDir(SetupPath), SW_SHOW, ewWaitUntilTerminated, ResultCode) then
   begin
     MsgBox(

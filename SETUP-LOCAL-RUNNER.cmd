@@ -8,6 +8,13 @@ set "EXIT_CODE=%ERRORLEVEL%"
 
 if "%EXIT_CODE%"=="0" (
   echo.
+  echo Applying on-demand runner service security mode...
+  powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\configure-sc220-runner-service.ps1"
+  set "EXIT_CODE=%ERRORLEVEL%"
+)
+
+if "%EXIT_CODE%"=="0" (
+  echo.
   echo Verifying tools visible to the Windows runner service...
   powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\verify-sc220-runner-host.ps1"
   set "EXIT_CODE=%ERRORLEVEL%"
@@ -18,7 +25,7 @@ if not "%EXIT_CODE%"=="0" (
   echo Setup berhenti dengan kode %EXIT_CODE%.
   echo Baca pesan di atas sebelum mencoba lagi.
 ) else (
-  echo Local runner SC220 sudah siap.
+  echo Local runner SC220 sudah siap dan offline sampai release dimulai.
 )
 echo.
 pause

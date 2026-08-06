@@ -6,8 +6,7 @@ param(
     [string]$SourceRef = '',
     [ValidateSet('stable', 'prerelease')]
     [string]$Channel = 'stable',
-    [string]$ReleaseNotes = '',
-    [switch]$NoWatch
+    [string]$ReleaseNotes = ''
 )
 
 $ErrorActionPreference = 'Stop'
@@ -42,6 +41,12 @@ function Get-NextPatchVersion([string]$Current) {
     return '{0}.{1}.{2}' -f [int]$Matches[1], [int]$Matches[2], ([int]$Matches[3] + 1)
 }
 
+function Get-LocalRunnerService {
+    return Get-Service -Name 'actions.runner.*' -ErrorAction SilentlyContinue |
+        Where-Object { $_.Name -match '(?i)sc220|masarray' } |
+        Select-Object -First 1
+}
+
 function Test-RunnerOnline {
     try {
         $runnerData = Get-GhJson api "repos/$Repository/actions/runners?per_page=100"
@@ -54,6 +59,31 @@ function Test-RunnerOnline {
     catch {
         Write-Warning 'Runner status could not be queried. GitHub login may need repository administration access.'
         return $null
+    }
+}
+
+function Start-And-WaitForRunner([System.ServiceProcess.ServiceController]$Service) {
+    if ($Service.Status -ne 'Running') {
+        Write-Host "Starting local runner service: $($Service.Name)"
+        Start-Service -Name $Service.Name
+        $Service = Get-Service -Name $Service.Name
+        $Service.WaitForStatus('Running', [TimeSpan]::FromSeconds(30))
+    }
+
+    for ($attempt = 0; $attempt -lt 30; $attempt++) {
+        $online = Test-RunnerOnline
+        if ($online) { return $online }
+        Start-Sleep -Seconds 2
+    }
+    throw 'The runner service started, but GitHub did not report label sc220-build online within 60 seconds.'
+}
+
+function Stop-LocalRunner([System.ServiceProcess.ServiceController]$Service) {
+    if (-not $Service) { return }
+    $current = Get-Service -Name $Service.Name -ErrorAction SilentlyContinue
+    if ($current -and $current.Status -ne 'Stopped') {
+        Write-Host "Returning local runner offline: $($current.Name)"
+        Stop-Service -Name $current.Name -Force -ErrorAction SilentlyContinue
     }
 }
 
@@ -119,6 +149,17 @@ or pass -WorkflowRef with a branch already recognized by GitHub Actions.
 "@
 }
 
+$runnerService = Get-LocalRunnerService
+if (-not $runnerService) {
+    throw 'SC220 runner service is missing. Run SETUP-LOCAL-RUNNER.cmd first.'
+}
+$runnerInfo = Get-CimInstance Win32_Service -Filter "Name='$($runnerService.Name)'"
+if (-not $runnerInfo -or
+    $runnerInfo.StartName -notin @('LocalSystem', 'NT AUTHORITY\SYSTEM') -or
+    $runnerInfo.StartMode -ne 'Manual') {
+    throw 'Runner service is not in release-only LocalSystem/Manual mode. Run SETUP-LOCAL-RUNNER.cmd again.'
+}
+
 $currentRelease = $null
 try {
     $currentRelease = Invoke-RestMethod -UseBasicParsing `
@@ -139,7 +180,6 @@ if (-not $Version) {
     $entered = Read-Host "Release version without v [default $suggested]"
     $Version = if ([string]::IsNullOrWhiteSpace($entered)) { $suggested } else { $entered.Trim() }
 }
-
 if ($Version -notmatch '^\d+\.\d+\.\d+$') {
     throw "Invalid semantic version: $Version"
 }
@@ -147,25 +187,12 @@ if ($Version -notmatch '^\d+\.\d+\.\d+$') {
 if (-not $ReleaseNotes) {
     $ReleaseNotes = Read-Host 'One-line release highlight [optional]'
 }
-
 $channelAnswer = Read-Host "Release channel stable/prerelease [default $Channel]"
 if (-not [string]::IsNullOrWhiteSpace($channelAnswer)) {
     if ($channelAnswer -notin @('stable', 'prerelease')) {
         throw "Unsupported release channel: $channelAnswer"
     }
     $Channel = $channelAnswer
-}
-
-$runner = Test-RunnerOnline
-if ($runner) {
-    Write-Host "Runner online : $($runner.name)" -ForegroundColor Green
-}
-else {
-    Write-Warning 'No online runner with label sc220-build was confirmed.'
-    $continue = Read-Host 'Queue the workflow anyway? [y/N]'
-    if ($continue -notmatch '^(?i)y(?:es)?$') {
-        throw 'Release cancelled. Run SETUP-LOCAL-RUNNER.cmd or start the runner service.'
-    }
 }
 
 Write-Section 'Release confirmation'
@@ -175,7 +202,7 @@ Write-Host "Workflow ref : $WorkflowRef"
 Write-Host "Version      : v$Version"
 Write-Host "Channel      : $Channel"
 Write-Host "Destination  : $DownloadRepository"
-Write-Host "Build runner : local PC (self-hosted)"
+Write-Host "Build runner : local PC, release-only LocalSystem service"
 Write-Host "Notes        : $ReleaseNotes"
 Write-Host ''
 $confirm = Read-Host 'Type RELEASE to build, test, and publish'
@@ -183,46 +210,51 @@ if ($confirm -cne 'RELEASE') {
     throw 'Release cancelled by user.'
 }
 
-$dispatchStarted = [DateTime]::UtcNow
-$workflowArguments = @(
-    'workflow', 'run', 'local-release.yml',
-    '--repo', $Repository,
-    '--ref', $WorkflowRef,
-    '-f', "version=$Version",
-    '-f', "source_ref=$SourceRef",
-    '-f', 'clean=true',
-    '-f', "release_channel=$Channel",
-    '-f', "release_notes=$ReleaseNotes"
-)
-Invoke-Gh @workflowArguments
-Write-Host 'Workflow queued. Waiting for GitHub to assign a run ID...'
+try {
+    $runner = Start-And-WaitForRunner $runnerService
+    Write-Host "Runner online : $($runner.name)" -ForegroundColor Green
 
-$run = $null
-for ($attempt = 0; $attempt -lt 20 -and -not $run; $attempt++) {
-    Start-Sleep -Seconds 2
-    $runs = @(Get-GhJson run list `
-        --repo $Repository `
-        --workflow 'local-release.yml' `
-        --branch $WorkflowRef `
-        --event workflow_dispatch `
-        --limit 10 `
-        --json 'databaseId,createdAt,status,url,headBranch,displayTitle')
+    $dispatchStarted = [DateTime]::UtcNow
+    $workflowArguments = @(
+        'workflow', 'run', 'local-release.yml',
+        '--repo', $Repository,
+        '--ref', $WorkflowRef,
+        '-f', "version=$Version",
+        '-f', "source_ref=$SourceRef",
+        '-f', 'clean=true',
+        '-f', "release_channel=$Channel",
+        '-f', "release_notes=$ReleaseNotes"
+    )
+    Invoke-Gh @workflowArguments
+    Write-Host 'Workflow queued. Waiting for GitHub to assign a run ID...'
 
-    $run = $runs | Where-Object {
-        ([DateTime]$_.createdAt).ToUniversalTime() -ge $dispatchStarted.AddSeconds(-5)
-    } | Sort-Object { [DateTime]$_.createdAt } -Descending | Select-Object -First 1
-}
+    $run = $null
+    for ($attempt = 0; $attempt -lt 20 -and -not $run; $attempt++) {
+        Start-Sleep -Seconds 2
+        $runs = @(Get-GhJson run list `
+            --repo $Repository `
+            --workflow 'local-release.yml' `
+            --branch $WorkflowRef `
+            --event workflow_dispatch `
+            --limit 10 `
+            --json 'databaseId,createdAt,status,url,headBranch,displayTitle')
 
-if (-not $run) {
-    throw 'Workflow was dispatched, but its run ID could not be located. Check the Actions tab.'
-}
+        $run = $runs | Where-Object {
+            ([DateTime]$_.createdAt).ToUniversalTime() -ge $dispatchStarted.AddSeconds(-5)
+        } | Sort-Object { [DateTime]$_.createdAt } -Descending | Select-Object -First 1
+    }
+    if (-not $run) {
+        throw 'Workflow was dispatched, but its run ID could not be located. Check the Actions tab.'
+    }
 
-Write-Host "Run URL: $($run.url)" -ForegroundColor Cyan
-if (-not $NoWatch) {
+    Write-Host "Run URL: $($run.url)" -ForegroundColor Cyan
     & gh.exe run watch $run.databaseId --repo $Repository --exit-status
     if ($LASTEXITCODE -ne 0) {
         throw "Local release workflow failed. Open $($run.url) for details."
     }
+}
+finally {
+    Stop-LocalRunner $runnerService
 }
 
 $releaseUrl = "https://github.com/$DownloadRepository/releases/tag/v$Version"

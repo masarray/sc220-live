@@ -83,12 +83,14 @@ Name: "vbcable"; Description: "Install or repair VB-Audio VB-CABLE (donationware
 Name: "desktopicon"; Description: "Create a desktop shortcut"; GroupDescription: "Shortcuts:"; Flags: unchecked
 
 [Files]
+; Keep the preflight probe first so solid compression does not delay early extraction.
+Source: "{#PrerequisiteProbeSource}"; DestName: "{#PrerequisiteProbeName}"; Flags: dontcopy noencryption
+
 ; The Microsoft runtime is executed only when its x64 registry state is absent.
 Source: "{#VCRedistSource}"; DestDir: "{#PrerequisiteTempDir}"; DestName: "{#VCRedistName}"; Flags: ignoreversion deleteafterinstall
 
-; Keep a diagnostic copy with the application and a temporary pre-install copy.
+; Preserve a diagnostic copy with the installed application.
 Source: "{#PrerequisiteProbeSource}"; DestDir: "{app}\Tools"; DestName: "{#PrerequisiteProbeName}"; Flags: ignoreversion
-Source: "{#PrerequisiteProbeSource}"; DestName: "{#PrerequisiteProbeName}"; Flags: dontcopy
 
 ; VB-Audio requires the setup executable to remain beside its INF, SYS, CAT,
 ; icon, and support files. Copy the complete reviewed package to a temporary
@@ -231,10 +233,15 @@ begin
   InitialCoreProbeCode := RunPrerequisiteProbe('Core');
   InitialVBCableProbeCode := RunPrerequisiteProbe('VB-Cable');
 
-  if InitialVBCableProbeCode = 0 then
-    WizardSelectTasks('!vbcable')
-  else
-    WizardSelectTasks('vbcable');
+  ; Interactive users receive the smart default. Silent automation keeps any
+  ; explicit /TASKS or /MERGETASKS selection unchanged.
+  if not WizardSilent then
+  begin
+    if InitialVBCableProbeCode = 0 then
+      WizardSelectTasks('!vbcable')
+    else
+      WizardSelectTasks('vbcable');
+  end;
 
   SystemCheckPage := CreateCustomPage(
     wpSelectTasks,

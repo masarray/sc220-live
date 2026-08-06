@@ -1,0 +1,37 @@
+$ErrorActionPreference = 'Stop'
+Set-StrictMode -Version 2.0
+
+$service = Get-Service -Name 'actions.runner.*' -ErrorAction SilentlyContinue |
+    Where-Object { $_.Name -match '(?i)sc220|masarray' } |
+    Select-Object -First 1
+if (-not $service) {
+    throw 'SC220 GitHub Actions runner service was not found.'
+}
+
+if ($service.Status -ne 'Stopped') {
+    Stop-Service -Name $service.Name -Force
+    $service.WaitForStatus('Stopped', [TimeSpan]::FromSeconds(30))
+}
+
+# The release smoke test installs and uninstalls an admin-default Inno Setup
+# package. Keep the high-privilege runner offline except during an explicit
+# RELEASE-SC220.cmd session.
+& sc.exe config $service.Name obj= LocalSystem start= demand | Out-Host
+if ($LASTEXITCODE -ne 0) {
+    throw "Unable to configure $($service.Name) as an on-demand LocalSystem service."
+}
+
+Set-Service -Name $service.Name -StartupType Manual
+$serviceInfo = Get-CimInstance Win32_Service -Filter "Name='$($service.Name)'"
+if (-not $serviceInfo) { throw 'Runner service configuration could not be read back.' }
+if ($serviceInfo.StartName -notin @('LocalSystem', 'NT AUTHORITY\SYSTEM')) {
+    throw "Unexpected runner service account: $($serviceInfo.StartName)"
+}
+if ($serviceInfo.StartMode -ne 'Manual') {
+    throw "Unexpected runner startup mode: $($serviceInfo.StartMode)"
+}
+
+Write-Host 'SC220 RUNNER SERVICE SECURITY MODE READY' -ForegroundColor Green
+Write-Host "Service : $($service.Name)"
+Write-Host "Account : $($serviceInfo.StartName)"
+Write-Host 'Startup : Manual (started only by RELEASE-SC220.cmd)'

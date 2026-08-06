@@ -105,8 +105,8 @@ message(STATUS "SC220 Live broadcast-state source: ${SC220_APP_GENERATED_SOURCE}
 # PC playback capture and safe PC-only routing, then apply the OBS-style
 # source-versus-monitor guard. The loopback implementation is regenerated with
 # event/polling fallback, automatic reconnect and honest silence telemetry.
-# Finally, rebuild the atomic analyzer, calibrate meters, and apply the final
-# release-facing visual hierarchy without changing audio behaviour.
+# Finally, rebuild the atomic analyzer, calibrate meters, apply the release
+# hierarchy, and expose truthful Windows Stream Output endpoint identities.
 include("${CMAKE_CURRENT_LIST_DIR}/GenerateSC220PcEndpointRouting.cmake")
 include("${CMAKE_CURRENT_LIST_DIR}/PolishSC220FinalUi.cmake")
 include("${CMAKE_CURRENT_LIST_DIR}/StabilizeSC220PcMusicMode.cmake")
@@ -121,3 +121,4 @@ include("${CMAKE_CURRENT_LIST_DIR}/GenerateSC220PcCaptureRecovery.cmake")
 include("${CMAKE_CURRENT_LIST_DIR}/RebuildSC220ImpactVisualizer.cmake")
 include("${CMAKE_CURRENT_LIST_DIR}/CalibrateSC220Meters.cmake")
 include("${CMAKE_CURRENT_LIST_DIR}/RefineSC220ReleaseUi.cmake")
+include("${CMAKE_CURRENT_LIST_DIR}/UseSC220RealStreamEndpoints.cmake")

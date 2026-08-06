@@ -3,7 +3,7 @@ setlocal
 cd /d "%~dp0"
 title SC220 Live - Setup Local GitHub Runner
 
-net session >nul 2>&1
+fltmc >nul 2>&1
 if not "%ERRORLEVEL%"=="0" (
   echo Requesting Administrator access for the complete runner setup...
   powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -Command "Start-Process -FilePath '%~f0' -WorkingDirectory '%~dp0' -Verb RunAs"

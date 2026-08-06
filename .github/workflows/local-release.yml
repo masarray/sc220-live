@@ -160,15 +160,18 @@ jobs:
         run: |
           $ErrorActionPreference = 'Stop'
           .\scripts\check-sc220-release-contract.ps1
-          $python = if (Get-Command py.exe -ErrorAction SilentlyContinue) {
-            @('py.exe', '-3')
+
+          if (Get-Command py.exe -ErrorAction SilentlyContinue) {
+            $pythonExe = 'py.exe'
+            $pythonArgs = @('-3')
           } else {
-            @('python.exe')
+            $pythonExe = 'python.exe'
+            $pythonArgs = @()
           }
 
-          & $python[0] @($python[1..($python.Count - 1)]) .\qa\audit_sc220_installer_bundle.py
+          & $pythonExe @pythonArgs .\qa\audit_sc220_installer_bundle.py
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          & $python[0] @($python[1..($python.Count - 1)]) .\qa\audit_sc220_local_release.py
+          & $pythonExe @pythonArgs .\qa\audit_sc220_local_release.py
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Build verified smart installer locally

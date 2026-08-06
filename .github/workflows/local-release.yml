@@ -52,7 +52,7 @@ jobs:
 
     steps:
       - name: Validate manual release request
-        shell: pwsh
+        shell: powershell
         run: |
           if ($env:RELEASE_VERSION -notmatch '^\d+\.\d+\.\d+$') {
             throw "Invalid semantic version: $env:RELEASE_VERSION"
@@ -85,7 +85,7 @@ jobs:
 
       - name: Resolve pinned prerequisite authorities
         id: authority
-        shell: pwsh
+        shell: powershell
         run: |
           $ErrorActionPreference = 'Stop'
           function Read-Lock([string]$Path) {
@@ -122,10 +122,10 @@ jobs:
           "@ | Add-Content -LiteralPath $env:GITHUB_STEP_SUMMARY -Encoding UTF8
 
       - name: Verify local build machine
-        shell: pwsh
+        shell: powershell
         run: |
           $ErrorActionPreference = 'Stop'
-          foreach ($command in @('git.exe', 'cmake.exe', 'gh.exe')) {
+          foreach ($command in @('git.exe', 'cmake.exe', 'ninja.exe', 'gh.exe')) {
             if (-not (Get-Command $command -ErrorAction SilentlyContinue)) {
               throw "$command is not available to the runner service. Re-run SETUP-LOCAL-RUNNER.cmd."
             }
@@ -156,7 +156,7 @@ jobs:
           Write-Host "MSVC       : $($vs.Trim())"
 
       - name: Validate source and installer contracts
-        shell: pwsh
+        shell: powershell
         run: |
           $ErrorActionPreference = 'Stop'
           .\scripts\check-sc220-release-contract.ps1
@@ -175,7 +175,7 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Build verified smart installer locally
-        shell: pwsh
+        shell: powershell
         run: |
           $ErrorActionPreference = 'Stop'
           $packageArgs = @{
@@ -187,7 +187,7 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Smoke install, prerequisite probe, and uninstall
-        shell: pwsh
+        shell: powershell
         run: |
           $ErrorActionPreference = 'Stop'
           $installer = Get-ChildItem .\dist -File -Filter "SC220-Live-v$env:RELEASE_VERSION-Setup-win-x64.exe" |
@@ -245,7 +245,7 @@ jobs:
           }
 
       - name: Publish release and update sc220-download website
-        shell: pwsh
+        shell: powershell
         env:
           GH_TOKEN: ${{ secrets.SC220_DOWNLOAD_TOKEN }}
         run: |
@@ -262,7 +262,7 @@ jobs:
 
       - name: Remove temporary release and private-authority files
         if: always()
-        shell: pwsh
+        shell: powershell
         run: |
           foreach ($path in @('.\.release-work', '.\third_party\askp-vst')) {
             if (Test-Path -LiteralPath $path) {

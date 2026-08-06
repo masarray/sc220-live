@@ -58,11 +58,11 @@ check(
     and "5757119cab7a1a75f09dcf0edea6e3be97975439" in workflow,
 )
 check(
-    "public release token is scoped only to the publish step",
+    "public release token is scoped only to preflight and publish steps",
     workflow.count("SC220_DOWNLOAD_TOKEN") == 2
     and "GH_TOKEN: ${{ secrets.SC220_DOWNLOAD_TOKEN }}" in workflow
     and "DOWNLOAD_TOKEN_CHECK: ${{ secrets.SC220_DOWNLOAD_TOKEN }}" in workflow
-    and "env:\n      GH_TOKEN:" not in workflow,
+    and not re.search(r"(?m)^\s{4}GH_TOKEN:", workflow),
 )
 check(
     "workflow never stores a GitHub-hosted artifact",
@@ -77,7 +77,16 @@ check(
 )
 check(
     "release is published only after build audit and smoke test",
-    workflow.find("Validate source and installer contracts")
+    all(
+        marker in workflow
+        for marker in (
+            "Validate source and installer contracts",
+            "Build verified smart installer locally",
+            "Smoke install, prerequisite probe, and uninstall",
+            "Publish release and update sc220-download website",
+        )
+    )
+    and workflow.find("Validate source and installer contracts")
     < workflow.find("Build verified smart installer locally")
     < workflow.find("Smoke install, prerequisite probe, and uninstall")
     < workflow.find("Publish release and update sc220-download website"),
@@ -94,7 +103,7 @@ check(
     "runner is repository-scoped and custom-labelled",
     "--url \"https://github.com/$Repository\"" in setup
     and "[string]$RunnerLabel = 'sc220-build'" in setup
-    and "C:\\actions-runner-sc220" in setup,
+    and r"C:\actions-runner-sc220" in setup,
 )
 check(
     "runner download digest is verified when GitHub supplies it",
@@ -120,7 +129,7 @@ check(
     "release launcher verifies the local runner before dispatch",
     "actions/runners?per_page=100" in start
     and "sc220-build" in start
-    and "workflow run" in start
+    and "'workflow', 'run'" in start
     and "gh.exe run watch" in start,
 )
 check(
@@ -133,7 +142,7 @@ check(
     "publisher targets only the public distribution repository",
     "[string]$TargetRepository = 'masarray/sc220-download'" in publish
     and "GH_TOKEN is required" in publish
-    and "release create" in publish,
+    and "'release', 'create'" in publish,
 )
 check(
     "publisher updates website metadata after a verified release",
@@ -158,7 +167,10 @@ check(
 combined = "\n".join((workflow, setup, start, publish, setup_cmd, release_cmd))
 check(
     "repository contains no obvious literal credential",
-    not re.search(r"(?:ghp_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}|sk-[A-Za-z0-9]{20,})", combined),
+    not re.search(
+        r"(?:ghp_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}|sk-[A-Za-z0-9]{20,})",
+        combined,
+    ),
 )
 
 failed = [name for name, ok in checks if not ok]

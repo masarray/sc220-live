@@ -5,6 +5,83 @@ param(
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version 2.0
 
+function Get-MachineCommand([string]$Name) {
+    $savedPath = $env:Path
+    try {
+        $env:Path = [Environment]::GetEnvironmentVariable('Path', 'Machine')
+        return Get-Command $Name -ErrorAction SilentlyContinue
+    }
+    finally {
+        $env:Path = $savedPath
+    }
+}
+
+function Resolve-PythonWingetId {
+    foreach ($candidate in @('Python.Python.3.13', 'Python.Python.3.12')) {
+        & winget.exe show --id $candidate --exact --accept-source-agreements --disable-interactivity *> $null
+        if ($LASTEXITCODE -eq 0) { return $candidate }
+    }
+    return $null
+}
+
+function Ensure-MachinePython {
+    $python = Get-MachineCommand 'py.exe'
+    if (-not $python) { $python = Get-MachineCommand 'python.exe' }
+    if ($python) {
+        Write-Host "Machine Python : $($python.Source)" -ForegroundColor Green
+        return
+    }
+
+    Write-Host 'Machine-wide Python is missing; installing it for the runner...' -ForegroundColor Yellow
+    if (-not (Get-Command winget.exe -ErrorAction SilentlyContinue)) {
+        throw 'winget.exe is required to install machine-wide Python.'
+    }
+
+    $pythonId = Resolve-PythonWingetId
+    if (-not $pythonId) {
+        throw 'No supported official Python package was found in winget.'
+    }
+
+    & winget.exe install --id $pythonId --exact --scope machine --force `
+        --accept-source-agreements --accept-package-agreements `
+        --silent --disable-interactivity
+    if ($LASTEXITCODE -ne 0) {
+        Write-Warning "winget returned $LASTEXITCODE while installing $pythonId; verifying the machine installation before failing."
+    }
+
+    $python = Get-MachineCommand 'py.exe'
+    if (-not $python) { $python = Get-MachineCommand 'python.exe' }
+
+    if (-not $python) {
+        $candidate = Get-ChildItem -LiteralPath $env:ProgramFiles -Directory -Filter 'Python*' -ErrorAction SilentlyContinue |
+            ForEach-Object { Join-Path $_.FullName 'python.exe' } |
+            Where-Object { Test-Path -LiteralPath $_ -PathType Leaf } |
+            Sort-Object -Descending |
+            Select-Object -First 1
+
+        if ($candidate) {
+            $pythonDir = Split-Path -Parent $candidate
+            $machinePath = [Environment]::GetEnvironmentVariable('Path', 'Machine')
+            $segments = @($machinePath -split ';' | Where-Object { $_ })
+            if ($segments -notcontains $pythonDir) {
+                $newMachinePath = (($segments + $pythonDir) -join ';')
+                [Environment]::SetEnvironmentVariable('Path', $newMachinePath, 'Machine')
+            }
+            $python = Get-MachineCommand 'python.exe'
+        }
+    }
+
+    if (-not $python) {
+        throw 'Python was installed or repaired, but it is still not visible on the machine PATH used by the runner.'
+    }
+
+    & $python.Source --version
+    if ($LASTEXITCODE -ne 0) {
+        throw "Machine Python exists but failed to start: $($python.Source)"
+    }
+    Write-Host "Machine Python : $($python.Source)" -ForegroundColor Green
+}
+
 $service = Get-Service -Name 'actions.runner.*' -ErrorAction SilentlyContinue |
     Where-Object { $_.Name -match '(?i)sc220|masarray' } |
     Select-Object -First 1
@@ -28,6 +105,10 @@ if ($LASTEXITCODE -ne 0) {
     throw "Unable to configure $($service.Name) as an on-demand LocalSystem service."
 }
 Set-Service -Name $service.Name -StartupType Manual
+
+# The initial setup may have found a per-user Python that LocalSystem cannot use.
+# Repair that edge case before snapshotting PATH for the runner service.
+Ensure-MachinePython
 
 # Windows services may retain the machine environment that existed before this
 # setup installed build tools. The runner reads .env at startup, so pin the

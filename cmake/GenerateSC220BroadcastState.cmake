@@ -116,6 +116,10 @@ include("${CMAKE_CURRENT_LIST_DIR}/UseSC220RealStreamEndpoints.cmake")
 # Enhancer, and expose the two-second learned static-noise workflow.
 include("${CMAKE_CURRENT_LIST_DIR}/IntegrateSC220StaticNoiseClean.cmake")
 
+# Runtime clock authority: publish the actual open-device sample rate and buffer
+# size. The analyzer must never receive a cosmetic/default 0 Hz status value.
+include("${CMAKE_CURRENT_LIST_DIR}/FixSC220RuntimeClockStatus.cmake")
+
 # Final analyzer authority: the engine feeds programmeAnalyzer from the exact
 # post-limiter master bus. Never route the display back to the disabled Voice
 # Enhancer analysis tap.

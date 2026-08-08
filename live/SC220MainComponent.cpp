@@ -908,6 +908,7 @@ bool SC220MainComponent::looksLikeSc220Input (const juce::String& name) noexcept
     const auto normalised = name.trim().toUpperCase();
     return normalised == "MIXER"
         || normalised.startsWith ("MIXER (")
+        || normalised.contains ("MIXER-01")
         || normalised.contains ("SC220")
         || normalised.contains ("RECORDING TECH");
 }

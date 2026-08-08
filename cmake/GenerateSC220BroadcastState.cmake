@@ -130,3 +130,8 @@ include("${CMAKE_CURRENT_LIST_DIR}/FinalizeSC220NaturalLivePath.cmake")
 # Restore the previously proven responsive post-limiter visualizer. This removes
 # the queued ScopeTap/32-band FFT lifecycle and uses atomic 14-band telemetry.
 include("${CMAKE_CURRENT_LIST_DIR}/RebuildSC220ImpactVisualizer.cmake")
+
+# Hardware-test P3 authority. This pass runs last so later source generation can
+# never silently restore hidden PC capture, stale LUFS-I-only display, linked
+# Dual Mono controls or Settings-only denoise UX.
+include("${CMAKE_CURRENT_LIST_DIR}/FinalizeSC220LiveUxP3.cmake")

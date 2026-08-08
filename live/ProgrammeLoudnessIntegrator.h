@@ -38,6 +38,7 @@ public:
         measuredFrames = 0;
         acceptedBlocks = 0;
         integrated = -120.0f;
+        momentary = -120.0f;
     }
 
     // weightedChannelEnergy is the sum of squared K-weighted channel samples
@@ -53,6 +54,7 @@ public:
     }
 
     float integratedLufs() const noexcept { return integrated; }
+    float momentaryLufs() const noexcept { return momentary; }
     std::uint64_t blockCount() const noexcept { return acceptedBlocks; }
     double elapsedSeconds() const noexcept
     {
@@ -92,7 +94,10 @@ private:
         currentSegmentLength = 0;
 
         if (segmentsReady < static_cast<int> (segmentEnergy.size()))
+        {
+            momentary = -120.0f;
             return;
+        }
 
         double blockEnergySum = 0.0;
         int blockFrames = 0;
@@ -104,6 +109,7 @@ private:
 
         const double blockMeanEnergy = blockEnergySum / std::max (1, blockFrames);
         const float blockLufs = lufsFromEnergy (blockMeanEnergy);
+        momentary = blockLufs;
         if (blockLufs < absoluteGateLufs)
             return;
 
@@ -163,6 +169,7 @@ private:
     std::uint64_t measuredFrames = 0;
     std::uint64_t acceptedBlocks = 0;
     float integrated = -120.0f;
+    float momentary = -120.0f;
 };
 
 } // namespace askp::live

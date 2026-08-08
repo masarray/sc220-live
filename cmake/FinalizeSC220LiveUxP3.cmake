@@ -11,6 +11,7 @@ endif()
 
 include("${CMAKE_CURRENT_LIST_DIR}/SC220P3Routing.cmake")
 include("${CMAKE_CURRENT_LIST_DIR}/SC220P3InputUx.cmake")
+include("${CMAKE_CURRENT_LIST_DIR}/SC220P3InputUxPost.cmake")
 include("${CMAKE_CURRENT_LIST_DIR}/SC220P3Loudness.cmake")
 
 message(STATUS "SC220 Live P3 final authority generated")

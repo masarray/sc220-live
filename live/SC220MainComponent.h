@@ -3,6 +3,7 @@
 #include "LiveAudioEngine.h"
 #include "LiveIcons.h"
 #include "LiveLicensePanel.h"
+#include "SC220DeviceWatcher.h"
 
 #include <juce_gui_extra/juce_gui_extra.h>
 
@@ -57,6 +58,7 @@ private:
     static bool looksLikeSc220Input (const juce::String& name) noexcept;
 
     LiveAudioEngine& audioEngine;
+    SC220DeviceWatcher sc220DeviceWatcher { audioEngine };
     WindowActions windowActions;
     std::unique_ptr<SurfaceLookAndFeel> lookAndFeel;
 

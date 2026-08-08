@@ -33,6 +33,8 @@ jobs:
         run: python qa/audit_p0_sc220_device_detection.py
       - name: Validate real Windows Stream Output endpoint names
         run: python qa/audit_sc220_real_stream_endpoints.py
+      - name: Validate Sonkupik static-noise clean integration
+        run: python qa/audit_sc220_static_noise_clean.py
       - name: Validate ASK-P v0.5.23 port boundary
         run: python qa/audit_v0140_askp_v0523_port.py
       - name: Validate SC220 dual-source broadcast bus

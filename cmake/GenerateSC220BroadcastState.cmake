@@ -115,3 +115,8 @@ include("${CMAKE_CURRENT_LIST_DIR}/UseSC220RealStreamEndpoints.cmake")
 # and SmoothDownwardExpander sources, apply the expander after the Voice Smart
 # Enhancer, and expose the two-second learned static-noise workflow.
 include("${CMAKE_CURRENT_LIST_DIR}/IntegrateSC220StaticNoiseClean.cmake")
+
+# Final analyzer authority: the engine feeds programmeAnalyzer from the exact
+# post-limiter master bus. Never route the display back to the disabled Voice
+# Enhancer analysis tap.
+include("${CMAKE_CURRENT_LIST_DIR}/RestoreSC220ProgrammeAnalyzerRoute.cmake")

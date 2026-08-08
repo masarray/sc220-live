@@ -78,12 +78,16 @@ private:
     juce::ComboBox monitorOutputBox;
     juce::TextButton stereoButton { "STEREO" };
     juce::TextButton dualMonoButton { "DUAL MONO" };
+    juce::TextButton noiseCleanButton { "DENOISE" };
+    juce::TextButton learnNoiseButton { "LEARN" };
     juce::ComboBox pcSourceBox;
     juce::TextButton programMonitorButton { "PROGRAM" };
     juce::TextButton musicCueButton { "MUSIC CUE" };
 
     juce::Slider inputTrim;
     juce::Slider sc220Fader;
+    juce::Slider sc220MonoLeftFader;
+    juce::Slider sc220MonoRightFader;
     juce::Slider pcFader;
     juce::Slider duckAmount;
     std::array<juce::Slider, 5> macroKnobs;

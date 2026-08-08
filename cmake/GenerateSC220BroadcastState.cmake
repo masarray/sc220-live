@@ -105,3 +105,8 @@ message(STATUS "SC220 Live broadcast-state source: ${SC220_APP_GENERATED_SOURCE}
 # PC playback capture and anti-loop policy, then apply final visual polish.
 include("${CMAKE_CURRENT_LIST_DIR}/GenerateSC220PcEndpointRouting.cmake")
 include("${CMAKE_CURRENT_LIST_DIR}/PolishSC220FinalUi.cmake")
+
+# Final stream-selector authority: never display ordinal aliases such as
+# "VB-CABLE 2" or "VB-CABLE 3". Preserve the exact currently enumerated
+# Windows render-endpoint friendly names and select by that exact identity.
+include("${CMAKE_CURRENT_LIST_DIR}/UseSC220RealStreamEndpoints.cmake")

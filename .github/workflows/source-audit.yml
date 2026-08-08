@@ -39,6 +39,8 @@ jobs:
         run: python qa/audit_sc220_runtime_regression_guard.py
       - name: Validate actual runtime sample-rate and buffer telemetry
         run: python qa/audit_sc220_runtime_clock_status.py
+      - name: Validate P3 live routing denoise dual-mono and loudness
+        run: python qa/audit_sc220_p3_live_ux.py
       - name: Validate ASK-P v0.5.23 port boundary
         run: python qa/audit_v0140_askp_v0523_port.py
       - name: Validate SC220 dual-source broadcast bus

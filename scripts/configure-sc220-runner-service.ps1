@@ -113,11 +113,14 @@ Ensure-MachinePython
 # Windows services may retain the machine environment that existed before this
 # setup installed build tools. The runner reads .env at startup, so pin the
 # current machine-level PATH without relying on a reboot or the user's PATH.
+# PSExecutionPolicyPreference applies only to PowerShell processes launched by
+# this runner service. It avoids changing LocalMachine/CurrentUser policy while
+# allowing GitHub Actions' generated temporary .ps1 scripts to execute.
 $machinePath = [Environment]::GetEnvironmentVariable('Path', 'Machine')
 if ([string]::IsNullOrWhiteSpace($machinePath)) {
     throw 'The Windows machine PATH is empty.'
 }
-$envText = "PATH=$machinePath`nSC220_RELEASE_RUNNER=1`n"
+$envText = "PATH=$machinePath`nPSExecutionPolicyPreference=Bypass`nSC220_RELEASE_RUNNER=1`n"
 $utf8NoBom = [Text.UTF8Encoding]::new($false)
 [IO.File]::WriteAllText((Join-Path $RunnerRoot '.env'), $envText, $utf8NoBom)
 
@@ -135,3 +138,4 @@ Write-Host "Service : $($service.Name)"
 Write-Host "Account : $($serviceInfo.StartName)"
 Write-Host 'Startup : Manual (started only by RELEASE-SC220.cmd)'
 Write-Host "PATH    : pinned in $RunnerRoot\.env"
+Write-Host 'PowerShell policy: Bypass for runner child processes only'

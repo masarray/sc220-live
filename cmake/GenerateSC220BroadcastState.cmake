@@ -110,3 +110,8 @@ include("${CMAKE_CURRENT_LIST_DIR}/PolishSC220FinalUi.cmake")
 # "VB-CABLE 2" or "VB-CABLE 3". Preserve the exact currently enumerated
 # Windows render-endpoint friendly names and select by that exact identity.
 include("${CMAKE_CURRENT_LIST_DIR}/UseSC220RealStreamEndpoints.cmake")
+
+# Final voice-clean authority: reuse the exact Sonkupik-Live MusicalNoiseClean
+# and SmoothDownwardExpander sources, apply the expander after the Voice Smart
+# Enhancer, and expose the two-second learned static-noise workflow.
+include("${CMAKE_CURRENT_LIST_DIR}/IntegrateSC220StaticNoiseClean.cmake")

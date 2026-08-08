@@ -1,6 +1,9 @@
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version 2.0
 
+$runnerRoot = 'C:\actions-runner-sc220'
+$runnerEnvPath = Join-Path $runnerRoot '.env'
+
 $machinePath = [Environment]::GetEnvironmentVariable('Path', 'Machine')
 if ([string]::IsNullOrWhiteSpace($machinePath)) {
     throw 'The Windows machine PATH is empty.'
@@ -41,6 +44,15 @@ if ($vswhere) {
 }
 if (-not $cpp) { $missing.Add('Visual Studio C++ Build Tools') }
 
+if (-not (Test-Path -LiteralPath $runnerEnvPath -PathType Leaf)) {
+    $missing.Add("Runner environment file ($runnerEnvPath)")
+} else {
+    $runnerEnv = @(Get-Content -LiteralPath $runnerEnvPath)
+    if ($runnerEnv -notcontains 'PSExecutionPolicyPreference=Bypass') {
+        $missing.Add('Runner-scoped PowerShell execution policy Bypass')
+    }
+}
+
 $runner = Get-Service -Name 'actions.runner.*' -ErrorAction SilentlyContinue |
     Where-Object { $_.Name -match '(?i)sc220|masarray' } |
     Select-Object -First 1
@@ -80,6 +92,7 @@ try {
     Write-Host "Runner : $($runner.Name) [$($runner.Status)]"
     Write-Host "Account: $($runnerInfo.StartName)"
     Write-Host 'Startup: Manual / release-only'
+    Write-Host 'PowerShell: runner-scoped Bypass'
     Write-Host "MSVC   : $($cpp.Trim())"
     Write-Host "Inno   : $inno"
     Write-Host "Ninja  : $((Get-Command ninja.exe).Source)"

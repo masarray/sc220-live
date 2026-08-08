@@ -29,6 +29,8 @@ jobs:
           -DSC220_UI_SOURCE=${{ github.workspace }}/live/SC220MainComponent.cpp
           -DSC220_UI_GENERATED_SOURCE=${{ runner.temp }}/SC220MainComponent_Aligned.cpp
           -P cmake/GenerateSC220AlignedUi.cmake
+      - name: Validate SC220 MIXER-01 device auto-detection
+        run: python qa/audit_p0_sc220_device_detection.py
       - name: Validate ASK-P v0.5.23 port boundary
         run: python qa/audit_v0140_askp_v0523_port.py
       - name: Validate SC220 dual-source broadcast bus

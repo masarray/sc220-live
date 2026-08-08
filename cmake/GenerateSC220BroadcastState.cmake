@@ -111,16 +111,22 @@ include("${CMAKE_CURRENT_LIST_DIR}/PolishSC220FinalUi.cmake")
 # Windows render-endpoint friendly names and select by that exact identity.
 include("${CMAKE_CURRENT_LIST_DIR}/UseSC220RealStreamEndpoints.cmake")
 
-# Final voice-clean authority: reuse the exact Sonkupik-Live MusicalNoiseClean
-# and SmoothDownwardExpander sources, apply the expander after the Voice Smart
-# Enhancer, and expose the two-second learned static-noise workflow.
+# Voice-clean UI/order authority from Sonkupik. A later finalizer narrows the
+# runtime policy to frozen-profile learning plus a learned-floor expander.
 include("${CMAKE_CURRENT_LIST_DIR}/IntegrateSC220StaticNoiseClean.cmake")
 
 # Runtime clock authority: publish the actual open-device sample rate and buffer
-# size. The analyzer must never receive a cosmetic/default 0 Hz status value.
+# size. Visual telemetry must never receive a cosmetic/default 0 Hz value.
 include("${CMAKE_CURRENT_LIST_DIR}/FixSC220RuntimeClockStatus.cmake")
 
-# Final analyzer authority: the engine feeds programmeAnalyzer from the exact
-# post-limiter master bus. Never route the display back to the disabled Voice
-# Enhancer analysis tap.
+# First repair any legacy analyzer routing so the proven visualizer restore can
+# consume a known post-master source.
 include("${CMAKE_CURRENT_LIST_DIR}/RestoreSC220ProgrammeAnalyzerRoute.cmake")
+
+# Final audio policy: Learn is explicit/frozen, normal programme audio does not
+# run the spectral workspace, and PC-source/Monitor self-routing is rejected.
+include("${CMAKE_CURRENT_LIST_DIR}/FinalizeSC220NaturalLivePath.cmake")
+
+# Restore the previously proven responsive post-limiter visualizer. This removes
+# the queued ScopeTap/32-band FFT lifecycle and uses atomic 14-band telemetry.
+include("${CMAKE_CURRENT_LIST_DIR}/RebuildSC220ImpactVisualizer.cmake")

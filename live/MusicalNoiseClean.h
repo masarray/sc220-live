@@ -8,14 +8,12 @@
 namespace askp::live {
 
 /**
-    Lightweight profile-based denoiser for live music.
+    Lightweight learned-noise profiler plus optional spectral workspace.
 
-    Design goals:
-      - user-learned static noise profile (RX-style workflow, original code);
-      - short FFT, stereo-linked attenuation and conservative reduction;
-      - fast transient release, slow reduction engagement;
-      - no allocation or locking in the audio callback;
-      - complementary smooth downward expander for silence cleanup.
+    SC220 Live uses the FFT path only while the user explicitly captures a
+    static-noise profile. The normal programme path stays dry and zero-latency;
+    the frozen profile supplies the stereo-linked expander threshold instead of
+    continuously adapting the music signal.
 */
 class MusicalNoiseClean
 {
@@ -53,13 +51,18 @@ public:
     void startLearning (double seconds = 2.0) noexcept;
     bool isLearning() const noexcept { return learningActive.load(); }
     bool hasProfile() const noexcept { return profileValid.load(); }
+    bool shouldCaptureProfile() const noexcept
+    {
+        return enabled.load() && (learnRequested.load() || learningActive.load());
+    }
     float getLearningProgress() const noexcept { return learningProgress.load(); }
     float getEstimatedNoiseFloorDb() const noexcept { return estimatedNoiseFloorDb.load(); }
 
-    /** In-place spectral processing. Adds fftSize samples of deterministic latency. */
+    /** FFT workspace used only during explicit Learn Static Noise capture. */
     void process (juce::AudioBuffer<float>& buffer) noexcept;
 
-    int getLatencySamples() const noexcept { return activeFftSize.load(); }
+    // Normal SC220 programme audio bypasses the spectral workspace entirely.
+    int getLatencySamples() const noexcept { return 0; }
 
 private:
     void reconfigureIfNeeded() noexcept;

@@ -9,6 +9,32 @@ float dbFromPeak (float peak) noexcept
 {
     return juce::Decibels::gainToDecibels (juce::jmax (peak, 1.0e-9f), -120.0f);
 }
+
+int sc220InputPreference (const juce::String& name) noexcept
+{
+    const auto normalised = name.trim().toUpperCase();
+
+    // Windows exposes the SC220 used in the field as "Microphone (MIXER-01)".
+    // Keep product-specific aliases ahead of the legacy generic MIXER fallback
+    // so another mixer endpoint cannot win when the real SC220 is present.
+    if (normalised.contains ("MIXER-01"))
+        return 100;
+    if (normalised.contains ("SC220"))
+        return 90;
+    if (normalised.contains ("RECORDING TECH"))
+        return 80;
+    if (normalised == "MIXER")
+        return 60;
+    if (normalised.startsWith ("MIXER ("))
+        return 50;
+
+    return 0;
+}
+
+bool looksLikeSc220InputName (const juce::String& name) noexcept
+{
+    return sc220InputPreference (name) > 0;
+}
 } // namespace
 
 LiveAudioEngine::LiveAudioEngine()
@@ -50,6 +76,39 @@ bool LiveAudioEngine::initialise (const juce::XmlElement* savedDeviceState)
             {
                 selectOutputDevice (name);
                 break;
+            }
+        }
+    }
+
+    // P0: SC220 Live is a dedicated hardware companion. Do not depend on the
+    // Windows default recording endpoint or on a stale saved device state.
+    // If an SC220 endpoint is present but another input is active, pick the
+    // highest-confidence SC220 alias automatically.
+    const auto activeInput = deviceManager.getAudioDeviceSetup().inputDeviceName;
+    if (! looksLikeSc220InputName (activeInput))
+    {
+        const auto inputs = getInputDeviceNames();
+        juce::String preferredSc220Input;
+        int preferredScore = 0;
+
+        for (const auto& name : inputs)
+        {
+            const int score = sc220InputPreference (name);
+            if (score > preferredScore)
+            {
+                preferredScore = score;
+                preferredSc220Input = name;
+            }
+        }
+
+        if (preferredSc220Input.isNotEmpty())
+        {
+            const auto selectionError = selectInputDevice (preferredSc220Input);
+            if (selectionError.isNotEmpty())
+            {
+                const juce::ScopedLock lock (statusLock);
+                lastError = "SC220 detected as '" + preferredSc220Input
+                          + "' but it could not be opened.\n\n" + selectionError;
             }
         }
     }

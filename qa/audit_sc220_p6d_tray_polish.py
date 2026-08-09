@@ -10,7 +10,6 @@ def require(text: str, needle: str, label: str) -> None:
         raise AssertionError(f"P6D authority missing {label}: {needle}")
 
 
-# P6D must be chained after P6C and remain application/tray UI only.
 if 'include("${CMAKE_CURRENT_LIST_DIR}/SC220P6DTrayPolish.cmake")' not in P6C:
     raise AssertionError("P6D must be chained after P6C")
 
@@ -37,8 +36,6 @@ for needle, label in [
 ]:
     require(P6D, needle, label)
 
-# The legacy ASK-P/VST icon may appear only as the replacement anchor that P6D
-# explicitly removes; it must never appear in a replacement side.
 if P6D.count("askp_app_logo_png") != 1:
     raise AssertionError("P6D should reference the ASK-P tray icon exactly once as the stale anchor to remove")
 

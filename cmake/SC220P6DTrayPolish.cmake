@@ -133,3 +133,8 @@ message(STATUS "SC220 P6D: compact tray panel spacing + canonical SC220 tray ico
 # policy: SC220 hardware remains entitled; software-only use gets 90 days then
 # the existing Midtrans licence flow becomes a required polished modal gate.
 include("${CMAKE_CURRENT_LIST_DIR}/SC220P6ETrayReliabilityAndSoftwareTrial.cmake")
+
+# P6F is the final tray-artwork authority. It replaces P6E's web-PNG raster with
+# the repository's actual multi-size favicon.ico so Windows receives the small
+# transparent icon authored for 48/32/16 px instead of a black-looking square.
+include("${CMAKE_CURRENT_LIST_DIR}/SC220P6FNativeTrayIcon.cmake")

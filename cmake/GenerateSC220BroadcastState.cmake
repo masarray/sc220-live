@@ -150,3 +150,7 @@ include("${CMAKE_CURRENT_LIST_DIR}/SC220P6AUiPolish.cmake")
 # P6B keeps LEARN frozen/non-adaptive while adding a zero-latency upper-band hiss
 # suppressor and replaces P6A's clipped outer glow with one digital-mixer MUTE shape.
 include("${CMAKE_CURRENT_LIST_DIR}/SC220P6BNoiseCleanup.cmake")
+
+# P6C is UI-only: replace loose DSP/Smart-Protect dot labels with compact glowing
+# status chips that make active/bypass state readable at a glance.
+include("${CMAKE_CURRENT_LIST_DIR}/SC220P6CStatusChips.cmake")

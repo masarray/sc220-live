@@ -11,16 +11,18 @@ third_party/askp-vst/
 The latest audited ASK-P repository HEAD is:
 
 ```text
-9b275b42e6668c958ac4367b86c6e8660922c8cb
+f91aa04e953cf14eb0682a1bc305138b6507d73a
 ```
 
-Its approved v0.5.24 release request names this exact **product source commit**:
+Its approved v0.5.24 release request still names this exact **product source commit**:
 
 ```text
 1cf050d40338cbcb5d8cddd9fc2de5f23e3d625f
 ```
 
-SC220 Live pins the submodule to the approved product source commit rather than following the moving repository HEAD. Commits after `1cf050d4...` only update release-request / release-audit helper metadata; the product DSP, presets, processor and production CMake source contract are unchanged.
+The current approved release-helper commit is `811b7376dd784ce9f64e03512c7baf7de5e77425`.
+
+SC220 Live pins the submodule to the approved product source commit rather than following the moving repository HEAD. Commits after `1cf050d4...` currently change release-request, release-audit, macOS/Pages setup and verification helpers; the product DSP, presets, processor and production CMake source contract are unchanged.
 
 ASK-P product metadata is now **v0.5.24** with DSP header revision `2026073102` and 13 factory profiles.
 

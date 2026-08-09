@@ -131,7 +131,11 @@ include("${CMAKE_CURRENT_LIST_DIR}/FinalizeSC220NaturalLivePath.cmake")
 # the queued ScopeTap/32-band FFT lifecycle and uses atomic 14-band telemetry.
 include("${CMAKE_CURRENT_LIST_DIR}/RebuildSC220ImpactVisualizer.cmake")
 
-# Hardware-test P3 authority. This pass runs last so later source generation can
-# never silently restore hidden PC capture, stale LUFS-I-only display, linked
-# Dual Mono controls or Settings-only denoise UX.
+# Hardware-test P3 authority. This pass restores explicit routing, direct
+# frozen-profile Noise controls, independent Dual Mono and live LUFS-M.
 include("${CMAKE_CURRENT_LIST_DIR}/FinalizeSC220LiveUxP3.cmake")
+
+# P4 is deliberately last: keep the approved P3 console/visualizer intact while
+# replacing raw-peak ducking with sustained speech presence and cleaning the
+# fixed YT/TikTok target caption from the loudness dial.
+include("${CMAKE_CURRENT_LIST_DIR}/SC220P4SmartDucking.cmake")

@@ -38,8 +38,8 @@ sc220_p6f_once(_app "ICO BinaryData include"
 
 # Replace P6E's PNG raster path with an ICO reader for the canonical Windows
 # small-icon asset. RealFaviconGenerator's file stores 48/32/16 32-bit DIB
-# entries; choose the frame nearest 32 px, preserve BGRA alpha, and honour the
-# legacy AND mask if an ICO frame happens to contain zero alpha.
+# entries; choose the exact 32 px frame when available, preserve BGRA alpha,
+# and honour the legacy AND mask if an ICO frame happens to contain zero alpha.
 sc220_p6f_once(_app "native favicon ICO tray renderer"
 [=[
     void installTrayIcon()
@@ -126,7 +126,9 @@ sc220_p6f_once(_app "native favicon ICO tray renderer"
                     || frameOffset + bytesInFrame > iconBytes)
                     continue;
 
-                const int score = width >= 32 ? width - 32 : (32 - width) + 100;
+                const int score = width == 32 ? 0
+                                : width > 32 ? width - 32
+                                             : 100 + (32 - width);
                 if (score < bestScore)
                 {
                     bestScore = score;

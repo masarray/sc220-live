@@ -17,9 +17,8 @@ function(sc220_p6d_once variable_name label anchor replacement)
     set(${variable_name} "${_value}" PARENT_SCOPE)
 endfunction()
 
-# Compact controller header now uses the SC220 favicon authority instead of the
-# generic waveform cue. This header artwork is intentionally independent from
-# the final Windows notification-area ICO path owned by P6F.
+# Compact controller header uses the same corrected SC220 96px app icon as the
+# Windows tray and executable small icon.
 sc220_p6d_once(_app "compact header SC220 icon"
 [=[
         if (auto icon = createLucideIcon ("audio_waveform_svg", colours::cyan))
@@ -73,9 +72,8 @@ sc220_p6d_once(_app "compact controller window size"
     "            miniWindow->setSize (300, 290);"
     "            miniWindow->setSize (320, 324);")
 
-# Remove the legacy ASK-P/VST fallback from the pre-P6F tray stage. P6E then
-# owns registration lifetime/retry; P6F finally replaces this PNG stage with the
-# actual multi-size favicon.ico before compilation.
+# Remove the legacy ASK-P/VST fallback. P6E owns tray registration lifetime and
+# P6F verifies that these favicon resources are the corrected SC220 app assets.
 sc220_p6d_once(_app "canonical SC220 system tray icon"
 [=[
         int iconBytes = 0;
@@ -129,14 +127,10 @@ foreach(_forbidden IN ITEMS
 endforeach()
 
 file(WRITE "${SC220_APP_GENERATED_SOURCE}" "${_app}")
-message(STATUS "SC220 P6D: compact tray panel spacing + canonical SC220 tray icon")
+message(STATUS "SC220 P6D: compact tray panel spacing + SC220 app icon path")
 
-# P6E owns Windows tray registration lifetime/retry and the commercial policy:
-# SC220 hardware remains entitled; software-only use gets 90 days then the
-# existing Midtrans licence flow becomes a required polished modal gate.
+# P6E owns Windows tray registration lifetime/retry and commercial policy.
 include("${CMAKE_CURRENT_LIST_DIR}/SC220P6ETrayReliabilityAndSoftwareTrial.cmake")
 
-# P6F is the final tray-artwork authority. It replaces P6E's web-PNG raster with
-# the repository's actual multi-size favicon.ico so Windows receives the small
-# transparent icon authored for 48/32/16 px instead of a black-looking square.
+# P6F locks P6E's existing PNG runtime path to the corrected SC220 app assets.
 include("${CMAKE_CURRENT_LIST_DIR}/SC220P6FNativeTrayIcon.cmake")

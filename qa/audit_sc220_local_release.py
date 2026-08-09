@@ -31,6 +31,8 @@ def check(name: str, condition: bool) -> None:
     checks.append((name, bool(condition)))
 
 
+approved_askp_commit = "2c764f82b0fc99eaff04d918cef4f839db7509e5"
+
 check("all one-click release files exist", all(path.exists() for path in paths.values()))
 check(
     "release workflow is manual-only",
@@ -55,9 +57,15 @@ check(
     workflow.count("persist-credentials: false") >= 2,
 )
 check(
-    "ASK-P authority remains pinned",
+    "ASK-P authority remains pinned and lock-verified",
     "repository: masarray/askp-vst" in workflow
-    and "5757119cab7a1a75f09dcf0edea6e3be97975439" in workflow,
+    and approved_askp_commit in workflow
+    and "ASKP_AUTHORITY.lock" in workflow
+    and "ASK-P checkout mismatch" in workflow,
+)
+check(
+    "release workflow reruns ASK-P port audit before build",
+    "qa\\audit_v0150_askp_p03_port.py" in workflow,
 )
 check(
     "public release token is exposed only to the publish step",

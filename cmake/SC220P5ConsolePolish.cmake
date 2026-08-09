@@ -1,10 +1,7 @@
 # P5 authority: final console polish requested from hardware review.
-# - stronger/faster learned-floor expander without adaptive learning
-# - user-facing SC220 endpoint naming
-# - Lucide speaker cue for PC Audio
-# - aligned SC220/Stream mute buttons
-# - explicit DSP ON/BYPASS wording and refined signature subtitle
-# - user-provided SVG fader thumb artwork
+# Keep this pass resilient to earlier generated-source transforms: use unique
+# function/context anchors instead of matching broad fragments that may also
+# appear in the constructor.
 
 if(NOT DEFINED SC220_ENGINE_GENERATED_SOURCE
    OR NOT DEFINED SC220_UI_MONITOR_GENERATED_SOURCE)
@@ -34,18 +31,24 @@ endfunction()
 function(sc220_p5_range variable_name label begin_marker end_marker replacement)
     set(_value "${${variable_name}}")
     string(FIND "${_value}" "${begin_marker}" _begin)
-    string(FIND "${_value}" "${end_marker}" _end)
-    if(_begin EQUAL -1 OR _end EQUAL -1 OR _end LESS_EQUAL _begin)
-        message(FATAL_ERROR "SC220 P5 range changed: ${label}")
+    if(_begin EQUAL -1)
+        message(FATAL_ERROR "SC220 P5 range begin changed: ${label}")
     endif()
+    # Search for the end marker only after the selected begin marker. This avoids
+    # accidentally pairing a constructor occurrence with a refresh-function end.
+    string(SUBSTRING "${_value}" ${_begin} -1 _tail)
+    string(FIND "${_tail}" "${end_marker}" _relative_end)
+    if(_relative_end EQUAL -1)
+        message(FATAL_ERROR "SC220 P5 range end changed: ${label}")
+    endif()
+    math(EXPR _end "${_begin} + ${_relative_end}")
     string(SUBSTRING "${_value}" 0 ${_begin} _prefix)
     string(SUBSTRING "${_value}" ${_end} -1 _suffix)
     set(${variable_name} "${_prefix}${replacement}${_suffix}" PARENT_SCOPE)
 endfunction()
 
-# Embed the reviewed SVG thumb directly into the generated UI. This keeps the
-# fader hit-test/drag behaviour native JUCE while making the visible cap follow
-# the supplied mixer artwork at every scale factor.
+# Friendly endpoint helper + scalable fader artwork. Internal endpoint identity
+# remains untouched; only the user-facing ComboBox text is renamed.
 string(CONCAT _namespace_replacement
 [=[
 juce::String sc220FriendlyEndpointLabel (juce::String name)
@@ -67,6 +70,8 @@ sc220_p5_once(_ui "friendly endpoint helper and SVG fader asset"
 class SC220MainComponent::SurfaceLookAndFeel final]=]
 "${_namespace_replacement}")
 
+# Render the supplied SVG as the visible fader cap while native JUCE Slider
+# behaviour continues to own hit testing, drag precision and value mapping.
 set(_fader_render [=[
         const auto cap = juce::Rectangle<float> (centreX - 20.0f, sliderPos - 34.0f, 40.0f, 68.0f);
         static auto faderThumb = juce::Drawable::createFromImageData (
@@ -94,22 +99,23 @@ sc220_p5_range(_ui "SVG linear-fader thumb"
     int getSliderThumbRadius]=]
 "${_fader_render}")
 
-# PC Audio keeps the real endpoint identity internally but replaces the hardware
-# driver token MIXER-01 with the product name SC220 on the user-facing surface.
+# Constructor setup: display friendly labels but map selected index back to the
+# current real endpoint list. Use pcSetupEndpoints so this block cannot collide
+# with the refresh-function pcEndpoints anchor below.
 set(_pc_setup [=[
     {
-        const auto pcEndpoints = audioEngine.getPcAudioEndpointNames();
-        for (int i = 0; i < pcEndpoints.size(); ++i)
-            pcSourceBox.addItem (sc220FriendlyEndpointLabel (pcEndpoints[i]), i + 1);
+        const auto pcSetupEndpoints = audioEngine.getPcAudioEndpointNames();
+        for (int i = 0; i < pcSetupEndpoints.size(); ++i)
+            pcSourceBox.addItem (sc220FriendlyEndpointLabel (pcSetupEndpoints[i]), i + 1);
     }
     pcSourceBox.setTextWhenNothingSelected ("SELECT PC AUDIO");
     pcSourceBox.onChange = [this]
     {
         const int index = pcSourceBox.getSelectedItemIndex();
-        const auto pcEndpoints = audioEngine.getPcAudioEndpointNames();
-        if (index < 0 || index >= pcEndpoints.size())
+        const auto pcSetupEndpoints = audioEngine.getPcAudioEndpointNames();
+        if (index < 0 || index >= pcSetupEndpoints.size())
             return;
-        const auto error = audioEngine.selectPcAudioEndpoint (pcEndpoints[index]);
+        const auto error = audioEngine.selectPcAudioEndpoint (pcSetupEndpoints[index]);
         if (error.isNotEmpty())
             juce::AlertWindow::showMessageBoxAsync (
                 juce::MessageBoxIconType::WarningIcon,
@@ -126,7 +132,12 @@ sc220_p5_range(_ui "friendly PC Audio combo setup"
     auto configureKnob =]=]
 "${_pc_setup}")
 
+# Refresh function only. Use the status line as context and stop before the
+# separately generated Stream Output refresh block. P4/P3/real-stream passes can
+# therefore evolve independently without P5 deleting their code.
 set(_pc_refresh [=[
+    const auto status = audioEngine.getStatus();
+
     const auto pcEndpoints = audioEngine.getPcAudioEndpointNames();
     bool endpointListChanged = pcEndpoints.size() != pcSourceBox.getNumItems();
     if (! endpointListChanged)
@@ -154,14 +165,16 @@ set(_pc_refresh [=[
 ]=])
 sc220_p5_range(_ui "friendly PC Audio combo refresh"
 [=[
+    const auto status = audioEngine.getStatus();
+
     const auto pcEndpoints = audioEngine.getPcAudioEndpointNames();
 ]=]
 [=[
-    const auto outputIndex]=]
+    juce::StringArray streamOutputs;
+]=]
 "${_pc_refresh}")
 
-# Add a compact Lucide speaker glyph above the PC Audio title without creating
-# per-frame objects. createLucideIcon is already backed by the bundled volume-2 SVG.
+# Compact Lucide speaker cue for the PC Audio source strip.
 sc220_p5_once(_ui "PC Audio Lucide speaker"
 [=[
     g.setColour (palette::graphite);
@@ -182,7 +195,7 @@ sc220_p5_once(_ui "PC Audio Lucide speaker"
                 pcStripArea.getWidth(), 24, juce::Justification::centred);
 ]=])
 
-# User-facing DSP copy: describe the power state and the processor explicitly.
+# User-facing DSP wording.
 string(REPLACE "MAS ARI SIGNATURE ENGINE"
                "Digital Sound Processor ~ Mas Ari Signature" _ui "${_ui}")
 sc220_p5_once(_ui "explicit DSP ON/BYPASS state"
@@ -205,8 +218,7 @@ sc220_p5_once(_ui "explicit DSP ON/BYPASS state"
                 juce::Justification::centredLeft);
 ]=])
 
-# SC220 and Stream mute switches share the same console baseline. sc220StripArea
-# is vertically inset, so using its bottom was visibly ~48 px too high.
+# SC220 MUTE uses the same lower console baseline as Stream MUTE.
 sc220_p5_once(_ui "SC220 mute baseline"
 [=[
     sc220Mute.setBounds (sc220StripArea.getCentreX() - 36,
@@ -217,8 +229,8 @@ sc220_p5_once(_ui "SC220 mute baseline"
                          inputArea.getBottom() - 44, 72, 31);
 ]=])
 
-# P5 strengthens the learned-floor expander while keeping the frozen-profile,
-# non-adaptive policy introduced earlier. Active programme stays open/unity.
+# Stronger learned-floor expander. The profile remains frozen/non-adaptive and
+# normal programme audio still avoids spectral denoise work after Learn.
 sc220_p5_once(_engine "stronger learned-floor expander amount"
 [=[
     expander.setAmount (0.78f);
@@ -229,8 +241,8 @@ sc220_p5_once(_engine "stronger learned-floor expander amount"
     expander.setThresholdOffsetDb (6.0f);
 ]=])
 
-# Generate a P5-tuned copy of MusicalNoiseClean.cpp so the reviewed base source
-# remains readable. Only the downward-expander ballistics/range change here.
+# Build a P5-tuned copy of the time-domain expander implementation. This changes
+# only range/ballistics; no adaptive learner or additional FFT is introduced.
 set(_noise_source "${_p5_root}/live/MusicalNoiseClean.cpp")
 file(READ "${_noise_source}" _noise)
 
@@ -279,6 +291,7 @@ endif()
 
 foreach(_required IN ITEMS
         "sc220FriendlyEndpointLabel"
+        "pcSetupEndpoints"
         "MIXER-01\", \"SC220"
         "volume_2_svg"
         "Digital Sound Processor ~ Mas Ari Signature"

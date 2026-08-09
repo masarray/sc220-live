@@ -98,7 +98,7 @@ void EnhancerEngineBridge::setPresetIndex (int index)
         return;
 
     index = juce::jlimit (0, names.size() - 1, index);
-    // The public authority method performs the complete v0.5.23 profile handoff:
+    // The public authority method performs the complete v0.5.24 profile handoff:
     // scene dimensions, five visible macros, internal output trim and protect.
     processor_.applyPresetMacroToParameters (index);
 }
@@ -167,7 +167,7 @@ float EnhancerEngineBridge::enhance() const noexcept
 
 float EnhancerEngineBridge::smartBass() const noexcept
 {
-    return getParameter (smartBassId, 68.0f);
+    return getParameter (smartBassId, 70.0f);
 }
 
 float EnhancerEngineBridge::smartTreble() const noexcept

@@ -33,7 +33,7 @@ for needle, label in [
     ('SC220TrayIconData::favicon_ico', "embedded ICO bytes"),
     ('SC220TrayIconData::favicon_icoSize', "embedded ICO size"),
     ('bitDepth != 32', "32-bit ICO frame validation"),
-    ('const int score = width >= 32 ? width - 32', "32 px frame preference"),
+    ('const int score = width == 32 ? 0', "exact 32 px frame preference"),
     ('juce::Colour::fromRGBA (px[2], px[1], px[0], alpha)', "BGRA-to-JUCE alpha decode"),
     ('setIconImage (trayImage, trayImage)', "exact decoded tray image publication"),
 ]:

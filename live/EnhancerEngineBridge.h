@@ -54,7 +54,23 @@ public:
 
     askp::LicenseManager& licenseManager() noexcept { return processor_.licenseManager; }
     const askp::LicenseManager& licenseManager() const noexcept { return processor_.licenseManager; }
-    bool editingAllowed() const noexcept { return processor_.licenseManager.editingAllowed(); }
+
+    // Physical SC220 ownership is its own entitlement. The software-only
+    // licence timer may expire, but a currently enumerated SC220 must keep the
+    // creative controls available without asking the hardware owner to pay for
+    // a second software entitlement.
+    void setHardwareEntitled (bool entitled) noexcept
+    {
+        hardwareEntitled_.store (entitled, std::memory_order_release);
+    }
+    bool isHardwareEntitled() const noexcept
+    {
+        return hardwareEntitled_.load (std::memory_order_acquire);
+    }
+    bool editingAllowed() const noexcept
+    {
+        return isHardwareEntitled() || processor_.licenseManager.editingAllowed();
+    }
     bool isLicensed() const noexcept { return processor_.licenseManager.isLicensed(); }
 
     void setPresetIndex (int index);
@@ -100,6 +116,11 @@ private:
     askp::Processor processor_;
     askp::ScopeTap analyzerTap_;
     std::atomic<bool> visualTapEnabled_ { false };
+    // Start permissive so persisted creative settings can be restored before
+    // the Windows endpoint watcher performs its first authoritative hardware
+    // scan. SC220DeviceWatcher replaces this value immediately when the main UI
+    // is constructed.
+    std::atomic<bool> hardwareEntitled_ { true };
 };
 
 } // namespace askp::live

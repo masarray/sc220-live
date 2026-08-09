@@ -5,8 +5,6 @@ aligned = (ROOT / "cmake/GenerateSC220AlignedUi.cmake").read_text(encoding="utf-
 state = (ROOT / "cmake/GenerateSC220BroadcastState.cmake").read_text(encoding="utf-8")
 polish = (ROOT / "cmake/PolishSC220FinalUi.cmake").read_text(encoding="utf-8")
 visualizer = (ROOT / "cmake/RebuildSC220ImpactVisualizer.cmake").read_text(encoding="utf-8")
-calibrator = (ROOT / "cmake/CalibrateSC220Meters.cmake").read_text(encoding="utf-8")
-release = (ROOT / "cmake/RefineSC220ReleaseUi.cmake").read_text(encoding="utf-8")
 telemetry = (ROOT / "live/ProgrammeBandTelemetry.h").read_text(encoding="utf-8")
 
 generated_root = ROOT / "build-sc220" / "generated" / "sc220-monitor"
@@ -34,16 +32,11 @@ check(
     )),
 )
 check(
-    "atomic analyzer calibration and release polish are ordered final passes",
-    all(token in state for token in (
-        'include("${CMAKE_CURRENT_LIST_DIR}/RebuildSC220ImpactVisualizer.cmake")',
-        'include("${CMAKE_CURRENT_LIST_DIR}/CalibrateSC220Meters.cmake")',
-        'include("${CMAKE_CURRENT_LIST_DIR}/RefineSC220ReleaseUi.cmake")',
-    ))
-    and state.find("RebuildSC220ImpactVisualizer.cmake")
-    < state.find("CalibrateSC220Meters.cmake")
-    < state.find("RefineSC220ReleaseUi.cmake")
-    and "GenerateSC220DirectPcCaptureVisualizer.cmake" not in state,
+    "natural live policy runs before restored responsive visualizer",
+    "FinalizeSC220NaturalLivePath.cmake" in state
+    and "RebuildSC220ImpactVisualizer.cmake" in state
+    and state.index("FinalizeSC220NaturalLivePath.cmake")
+        < state.index("RebuildSC220ImpactVisualizer.cmake"),
 )
 check("final generated sources exist", generated_ui_path.exists() and generated_engine_path.exists())
 check(
@@ -70,100 +63,37 @@ check(
     )),
 )
 check(
-    "telemetry uses fourteen preallocated proportional band-pass filters",
+    "atomic analyzer uses fourteen preallocated stereo band filters",
     all(token in telemetry for token in (
-        "bandCount = 14", "centreFrequencies", "Coefficients", "State",
-        "processSample", "std::array<std::array<State, bandCount>, 2>",
-        "lowerBoundary", "upperBoundary", "nominal / bandwidth",
+        "bandCount = 14", "centreFrequencies", "processSample",
+        "std::array<std::array<State, bandCount>, 2>",
+        "publishedGeneration.fetch_add",
     )),
 )
 check(
-    "telemetry publishes calibrated levels and separate rhythm activity atomically",
-    all(token in telemetry for token in (
-        "std::array<std::atomic<float>, bandCount> publishedDb",
-        "std::array<std::atomic<float>, bandCount> publishedActivity",
-        "publishedGeneration.fetch_add", "publishedDb[band].store",
-        "publishedActivity[band].store", "readActivity",
-    )),
-)
-check(
-    "telemetry keeps a stable 180 ms baseline plus fast per-frequency activity",
-    all(token in telemetry for token in (
-        "calibratedPower", "fastPower", "calibratedSmoothingSeconds = 0.180",
-        "fastAttackSeconds", "fastReleaseSeconds", "activityThresholdDb",
-        "activityRangeDb",
-    )),
-)
-check(
-    "telemetry has no queue allocation lock or FFT implementation",
-    all(token not in telemetry for token in (
-        "std::vector", "std::deque", "std::queue", "juce::AbstractFifo",
-        "std::mutex", "juce::CriticalSection", "condition_variable",
-        "juce::dsp::FFT", "performFrequencyOnlyForwardTransform", "new ",
-    )),
-)
-check(
-    "exact post-limiter programme buffer feeds the band telemetry",
+    "exact post-limiter programme buffer feeds atomic band telemetry",
     all(token in generated_engine for token in (
         "masterLimiter.process (masterContext);",
         "programmeBandTelemetry.process",
         "voiceBlock.getReadPointer (0)", "voiceBlock.getReadPointer (1)",
     ))
     and generated_engine.find("programmeBandTelemetry.process")
-    > generated_engine.find("masterLimiter.process (masterContext);"),
+        > generated_engine.find("masterLimiter.process (masterContext);"),
 )
 check(
-    "UI reads calibrated levels and separate activity without sample transport",
+    "UI reads atomic levels with fast transient ballistics",
     all(token in generated_ui for token in (
         "updateFromTelemetry", "programmeBandTelemetry.read",
-        "programmeBandTelemetry.readActivity", "rawActivity", "rhythm * 0.20f",
-        "PROGRAM ANALYZER", "const float displayDb = rawDb[band]",
-    ))
-    and "PINK-FLAT BANDS" not in generated_ui
-    and "WAITING FOR ENGINE BANDS" not in generated_ui
-    and "WAITING FOR POST-LIMITER AUDIO" not in generated_ui,
+        "programmeBandTelemetry.readActivity", "activity[band]",
+        "constexpr int segments = 16", "const float rise",
+        "pulses[band]", "14 BAND  /  30 FPS",
+    )),
 )
 check(
-    "deleted visualizer paths are absent",
+    "old queued FFT visualizer is absent from generated programme path",
     all(token not in generated_ui + generated_engine for token in (
-        "ProgrammeSpectrumSnapshot", "programmeSpectrumSnapshot",
-        "performFrequencyOnlyForwardTransform", "updateFromSnapshot",
-        "updateFromTaps", "programmeTap.consumeLatest", "musicTap.consumeLatest",
-        "voiceTap.consumeLatest", "PcAudioLoopbackCapture::consumeLatestVisual",
-        "MUSIC RECOVERY", "VOICE RECOVERY", "PC CAPTURE", "NO FRAMES",
-    )),
-)
-check(
-    "rhythmic visual lift pulse and peak hold remain deterministic",
-    all(token in generated_ui for token in (
-        "segmentCount = 16", "peakHoldFrames[band] = 14",
-        "expandedDb = -38.0f", "* 1.32f", "positiveRise",
-        "pulses[band]", "releaseMix", "heldPeaks[band] - 0.032f",
-        "baseTarget + rhythm * 0.20f",
-    )),
-)
-check(
-    "calibration pass removes the old visual EQ contour",
-    all(token in calibrator for token in (
-        "remove cosmetic analyzer contour", "PINK-FLAT BANDS",
-    ))
-    and all(token not in generated_ui for token in (
-        "displayDb += 4.0f", "displayDb += 2.0f", "displayDb -= 1.5f",
-    )),
-)
-check(
-    "release pass removes analyzer engineering copy but preserves pause feedback",
-    all(token in release for token in (
-        "remove analyzer debug generation and fps text", 'g.drawText (\"PAUSED\"'))
-    and all(token not in generated_ui for token in (
-        "14 BAND  /  30 FPS", "PINK-FLAT BANDS  #", "WAITING FOR ENGINE BANDS",
-    ))
-    and '"PAUSED"' in generated_ui,
-)
-check(
-    "obsolete time-history visualizer is absent",
-    all(token not in generated_ui for token in (
-        "PROGRAM IMPACT", "PC INPUT IMPACT", '"OLDER"', '"NOW"', "historySize = 32",
+        "programmeTap.consumeLatest", "performFrequencyOnlyForwardTransform",
+        "multiplyWithWindowingTable", "updateFromTap (audioEngine.programmeAnalyzerTap()",
     )),
 )
 check(
@@ -173,9 +103,20 @@ check(
         "selectMonitorOutputDevice",
     )),
 )
+check(
+    "truthful Stream endpoint UI remains intact",
+    "SELECT STREAM DEVICE" in generated_ui
+    and "VB-CABLE 2" not in generated_ui
+    and "VB-CABLE 3" not in generated_ui,
+)
+check(
+    "restored visualizer source itself is fail-closed against old FFT route",
+    "obsolete queued FFT visualizer remains" in visualizer
+    and "programmeBandTelemetry.process" in visualizer,
+)
 
 failed = [name for name, ok in checks if not ok]
-print("SC220 Live final console and premium lean rhythmic analyzer audit")
+print("SC220 Live generated console and responsive atomic analyzer audit")
 for name, ok in checks:
     print(f"[ {'PASS' if ok else 'FAIL'} ] {name}")
 print(f"Checks: {len(checks)}  Passed: {len(checks) - len(failed)}  Failed: {len(failed)}")

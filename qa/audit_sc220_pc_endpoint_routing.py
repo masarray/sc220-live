@@ -5,7 +5,6 @@ header = (ROOT / "live/PcAudioLoopbackCapture.h").read_text(encoding="utf-8")
 source = (ROOT / "live/PcAudioLoopbackCapture.cpp").read_text(encoding="utf-8")
 engine_h = (ROOT / "live/LiveAudioEngine.h").read_text(encoding="utf-8")
 generator = (ROOT / "cmake/GenerateSC220PcEndpointRouting.cmake").read_text(encoding="utf-8")
-stabilizer = (ROOT / "cmake/StabilizeSC220PcMusicMode.cmake").read_text(encoding="utf-8")
 state_generator = (ROOT / "cmake/GenerateSC220BroadcastState.cmake").read_text(encoding="utf-8")
 
 generated_root = ROOT / "build-sc220" / "generated" / "sc220-monitor"
@@ -70,7 +69,7 @@ check(
     )),
 )
 check(
-    "endpoint conflict primitives remain available",
+    "endpoint conflict policy compares names and blocks virtual-cable self-capture",
     all(token in source for token in (
         "endpointNamesMatch",
         "endpointWouldConflict",
@@ -93,29 +92,21 @@ check(
     )),
 )
 check(
-    "PC endpoint and stabilizer generators run in the intended order",
+    "PC endpoint generator is chained before final UI polish",
     'include("${CMAKE_CURRENT_LIST_DIR}/GenerateSC220PcEndpointRouting.cmake")' in state_generator
-    and 'include("${CMAKE_CURRENT_LIST_DIR}/StabilizeSC220PcMusicMode.cmake")' in state_generator
     and state_generator.find("GenerateSC220PcEndpointRouting.cmake")
-    < state_generator.find("PolishSC220FinalUi.cmake")
-    < state_generator.find("StabilizeSC220PcMusicMode.cmake"),
+    < state_generator.find("PolishSC220FinalUi.cmake"),
 )
 check(
-    "generated engine allows safe virtual sources and blocks the same Stream cable",
+    "generated engine filters unsafe endpoints and prevents Stream/PC self-loop",
     all(token in generated_engine for token in (
         "getPcAudioEndpointNames",
         "selectPcAudioEndpoint",
-        "pcEndpointConflictsWithStream",
-        "virtualCableIdentity",
-        "sourceCable.isNotEmpty() && sourceCable == streamCable",
-        "PC Audio cannot capture the same cable used by Stream Output",
+        "isUnsafeVirtualEndpoint (endpoint.name)",
+        "endpointWouldConflict",
+        "The Stream output cannot be the same endpoint captured by PC Audio",
         "PC Audio capture was blocked",
-    ))
-    and "isUnsafeVirtualEndpoint (endpoint.name)" not in generated_engine[
-        generated_engine.find("juce::StringArray LiveAudioEngine::getPcAudioEndpointNames"):
-        generated_engine.find("juce::String LiveAudioEngine::selectPcAudioEndpoint")
-    ]
-    and "same cable" in stabilizer.lower(),
+    )),
 )
 check(
     "generated UI provides a real PC playback endpoint selector",

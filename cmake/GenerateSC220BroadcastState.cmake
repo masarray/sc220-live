@@ -102,23 +102,55 @@ file(WRITE "${SC220_APP_GENERATED_SOURCE}" "${_app}")
 message(STATUS "SC220 Live broadcast-state source: ${SC220_APP_GENERATED_SOURCE}")
 
 # The monitor engine, UI and persisted application now exist. Add selectable
-# PC playback capture and safe PC-only routing, then apply the OBS-style
-# source-versus-monitor guard. The loopback implementation is regenerated with
-# event/polling fallback, automatic reconnect and honest silence telemetry.
-# Finally, rebuild the atomic analyzer, calibrate meters, apply the release
-# hierarchy, and expose truthful Windows Stream Output endpoint identities.
+# PC playback capture and anti-loop policy, then apply final visual polish.
 include("${CMAKE_CURRENT_LIST_DIR}/GenerateSC220PcEndpointRouting.cmake")
 include("${CMAKE_CURRENT_LIST_DIR}/PolishSC220FinalUi.cmake")
-include("${CMAKE_CURRENT_LIST_DIR}/StabilizeSC220PcMusicMode.cmake")
-include("${CMAKE_CURRENT_LIST_DIR}/GuardSC220PcMonitorRouting.cmake")
 
-set(SC220_PC_CAPTURE_SOURCE
-    "${CMAKE_CURRENT_SOURCE_DIR}/live/PcAudioLoopbackCapture.cpp")
-set(SC220_PC_CAPTURE_GENERATED_SOURCE
-    "${CMAKE_CURRENT_BINARY_DIR}/generated/sc220-monitor/PcAudioLoopbackCapture_Recovery.cpp")
-include("${CMAKE_CURRENT_LIST_DIR}/GenerateSC220PcCaptureRecovery.cmake")
-
-include("${CMAKE_CURRENT_LIST_DIR}/RebuildSC220ImpactVisualizer.cmake")
-include("${CMAKE_CURRENT_LIST_DIR}/CalibrateSC220Meters.cmake")
-include("${CMAKE_CURRENT_LIST_DIR}/RefineSC220ReleaseUi.cmake")
+# Final stream-selector authority: never display ordinal aliases such as
+# "VB-CABLE 2" or "VB-CABLE 3". Preserve the exact currently enumerated
+# Windows render-endpoint friendly names and select by that exact identity.
 include("${CMAKE_CURRENT_LIST_DIR}/UseSC220RealStreamEndpoints.cmake")
+
+# Voice-clean UI/order authority from Sonkupik. A later finalizer narrows the
+# runtime policy to frozen-profile learning plus a learned-floor expander.
+include("${CMAKE_CURRENT_LIST_DIR}/IntegrateSC220StaticNoiseClean.cmake")
+
+# Runtime clock authority: publish the actual open-device sample rate and buffer
+# size. Visual telemetry must never receive a cosmetic/default 0 Hz value.
+include("${CMAKE_CURRENT_LIST_DIR}/FixSC220RuntimeClockStatus.cmake")
+
+# First repair any legacy analyzer routing so the proven visualizer restore can
+# consume a known post-master source.
+include("${CMAKE_CURRENT_LIST_DIR}/RestoreSC220ProgrammeAnalyzerRoute.cmake")
+
+# Final audio policy: Learn is explicit/frozen, normal programme audio does not
+# run the spectral workspace, and PC-source/Monitor self-routing is rejected.
+include("${CMAKE_CURRENT_LIST_DIR}/FinalizeSC220NaturalLivePath.cmake")
+
+# Restore the previously proven responsive post-limiter visualizer. This removes
+# the queued ScopeTap/32-band FFT lifecycle and uses atomic 14-band telemetry.
+include("${CMAKE_CURRENT_LIST_DIR}/RebuildSC220ImpactVisualizer.cmake")
+
+# Hardware-test P3 authority. This pass restores explicit routing, direct
+# frozen-profile Noise controls, independent Dual Mono and live LUFS-M.
+include("${CMAKE_CURRENT_LIST_DIR}/FinalizeSC220LiveUxP3.cmake")
+
+# P4 keeps the approved P3 console/visualizer intact while replacing raw-peak
+# ducking with sustained speech presence and cleaning the loudness dial.
+include("${CMAKE_CURRENT_LIST_DIR}/SC220P4SmartDucking.cmake")
+
+# P5 is the final hardware-polish pass: stronger/faster silence cleanup, friendly
+# endpoint/product wording, aligned mute controls and the supplied SVG fader cap.
+include("${CMAKE_CURRENT_LIST_DIR}/SC220P5ConsolePolish.cmake")
+
+# P6A is UI-only: optically centre the fader cap, use the supplied PC Audio
+# headphones artwork, rebalance PC Audio vertical spacing and animate active MUTE.
+include("${CMAKE_CURRENT_LIST_DIR}/SC220P6AUiPolish.cmake")
+
+# P6B keeps LEARN frozen/non-adaptive while adding a zero-latency upper-band hiss
+# suppressor and replaces P6A's clipped outer glow with one digital-mixer MUTE shape.
+include("${CMAKE_CURRENT_LIST_DIR}/SC220P6BNoiseCleanup.cmake")
+
+# P6C is UI-only: replace loose DSP/Smart-Protect dot labels with compact glowing
+# status chips that make active/bypass state readable at a glance.
+include("${CMAKE_CURRENT_LIST_DIR}/SC220P6CStatusChips.cmake")

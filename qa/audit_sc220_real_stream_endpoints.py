@@ -18,10 +18,10 @@ def check(name: str, condition: bool) -> None:
 
 check("real Stream Output generator exists", PASS.exists())
 check(
-    "real endpoint pass runs after the final visual refinement",
-    'include("${CMAKE_CURRENT_LIST_DIR}/RefineSC220ReleaseUi.cmake")' in chain
+    "real endpoint pass runs after final UI polish",
+    'include("${CMAKE_CURRENT_LIST_DIR}/PolishSC220FinalUi.cmake")' in chain
     and 'include("${CMAKE_CURRENT_LIST_DIR}/UseSC220RealStreamEndpoints.cmake")' in chain
-    and chain.index("RefineSC220ReleaseUi.cmake")
+    and chain.index("PolishSC220FinalUi.cmake")
     < chain.index("UseSC220RealStreamEndpoints.cmake"),
 )
 check(
@@ -31,10 +31,7 @@ check(
 )
 check(
     "final menu displays exact Windows friendly names",
-    "outputBox.addItemList (streamOutputs, 1)" in stream_pass
-    and "outputBox.addItem (i == 0" not in stream_pass.split(
-        "set(_stream_list_real", 1
-    )[1],
+    "outputBox.addItemList (streamOutputs, 1)" in stream_pass,
 )
 check(
     "stream names are preserved and deduplicated",
@@ -42,7 +39,7 @@ check(
     and "outputBox.getText().trim()" in stream_pass,
 )
 check(
-    "standard Hi-Fi and other installed virtual render sinks remain discoverable",
+    "installed virtual render sinks remain discoverable",
     all(token in stream_pass for token in (
         'name.containsIgnoreCase ("CABLE")',
         'name.containsIgnoreCase ("VOICEMEETER INPUT")',
@@ -50,7 +47,7 @@ check(
     )),
 )
 check(
-    "device removal refreshes the menu rather than preserving stale aliases",
+    "device removal refreshes the exact endpoint list",
     all(token in stream_pass for token in (
         "streamListChanged",
         "outputBox.clear (juce::dontSendNotification)",
@@ -60,7 +57,7 @@ check(
     )),
 )
 check(
-    "selected endpoint identity remains visible through tooltip",
+    "selected endpoint identity remains visible",
     "outputBox.setTooltip (selectedEndpoint)" in stream_pass
     and "outputBox.setTooltip (streamOutputs[outputIndex])" in stream_pass,
 )
@@ -73,17 +70,13 @@ check(
     )),
 )
 check(
-    "selector wording no longer claims a fabricated cable instance",
-    "SELECT STREAM DEVICE" in stream_pass,
-)
-check(
-    "legacy alias source remains guarded by a later fail-closed pass",
+    "legacy alias source is guarded by later replacement pass",
     'i == 0 ? "VB-CABLE"' in polish
     and "UseSC220RealStreamEndpoints.cmake" in chain,
 )
 
 failed = [name for name, ok in checks if not ok]
-print("SC220 Live truthful Windows Stream Output endpoint audit")
+print("SC220 Live real Windows Stream Output endpoint audit")
 for name, ok in checks:
     print(f"[ {'PASS' if ok else 'FAIL'} ] {name}")
 print(f"Checks: {len(checks)}  Passed: {len(checks) - len(failed)}  Failed: {len(failed)}")

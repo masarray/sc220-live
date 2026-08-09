@@ -3,6 +3,7 @@
 #include "LiveAudioEngine.h"
 #include "LiveIcons.h"
 #include "LiveLicensePanel.h"
+#include "SC220DeviceWatcher.h"
 
 #include <juce_gui_extra/juce_gui_extra.h>
 
@@ -57,6 +58,7 @@ private:
     static bool looksLikeSc220Input (const juce::String& name) noexcept;
 
     LiveAudioEngine& audioEngine;
+    SC220DeviceWatcher sc220DeviceWatcher { audioEngine };
     WindowActions windowActions;
     std::unique_ptr<SurfaceLookAndFeel> lookAndFeel;
 
@@ -76,12 +78,16 @@ private:
     juce::ComboBox monitorOutputBox;
     juce::TextButton stereoButton { "STEREO" };
     juce::TextButton dualMonoButton { "DUAL MONO" };
+    juce::TextButton noiseCleanButton { "DENOISE" };
+    juce::TextButton learnNoiseButton { "LEARN" };
     juce::ComboBox pcSourceBox;
     juce::TextButton programMonitorButton { "PROGRAM" };
     juce::TextButton musicCueButton { "MUSIC CUE" };
 
     juce::Slider inputTrim;
     juce::Slider sc220Fader;
+    juce::Slider sc220MonoLeftFader;
+    juce::Slider sc220MonoRightFader;
     juce::Slider pcFader;
     juce::Slider duckAmount;
     std::array<juce::Slider, 5> macroKnobs;

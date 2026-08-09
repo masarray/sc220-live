@@ -7,10 +7,10 @@
 
 namespace askp::live {
 
-// Allocation-free ITU-R BS.1770 / EBU R128 loudness measurement.
+// Allocation-free ITU-R BS.1770 / EBU R128 integrated-loudness gate.
 // K-weighting is performed by LiveAudioEngine before frames reach this class.
-// Four adjacent 100 ms segments form each 400 ms momentary block with 75%
-// overlap. Integrated loudness retains the absolute and relative R128 gates.
+// Four adjacent 100 ms segments form each 400 ms measurement block, providing
+// the prescribed 75% overlap without retaining an unbounded programme history.
 class ProgrammeLoudnessIntegrator final
 {
 public:
@@ -60,10 +60,6 @@ public:
     {
         return static_cast<double> (measuredFrames) / sampleRate;
     }
-    bool momentaryReady() const noexcept
-    {
-        return segmentsReady >= static_cast<int> (segmentEnergy.size());
-    }
     bool ready() const noexcept
     {
         return acceptedBlocks > 0 && elapsedSeconds() >= warmupSeconds;
@@ -98,7 +94,10 @@ private:
         currentSegmentLength = 0;
 
         if (segmentsReady < static_cast<int> (segmentEnergy.size()))
+        {
+            momentary = -120.0f;
             return;
+        }
 
         double blockEnergySum = 0.0;
         int blockFrames = 0;
@@ -109,12 +108,13 @@ private:
         }
 
         const double blockMeanEnergy = blockEnergySum / std::max (1, blockFrames);
-        momentary = lufsFromEnergy (blockMeanEnergy);
-        if (momentary < absoluteGateLufs)
+        const float blockLufs = lufsFromEnergy (blockMeanEnergy);
+        momentary = blockLufs;
+        if (blockLufs < absoluteGateLufs)
             return;
 
         const int bin = std::clamp (
-            static_cast<int> ((momentary - histogramMinimumLufs) / histogramStepLu),
+            static_cast<int> ((blockLufs - histogramMinimumLufs) / histogramStepLu),
             0, histogramBins - 1);
         histogramEnergy[static_cast<std::size_t> (bin)] += blockMeanEnergy;
         ++histogramCount[static_cast<std::size_t> (bin)];

@@ -29,36 +29,52 @@ jobs:
           -DSC220_UI_SOURCE=${{ github.workspace }}/live/SC220MainComponent.cpp
           -DSC220_UI_GENERATED_SOURCE=${{ runner.temp }}/SC220MainComponent_Aligned.cpp
           -P cmake/GenerateSC220AlignedUi.cmake
+      - name: Validate SC220 MIXER-01 device auto-detection
+        run: python qa/audit_p0_sc220_device_detection.py
+      - name: Validate real Windows Stream Output endpoint names
+        run: python qa/audit_sc220_real_stream_endpoints.py
+      - name: Validate Sonkupik static-noise clean integration
+        run: python qa/audit_sc220_static_noise_clean.py
+      - name: Guard proven monitor and programme analyzer runtime paths
+        run: python qa/audit_sc220_runtime_regression_guard.py
+      - name: Validate actual runtime sample-rate and buffer telemetry
+        run: python qa/audit_sc220_runtime_clock_status.py
+      - name: Validate P3 live routing denoise dual-mono and loudness
+        run: python qa/audit_sc220_p3_live_ux.py
+      - name: Validate P4 speech-aware ducking and clean LUFS UI
+        run: python qa/audit_sc220_p4_smart_ducking.py
+      - name: Validate P5 console polish app branding and expander ballistics
+        run: python qa/audit_sc220_p5_console_polish.py
+      - name: Validate P6A UI-only fader icon spacing and MUTE safety polish
+        run: python qa/audit_sc220_p6a_ui_polish.py
+      - name: Validate P6B frozen hiss cleanup and single-shape MUTE blink
+        run: python qa/audit_sc220_p6b_noise_cleanup.py
+      - name: Validate P6C DSP and Smart Protect illuminated status chips
+        run: python qa/audit_sc220_p6c_status_chips.py
+      - name: Validate P6D compact tray panel and SC220 tray icon
+        run: python qa/audit_sc220_p6d_tray_polish.py
+      - name: Validate P6E reliable tray and 90-day software-only licence
+        run: python qa/audit_sc220_p6e_tray_trial_license.py
+      - name: Validate P6F canonical SC220 app/tray icon assets
+        run: python qa/audit_sc220_p6f_native_tray_icon.py
       - name: Validate ASK-P v0.5.23 port boundary
         run: python qa/audit_v0140_askp_v0523_port.py
       - name: Validate SC220 dual-source broadcast bus
         run: python qa/audit_sc220_dual_source_bus.py
       - name: Validate SC220 premium UX contract
         run: python qa/audit_sc220_premium_ux.py
-      - name: Validate aligned console and atomic band visualizer
+      - name: Validate aligned console and analyzer bridge
         run: python qa/audit_sc220_console_alignment.py
-      - name: Validate synthetic band-pass response
-        run: python qa/audit_sc220_spectralizer_response.py
-      - name: Validate atomic post-limiter telemetry
-        run: python qa/audit_sc220_atomic_bands.py
-      - name: Compile atomic band telemetry
-        run: g++ -std=c++17 -O2 qa/programme_band_telemetry_test.cpp -o /tmp/programme-band-test
-      - name: Run atomic band telemetry
-        run: /tmp/programme-band-test
-      - name: Validate OBS-style native WASAPI Monitor Bus
+      - name: Validate independent physical Monitor Bus
         run: python qa/audit_sc220_monitor_bus.py
       - name: Validate selectable PC endpoint and anti-loop routing
         run: python qa/audit_sc220_pc_endpoint_routing.py
-      - name: Validate truthful Windows Stream Output endpoint identities
-        run: python qa/audit_sc220_real_stream_endpoints.py
-      - name: Validate PC source versus monitor safety and capture recovery
-        run: python qa/audit_sc220_pc_monitor_safety.py
-      - name: Validate PC music-only atomic analyzer and safe cable source
-        run: python qa/audit_sc220_pc_music_only.py
       - name: Validate public release gate and guidance
         run: python qa/audit_sc220_public_release.py
       - name: Validate verified VB-CABLE installer bundle
         run: python qa/audit_sc220_installer_bundle.py
+      - name: Validate local release packaging contract
+        run: python qa/audit_sc220_local_release.py
       - name: Validate clean-build executable unlock order
         run: python qa/audit_sc220_clean_build.py
       - name: Validate fixed transform reference

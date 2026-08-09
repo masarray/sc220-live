@@ -4,6 +4,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 P6D = (ROOT / "cmake" / "SC220P6DTrayPolish.cmake").read_text(encoding="utf-8")
 P6F = (ROOT / "cmake" / "SC220P6FNativeTrayIcon.cmake").read_text(encoding="utf-8")
+P6E = (ROOT / "cmake" / "SC220P6ETrayReliabilityAndSoftwareTrial.cmake").read_text(encoding="utf-8")
 CANONICAL_96 = ROOT / "assets" / "favicon" / "favicon-96x96.png"
 CANONICAL_512 = ROOT / "assets" / "favicon" / "web-app-manifest-512x512.png"
 ALIAS_96 = ROOT / "assets" / "ui" / "favicon-96x96.png"
@@ -53,9 +54,16 @@ for needle, label in [
     ('_canonical_512_sha STREQUAL _alias_512_sha', "512px alias parity guard"),
     ('BinaryData::getNamedResource (\\"favicon_96x96_png\\"', "runtime 96px resource"),
     ('BinaryData::getNamedResource (\\"favicon_512x512_png\\"', "runtime 512px fallback"),
-    ('setIconImage (trayImage, trayImage)', "tray publication"),
+    ('setIconImage (trayImage', "tray publication contract"),
 ]:
     require(P6F, needle, label)
+
+# P6E remains the runtime owner. Its current JUCE Windows publication uses an
+# empty optional dark-mode image argument, which P6F must not over-specify.
+if 'setIconImage (trayImage, {});' not in P6E:
+    raise AssertionError("P6E tray publication path changed; re-audit P6F guard")
+if 'setIconImage (trayImage, trayImage)' in P6F:
+    raise AssertionError("P6F must not hard-code JUCE optional second icon argument")
 
 for forbidden in [
     "sc220-download",

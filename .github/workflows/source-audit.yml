@@ -55,6 +55,8 @@ jobs:
         run: python qa/audit_sc220_p6d_tray_polish.py
       - name: Validate P6E reliable tray and 90-day software-only licence
         run: python qa/audit_sc220_p6e_tray_trial_license.py
+      - name: Validate P6F canonical multi-size Windows ICO tray renderer
+        run: python qa/audit_sc220_p6f_native_tray_icon.py
       - name: Validate ASK-P v0.5.23 port boundary
         run: python qa/audit_v0140_askp_v0523_port.py
       - name: Validate SC220 dual-source broadcast bus

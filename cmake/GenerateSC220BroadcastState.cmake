@@ -146,3 +146,7 @@ include("${CMAKE_CURRENT_LIST_DIR}/SC220P5ConsolePolish.cmake")
 # P6A is UI-only: optically centre the fader cap, use the supplied PC Audio
 # headphones artwork, rebalance PC Audio vertical spacing and animate active MUTE.
 include("${CMAKE_CURRENT_LIST_DIR}/SC220P6AUiPolish.cmake")
+
+# P6B keeps LEARN frozen/non-adaptive while adding a zero-latency upper-band hiss
+# suppressor and replaces P6A's clipped outer glow with one digital-mixer MUTE shape.
+include("${CMAKE_CURRENT_LIST_DIR}/SC220P6BNoiseCleanup.cmake")

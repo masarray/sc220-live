@@ -1,9 +1,12 @@
 authority_repository=masarray/askp-vst
-authority_commit=5757119cab7a1a75f09dcf0edea6e3be97975439
+authority_commit=240b9d3be3ca1fbdedfa5b7027e465c22a56b0ea
 engine_version=0.5.23
 engine_header_revision=2026073102
 factory_profiles=13
-integration=pinned-git-submodule-generated-headless-processor
+integration=pinned-git-submodule-upstream-p0.3-generated-dsp-headless-processor
+checkpoint=P0.3-smart-warm-vocal-enhancement
+checkpoint_release_ready=false
+effective_dsp_generator=scripts/generate_p0_musical_rebalance_dsp.py
 live_control_glide_seconds=0.012
 reference_control_glide_seconds=0.080
 visualizer=sonkupik-sphere-v0.10.4-local

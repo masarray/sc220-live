@@ -154,6 +154,18 @@ check(
     and "Type RELEASE to build, test, and publish" in start,
 )
 check(
+    "launcher safely repairs only clean ASK-P submodule pointer drift",
+    "Sync-CleanAskpSubmodule" in start
+    and "submodule contains local edits" in start
+    and "submodule update --init --recursive --force --checkout" in start,
+)
+check(
+    "launcher can fast-forward a clean local source branch",
+    "git.exe merge-base" in start
+    and "git.exe merge --ff-only" in start
+    and "Fast-forwarding automatically" in start,
+)
+check(
     "launcher separates stable workflow ref from build ref",
     "[string]$WorkflowRef = 'main'" in start
     and "contents/.github/workflows/local-release.yml?ref=$WorkflowRef" in start
@@ -168,6 +180,35 @@ check(
     and "finally" in start
     and "Stop-LocalRunner" in start
     and "gh.exe run watch" in start,
+)
+check(
+    "launcher reattaches to unfinished release instead of duplicating dispatch",
+    "Get-ActiveWorkflowRun" in start
+    and "Reusing it instead of dispatching a duplicate" in start
+    and start.find("Get-ActiveWorkflowRun") < start.find("Invoke-GhCapture @workflowArguments"),
+)
+check(
+    "launcher extracts workflow run ID directly from dispatch URL",
+    "Get-RunIdFromDispatchOutput" in start
+    and "/actions/runs/([0-9]+)" in start
+    and "Workflow run ID received immediately" in start,
+)
+check(
+    "launcher fallback uses monotonic numeric run IDs instead of DateTime casts",
+    "Wait-ForNewWorkflowRun" in start
+    and "databaseId -gt $PreviousRunId" in start
+    and "[DateTime]$_.createdAt" not in start
+    and "ToUniversalTime()" not in start,
+)
+check(
+    "launcher verifies public tag before reporting success",
+    "Test-PublicReleaseExists" in start
+    and "completed without a verifiable public release tag" in start,
+)
+check(
+    "release confirmation is case-insensitive but still explicit",
+    "OrdinalIgnoreCase" in start
+    and "Release cancelled by user" in start,
 )
 check(
     "publisher validates installer checksum and manifest",

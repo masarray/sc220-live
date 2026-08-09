@@ -26,12 +26,14 @@ workflow = read(".github/workflows/source-audit.yml")
 historical_doc = read("docs/ASKP_V0523_ENGINE_PORT.md")
 
 # Latest approved ASK-P v0.5.24 release request names this exact immutable
-# product source commit. Later upstream HEAD commits only adjust release request
-# / release-audit helper metadata, not the product DSP/preset/processor source.
+# product source commit. Later upstream HEAD commits adjust release request,
+# release audit and cross-platform helper policy rather than product audio source.
 source_commit = "1cf050d40338cbcb5d8cddd9fc2de5f23e3d625f"
-latest_audited_head = "9b275b42e6668c958ac4367b86c6e8660922c8cb"
+latest_audited_head = "f91aa04e953cf14eb0682a1bc305138b6507d73a"
+release_helper_commit = "811b7376dd784ce9f64e03512c7baf7de5e77425"
 check("ASK-P v0.5.24 approved source pinned", source_commit in cmake and source_commit in lock and source_commit in sync_script)
 check("latest upstream audited head recorded", latest_audited_head in lock)
+check("current approved release helper recorded", release_helper_commit in lock)
 check("ASK-P submodule declared", "third_party/askp-vst" in gitmodules)
 
 try:

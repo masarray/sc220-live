@@ -142,3 +142,7 @@ include("${CMAKE_CURRENT_LIST_DIR}/SC220P4SmartDucking.cmake")
 # P5 is the final hardware-polish pass: stronger/faster silence cleanup, friendly
 # endpoint/product wording, aligned mute controls and the supplied SVG fader cap.
 include("${CMAKE_CURRENT_LIST_DIR}/SC220P5ConsolePolish.cmake")
+
+# P6A is UI-only: optically centre the fader cap, use the supplied PC Audio
+# headphones artwork, rebalance PC Audio vertical spacing and animate active MUTE.
+include("${CMAKE_CURRENT_LIST_DIR}/SC220P6AUiPolish.cmake")

@@ -57,8 +57,8 @@ jobs:
         run: python qa/audit_sc220_p6e_tray_trial_license.py
       - name: Validate P6F canonical SC220 app/tray icon assets
         run: python qa/audit_sc220_p6f_native_tray_icon.py
-      - name: Validate ASK-P v0.5.23 port boundary
-        run: python qa/audit_v0140_askp_v0523_port.py
+      - name: Validate ASK-P v0.5.24 production P0.3 port boundary
+        run: python qa/audit_v0150_askp_p03_port.py
       - name: Validate SC220 dual-source broadcast bus
         run: python qa/audit_sc220_dual_source_bus.py
       - name: Validate SC220 premium UX contract
@@ -79,24 +79,34 @@ jobs:
         run: python qa/audit_sc220_clean_build.py
       - name: Validate fixed transform reference
         run: python qa/verify_fixed_fft.py
-      - name: Checkout private ASK-P authority when CI token is configured
+      - name: Checkout approved private ASK-P v0.5.24 product source when CI token is configured
         if: ${{ env.ASKP_REPO_TOKEN != '' }}
         uses: actions/checkout@v4
         with:
           repository: masarray/askp-vst
-          ref: 5757119cab7a1a75f09dcf0edea6e3be97975439
+          ref: 2c764f82b0fc99eaff04d918cef4f839db7509e5
           token: ${{ secrets.ASKP_REPO_TOKEN }}
           path: third_party/askp-vst
-      - name: Compile current profile and DSP audit
+      - name: Run upstream ASK-P v0.5.24 P0.3 production source audit
+        if: ${{ env.ASKP_REPO_TOKEN != '' }}
+        working-directory: third_party/askp-vst
+        run: python tools/p0_musical_rebalance_source_audit.py
+      - name: Generate approved ASK-P v0.5.24 effective DSP
+        if: ${{ env.ASKP_REPO_TOKEN != '' }}
+        run: >-
+          python third_party/askp-vst/scripts/generate_p0_musical_rebalance_dsp.py
+          --input third_party/askp-vst/engine/arsonkupik_dsp.cpp
+          --output /tmp/arsonkupik_dsp_v0524.cpp
+      - name: Compile current profile and approved effective DSP audit
         if: ${{ env.ASKP_REPO_TOKEN != '' }}
         run: >-
           g++ -std=c++17 -O2
           -Ithird_party/askp-vst/engine
           qa/preset_profile_v0519_audit.cpp
-          third_party/askp-vst/engine/arsonkupik_dsp.cpp
+          /tmp/arsonkupik_dsp_v0524.cpp
           third_party/askp-vst/engine/arsonkupik_presets.cpp
           -o /tmp/sonkupik-preset-profile-audit
-      - name: Run current profile and DSP audit
+      - name: Run current profile and approved effective DSP audit
         if: ${{ env.ASKP_REPO_TOKEN != '' }}
         run: /tmp/sonkupik-preset-profile-audit
 

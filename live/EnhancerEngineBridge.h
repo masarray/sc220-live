@@ -33,7 +33,7 @@ public:
         bool clipping = false;
     };
 
-    static constexpr const char* engineVersion = "0.5.23";
+    static constexpr const char* engineVersion = "0.5.24";
     static constexpr int engineRevision = ASKP_DSP_HEADER_REVISION;
     static constexpr int factoryProfileCount = 13;
 

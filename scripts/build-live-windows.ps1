@@ -284,11 +284,23 @@ function Remove-IncompatibleBuildTree([string]$buildPath, [string]$wantedGenerat
     }
 }
 
+# Keep local one-click builds deterministic: make the checked-out submodule
+# match the approved v0.5.24 product source before CMake performs its own gates.
+$syncAuthority = Join-Path $root 'scripts\sync-askp-v0523.ps1'
+if (-not (Test-Path -LiteralPath $syncAuthority -PathType Leaf)) {
+    throw "ASK-P authority sync helper is missing: $syncAuthority"
+}
+Write-Host '==> Synchronising approved ASK-P v0.5.24 production authority'
+& powershell.exe -NoProfile -ExecutionPolicy Bypass -File $syncAuthority -RepositoryRoot $root
+if ($LASTEXITCODE -ne 0) {
+    throw "ASK-P authority synchronisation failed with exit code $LASTEXITCODE"
+}
+
 $pinnedEngine = Join-Path $root 'third_party\askp-vst\engine\arsonkupik_dsp.cpp'
 if (-not (Test-Path $pinnedEngine)) {
-    throw "Pinned ArSonKuPik v0.5.23 authority is missing: $pinnedEngine"
+    throw "Pinned ArSonKuPik v0.5.24 authority is missing: $pinnedEngine"
 }
-Write-Host '==> Enhancer authority: ArSonKuPik v0.5.23 (pinned private submodule)'
+Write-Host '==> Enhancer authority: ArSonKuPik v0.5.24 (approved production source)'
 
 $vs = Get-VisualStudioInstallation
 $vsMajor = 0

@@ -128,3 +128,8 @@ endforeach()
 
 file(WRITE "${SC220_APP_GENERATED_SOURCE}" "${_app}")
 message(STATUS "SC220 P6D: compact tray panel spacing + canonical SC220 tray icon")
+
+# P6E owns the final Windows tray registration reliability and the commercial
+# policy: SC220 hardware remains entitled; software-only use gets 90 days then
+# the existing Midtrans licence flow becomes a required polished modal gate.
+include("${CMAKE_CURRENT_LIST_DIR}/SC220P6ETrayReliabilityAndSoftwareTrial.cmake")

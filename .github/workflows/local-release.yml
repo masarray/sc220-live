@@ -170,6 +170,34 @@ jobs:
           Write-Host "Inno Setup : $iscc"
           Write-Host "MSVC       : $($vs.Trim())"
 
+      - name: Prepare persistent JUCE 8.0.14 cache
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $cacheRoot = Join-Path $env:ProgramData 'MasArray\SC220ReleaseCache'
+          $juceDir = Join-Path $cacheRoot 'JUCE-8.0.14'
+          New-Item -ItemType Directory -Force -Path $cacheRoot | Out-Null
+
+          $valid = $false
+          if (Test-Path -LiteralPath (Join-Path $juceDir 'CMakeLists.txt') -PathType Leaf) {
+            $dirty = (& git -C $juceDir status --porcelain 2>$null | Out-String).Trim()
+            $tag = (& git -C $juceDir describe --tags --exact-match HEAD 2>$null | Select-Object -First 1)
+            $valid = ($LASTEXITCODE -eq 0 -and -not $dirty -and $tag -and $tag.Trim() -eq '8.0.14')
+          }
+
+          if (-not $valid) {
+            if (Test-Path -LiteralPath $juceDir) {
+              Remove-Item -LiteralPath $juceDir -Recurse -Force
+            }
+            Write-Host 'Caching JUCE 8.0.14 once for future clean releases...'
+            & git clone --depth 1 --branch 8.0.14 https://github.com/juce-framework/JUCE.git $juceDir
+            if ($LASTEXITCODE -ne 0) { throw 'Unable to populate the persistent JUCE cache.' }
+          } else {
+            Write-Host "JUCE cache hit: $juceDir" -ForegroundColor Green
+          }
+
+          "JUCE_DIR=$juceDir" | Out-File $env:GITHUB_ENV -Append -Encoding utf8
+
       - name: Validate source and installer contracts
         shell: powershell
         run: |

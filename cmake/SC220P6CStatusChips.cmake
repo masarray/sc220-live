@@ -111,3 +111,8 @@ endforeach()
 
 file(WRITE "${SC220_UI_MONITOR_GENERATED_SOURCE}" "${_ui}")
 message(STATUS "SC220 P6C: glowing DSP state + Smart Protect status chips")
+
+# P6D operates on the separately generated application source: compact tray panel
+# spacing plus canonical SC220 tray/app artwork. Kept chained here so P6C remains
+# the final console-surface pass while P6D owns only tray/application chrome.
+include("${CMAKE_CURRENT_LIST_DIR}/SC220P6DTrayPolish.cmake")

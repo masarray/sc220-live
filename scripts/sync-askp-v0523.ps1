@@ -9,7 +9,7 @@ Set-StrictMode -Version Latest
 # The pinned authority is the exact ASK-P v0.5.24 product source commit named by
 # the latest approved release request. SC220 mirrors its production audit+generator
 # source contract rather than following an unreviewed moving branch head.
-$commit = '1cf050d40338cbcb5d8cddd9fc2de5f23e3d625f'
+$commit = '2c764f82b0fc99eaff04d918cef4f839db7509e5'
 $relativePath = 'third_party/askp-vst'
 $authority = Join-Path $RepositoryRoot 'third_party\askp-vst'
 $authorityParent = Split-Path -Parent $authority

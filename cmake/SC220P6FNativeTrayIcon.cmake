@@ -204,9 +204,9 @@ sc220_p6f_once(_app "native favicon ICO tray renderer"
 
         if (decoded.isValid())
         {
-            // Keep the exact ICO frame rather than drawing a large web PNG onto
-            // a new black-capable raster. Windows/JUCE now receives the same
-            // transparent artwork authored for the notification-area sizes.
+            // Use the exact Windows small-icon frame instead of rasterising the
+            // web PNG. This preserves the ICO's authored transparency and
+            // avoids the black-square result observed in the notification area.
             trayImage = decoded;
         }
         else

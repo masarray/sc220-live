@@ -53,10 +53,16 @@ for needle, label in [
 ]:
     require(P6F, needle, label)
 
+# These signatures belonged to the failed P6F ICO-detour implementation. The
+# runtime guard may mention their names as forbidden generated-source tokens,
+# but no dedicated ICO BinaryData target/decoder may remain in P6F itself.
 for forbidden in [
-    'SC220TrayIconData',
-    'favicon_ico',
-    'askp_app_logo_png',
+    'HEADER_NAME SC220TrayIconData.h',
+    'NAMESPACE SC220TrayIconData',
+    'juce_add_binary_data(SC220TrayIconData',
+    'SOURCES "${_p6f_root}/assets/ui/favicon.ico"',
+    'juce::Colour::fromRGBA (px[2], px[1], px[0], alpha)',
+    'const int score = width == 32 ? 0',
     'MusicalNoiseClean',
     'noiseClean.',
     'expander.',

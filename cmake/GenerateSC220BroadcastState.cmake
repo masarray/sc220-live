@@ -135,7 +135,10 @@ include("${CMAKE_CURRENT_LIST_DIR}/RebuildSC220ImpactVisualizer.cmake")
 # frozen-profile Noise controls, independent Dual Mono and live LUFS-M.
 include("${CMAKE_CURRENT_LIST_DIR}/FinalizeSC220LiveUxP3.cmake")
 
-# P4 is deliberately last: keep the approved P3 console/visualizer intact while
-# replacing raw-peak ducking with sustained speech presence and cleaning the
-# fixed YT/TikTok target caption from the loudness dial.
+# P4 keeps the approved P3 console/visualizer intact while replacing raw-peak
+# ducking with sustained speech presence and cleaning the loudness dial.
 include("${CMAKE_CURRENT_LIST_DIR}/SC220P4SmartDucking.cmake")
+
+# P5 is the final hardware-polish pass: stronger/faster silence cleanup, friendly
+# endpoint/product wording, aligned mute controls and the supplied SVG fader cap.
+include("${CMAKE_CURRENT_LIST_DIR}/SC220P5ConsolePolish.cmake")

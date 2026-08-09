@@ -21,6 +21,9 @@ lock = read("ASKP_AUTHORITY.lock")
 gitmodules = read(".gitmodules")
 gitattributes = read(".gitattributes")
 sync_script = read("scripts/sync-askp-v0523.ps1")
+build_script = read("scripts/build-live-windows.ps1")
+workflow = read(".github/workflows/source-audit.yml")
+historical_doc = read("docs/ASKP_V0523_ENGINE_PORT.md")
 
 # Latest approved ASK-P v0.5.24 release request names this exact immutable
 # product source commit. Later upstream HEAD commits only adjust release request
@@ -58,6 +61,7 @@ check("upstream P0.3 generator required", all(x in cmake for x in [
     "--input \"${ASKP_DSP_CANONICAL_SOURCE}\"",
     "--output \"${ASKP_DSP_SOURCE}\"",
 ]))
+check("source audit runs before generator in CMake", cmake.find("COMMAND \"${Python3_EXECUTABLE}\" \"${ASKP_P03_SOURCE_AUDIT}\"") < cmake.find("COMMAND \"${Python3_EXECUTABLE}\" \"${ASKP_P03_GENERATOR}\""))
 check("generated production DSP compiled instead of canonical", all(x in cmake for x in [
     "set(ASKP_DSP_CANONICAL_SOURCE",
     "set(ASKP_DSP_SOURCE \"${ASKP_GENERATED_DIR}/arsonkupik_dsp.cpp\")",
@@ -90,6 +94,15 @@ check("legacy CRLF sphere normalised before CMake", all(x in sync_script for x i
     "Normalize-TextFileToLf", "OrbVisualizer.cpp", ".Replace(\"`r`n\", \"`n\")"]))
 check("sync verifies both production audit and generator", all(x in sync_script for x in [
     "p0_musical_rebalance_source_audit.py", "generate_p0_musical_rebalance_dsp.py"]))
+check("one-click Windows build self-syncs approved authority", all(x in build_script for x in [
+    "sync-askp-v0523.ps1", "Synchronising approved ASK-P v0.5.24 production authority",
+    "ArSonKuPik v0.5.24 (approved production source)"]))
+check("CI checks out approved source commit", source_commit in workflow)
+workflow_audit = workflow.find("Run upstream ASK-P v0.5.24 P0.3 production source audit")
+workflow_generate = workflow.find("Generate approved ASK-P v0.5.24 effective DSP")
+check("CI runs upstream source audit before generator", workflow_audit >= 0 and workflow_generate > workflow_audit)
+check("CI compiles generated effective DSP", "/tmp/arsonkupik_dsp_v0524.cpp" in workflow and "arsonkupik_presets.cpp" in workflow)
+check("historical v0.5.23 document cannot masquerade as current", "Historical record only" in historical_doc and "superseded" in historical_doc.lower())
 
 failed = [name for name, ok in checks if not ok]
 print("SC220 Live ASK-P v0.5.24 production P0.3 port audit")

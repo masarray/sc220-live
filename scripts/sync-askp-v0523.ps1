@@ -6,9 +6,10 @@ $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 
 # Historical filename retained because existing local build shortcuts may call it.
-# The pinned authority is now the ASK-P P0.3 development checkpoint; its canonical
-# base engine still reports v0.5.23 until upstream performs the production fold.
-$commit = '240b9d3be3ca1fbdedfa5b7027e465c22a56b0ea'
+# The pinned authority is the exact ASK-P v0.5.24 product source commit named by
+# the latest approved release request. SC220 mirrors its production audit+generator
+# source contract rather than following an unreviewed moving branch head.
+$commit = '1cf050d40338cbcb5d8cddd9fc2de5f23e3d625f'
 $relativePath = 'third_party/askp-vst'
 $authority = Join-Path $RepositoryRoot 'third_party\askp-vst'
 $authorityParent = Split-Path -Parent $authority
@@ -131,7 +132,7 @@ $treeLine = ($treeResult.Lines | ForEach-Object { $_.ToString() }) -join "`n"
 if ($treeResult.ExitCode -ne 0 -or
     $treeLine -notmatch "^160000\s+commit\s+$commit\s+") {
     throw @"
-The current SC220 Live branch does not contain the pinned ASK-P P0.3 gitlink.
+The current SC220 Live branch does not contain the pinned ASK-P v0.5.24 production gitlink.
 Expected: $relativePath -> $commit
 
 Refresh the current SC220 Live branch first:
@@ -146,7 +147,7 @@ if ($null -eq $actual) {
 }
 
 if ($actual -ne $commit) {
-    Write-Host '==> Initialising ASK-P P0.3 authority submodule' -ForegroundColor Yellow
+    Write-Host '==> Initialising ASK-P v0.5.24 production authority submodule' -ForegroundColor Yellow
 
     # Clear broken administrative state left by interrupted or older submodule
     # layouts. Failure here is harmless when the module was never initialised.
@@ -206,9 +207,14 @@ if ($actual -ne $commit) {
     throw "ASK-P authority mismatch. Expected $commit but found $actual"
 }
 
+$sourceAudit = Join-Path $authority 'tools\p0_musical_rebalance_source_audit.py'
+if (-not (Test-Path -LiteralPath $sourceAudit -PathType Leaf)) {
+    throw "ASK-P v0.5.24 production source audit is missing: $sourceAudit"
+}
+
 $generator = Join-Path $authority 'scripts\generate_p0_musical_rebalance_dsp.py'
 if (-not (Test-Path -LiteralPath $generator -PathType Leaf)) {
-    throw "ASK-P P0.3 effective-DSP generator is missing: $generator"
+    throw "ASK-P v0.5.24 effective-DSP generator is missing: $generator"
 }
 
 # Git for Windows may materialise tracked source as CRLF when an older checkout
@@ -217,5 +223,5 @@ if (-not (Test-Path -LiteralPath $generator -PathType Leaf)) {
 # still produces a different SHA and remains fail-closed.
 Normalize-TextFileToLf -Path (Join-Path $RepositoryRoot 'third_party\sonkupik-sphere-v0.10.4\OrbVisualizer.cpp')
 
-Write-Host "==> ASK-P authority verified: P0.3 checkpoint @ $commit" -ForegroundColor Green
-Write-Host '==> Effective SC220 DSP will be generated fail-closed from the pinned upstream P0/P0.1/P0.2/P0.3 calibration.' -ForegroundColor Green
+Write-Host "==> ASK-P authority verified: approved v0.5.24 product source @ $commit" -ForegroundColor Green
+Write-Host '==> SC220 will run the upstream production P0.3 source audit, then generate the same effective DSP contract used by ASK-P.' -ForegroundColor Green

@@ -47,7 +47,7 @@ for needle, label in [
     ('BinaryData::getNamedResource (\\"favicon_96x96_png\\"', "tray 96px SC220 asset"),
     ('BinaryData::getNamedResource (\\"favicon_512x512_png\\"', "tray 512px fallback"),
     ('trayImage = juce::Image (juce::Image::ARGB, 32, 32, true)', "persistent native tray surface"),
-    ('setIconImage (trayImage, trayImage)', "tray icon publication"),
+    ('setIconImage (trayImage, {})', "tray icon publication"),
     ('_icon96_size EQUAL 13165', "reviewed 96px size guard"),
     ('_icon512_size EQUAL 182135', "reviewed 512px size guard"),
 ]:

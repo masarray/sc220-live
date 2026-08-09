@@ -26,6 +26,18 @@ count = int.from_bytes(raw[4:6], "little")
 if count < 3:
     raise AssertionError("favicon.ico should keep the multi-size Windows icon set")
 
+sizes = []
+for i in range(count):
+    offset = 6 + i * 16
+    if offset + 16 > len(raw):
+        break
+    width = raw[offset] or 256
+    height = raw[offset + 1] or 256
+    bit_depth = int.from_bytes(raw[offset + 6:offset + 8], "little")
+    sizes.append((width, height, bit_depth))
+if (32, 32, 32) not in sizes:
+    raise AssertionError(f"favicon.ico must contain an exact 32x32 32-bit tray frame, got {sizes}")
+
 for needle, label in [
     ('HEADER_NAME SC220TrayIconData.h', "dedicated BinaryData header"),
     ('NAMESPACE SC220TrayIconData', "dedicated BinaryData namespace"),

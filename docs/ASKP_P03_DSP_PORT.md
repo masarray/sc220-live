@@ -1,79 +1,86 @@
-# SC220 Live — ASK-P P0.3 Effective DSP Port
+# SC220 Live — ASK-P v0.5.24 Production DSP Port
 
 ## Authority
 
 - Source repository: `masarray/askp-vst`
-- Pinned checkpoint: `240b9d3be3ca1fbdedfa5b7027e465c22a56b0ea`
-- Upstream checkpoint: **P0.3 Smart Warm Vocal Enhancement**
-- Canonical base engine version: `0.5.23`
+- Latest audited upstream HEAD: `9b275b42e6668c958ac4367b86c6e8660922c8cb`
+- Latest approved release: **v0.5.24**
+- Approved product source commit: `1cf050d40338cbcb5d8cddd9fc2de5f23e3d625f`
 - DSP header revision: `2026073102`
 - Factory profiles: `13`
-- Release status: **development/listening checkpoint; not an upstream production release**
+- P0.3 feature: **Smart Warm Vocal Enhancement**
 
-SC220 Live intentionally keeps the embedded plugin version at `0.5.23`. ASK-P has not yet folded P0.3 into canonical `engine/arsonkupik_dsp.cpp` or published a new production version. The SC220 build identity therefore names the P0.3 checkpoint explicitly instead of inventing `0.5.24`.
+The approved upstream release request explicitly names `1cf050d4...` as the immutable product source commit. SC220 Live pins that product source rather than following the moving repository HEAD. The later upstream commits through `9b275b42...` change release-request / release-audit helper metadata only; the product DSP, presets and processor source remain the approved v0.5.24 source.
 
-## Why the port generates DSP
+## Production DSP source contract
 
-Between the previous SC220 authority `5757119cab7a1a75f09dcf0edea6e3be97975439` and P0.3 checkpoint `240b9d3be3ca1fbdedfa5b7027e465c22a56b0ea`, upstream changed the presets and added the accepted P0/P0.1/P0.2/P0.3 calibration pipeline, but did not yet fold that calibration into canonical `engine/arsonkupik_dsp.cpp`.
+ASK-P v0.5.24 production does not compile the canonical `engine/arsonkupik_dsp.cpp` directly. The approved sound is represented by the immutable canonical input plus a fail-closed audit/generator pipeline.
 
-Compiling the canonical file directly would therefore produce the wrong sound even though the submodule and presets looked current.
-
-SC220 Live now runs the pinned upstream generator during CMake configuration:
+SC220 Live now mirrors the same production sequence:
 
 ```text
+tools/p0_musical_rebalance_source_audit.py
+        |
+        v
 scripts/generate_p0_musical_rebalance_dsp.py
-    canonical engine/arsonkupik_dsp.cpp
-        -> generated/arsonkupik_dsp_p0_3.cpp
+        |
+        v
+<SC220 build>/generated/askp-v0.5.24-1cf050d/arsonkupik_dsp.cpp
 ```
 
-The generated translation unit is the one compiled into SC220 Live, the reference renderer and the Live renderer. Generation is fail-closed: if upstream source anchors drift, configuration fails rather than silently compiling a partial sonic update.
+CMake refuses configuration when the upstream source audit fails, generation fails, the generated file is missing, or SC220's supplemental reviewed anchors are absent. The generated translation unit is compiled by SC220 Live and both optional parity renderers.
 
-## Audio improvements now carried by SC220 Live
+This closes the main gap in the earlier port, which ran the generator but did not yet run the complete upstream production source audit first.
+
+## Audio improvements carried by SC220 Live
 
 ### P0 — musical rebalance / rounder authority
 
-- broader low foundation rather than narrow attack emphasis;
-- Signature sub glide at 52 Hz;
-- deeper 78 Hz bloom and rounder 118 Hz torque;
-- 170/185 Hz acoustic/chest support;
-- stronger Core and Living Body foundations;
-- warm-particle cushion and reduced warm transient guard;
-- static Signature output trim of -0.35 dB;
-- linked full-band Signature macro compressor disabled so enhancement can move without programme-level pumping.
+- low-body shelf: 76 Hz / +1.12 dB / Q0.64;
+- Signature sub glide: 52 Hz / +0.74 dB;
+- Signature deep bloom: 78 Hz / +0.72 dB;
+- Signature bass torque: 118 Hz / +0.74 dB / Q0.70;
+- Signature chest authority: 185 Hz / +0.53 dB;
+- warm particles: 78;
+- Smart Bass: 70;
+- body focus: 1.030;
+- Signature output trim: -0.35 dB;
+- Signature linked full-band macro compressor remains disabled so enhancement does not create programme-level pumping.
 
 ### P0.1 — anti-ringing vocal presence
 
-- broad presence geometry moved to the approved 2180 Hz / +0.40 dB / Q0.64 balance;
-- Vocal Presence gain law restrained and Q moved to 0.95;
-- Vocal Clarity moved to 3500 Hz / Q1.05 with restrained gain;
-- P6 Presence Mid reduced to 1.04x;
-- removes the residual ~2.3 kHz spotlight without sacrificing chest/throat authority or upper clarity.
+- base Presence: 2180 Hz / +0.40 dB / Q0.64;
+- restrained Vocal Presence gain law with Q0.95;
+- Vocal Clarity: 3500 Hz / Q1.05;
+- P6 Presence Mid: 1.04x;
+- residual ~2.3 kHz spotlight remains removed without sacrificing higher vocal clarity.
 
 ### P0.2 — sparkling / 3D air
 
-- P6 Tickle Mid 1.21x;
-- air articulation modulation 0.030;
-- skin articulation modulation 0.035;
+- P6 Tickle Mid: 1.21x;
+- Air articulation modulation: 0.030;
+- Skin articulation modulation: 0.035;
 - bounded Smart Side Air authority increase;
-- generated 3D air increased approximately 8–10%;
-- existing 6.2 kHz generated-air and 7.8 kHz Side-Air high-pass protection remains authoritative;
-- scene-space, correlation, anti-phase, density and brightness guards remain active.
+- generated 3D Air coefficients: 0.066 / 0.026 / 0.094;
+- generated Air remains high-passed at 6.2 kHz;
+- dedicated Side Air remains high-passed at 7.8 kHz;
+- brightness, density, scene-space, correlation and anti-phase protection remains active.
 
 ### P0.3 — Smart Warm Vocal Enhancement
 
-P0.3 adds a second, bounded lower-body-led identity route to the existing Smart Warm Vocal Body detector. It is designed for warm/dark/chest-led vocals that can sit behind bright accompaniment even when a normal 1.5–3 kHz presence boost would be the wrong fix.
+P0.3 keeps the proven Presence-led vocal-body detector and adds a bounded lower-body-led route for warm/dark/chest-led vocals whose identity is carried more by throat/body than 1.5–3 kHz Presence.
 
-The new detector reuses existing envelopes only. It adds no FFT, filter, compressor, audio lane or realtime allocation. It requires a presence floor, musical throat/body energy, centred low-mid energy and a Core-safe condition so kick/bass or wide low-mid material do not receive vocal-like warm bloom.
+The route reuses existing analysis envelopes only. It adds no FFT, filter, compressor, audio lane, allocation or latency. It requires a real Presence floor, musical 240–1100 Hz throat/body evidence, centred lower-body content, non-dominant 72–150 Hz Core, and the existing mud/sustain/freshness/centre guards.
 
-The new route supplements, rather than replaces, the existing presence-led detector. It changes detection coverage, not the global vocal wet amount or static upper-mid gain.
+This changes detector coverage, not global vocal gain. Vocal Body remains 76, the 575 Hz / +1.96 dB warm-body bridge remains unchanged, and kick/bass or wide low-mid material remains explicitly rejected by the production source audit.
 
-## Presets
+## Presets and bridge defaults
 
-SC220 Live compiles `engine/arsonkupik_presets.cpp` from the same P0.3-pinned authority. All 13 current factory profiles remain available through the existing `EnhancerEngineBridge` API.
+SC220 compiles `engine/arsonkupik_presets.cpp` from the same approved v0.5.24 product source. All 13 factory profiles remain available through `EnhancerEngineBridge`.
 
-The Signature profile now carries the current P0 calibration, including the round-bass foundation, 575 Hz warm-body bridge, P0.1 presence geometry, sparkle/detail settings and -0.35 dB Signature Balanced output trim.
+The bridge now reports engine version `0.5.24`. Its defensive Smart Bass fallback is also aligned to the production Signature value of `70` rather than the older `68` fallback.
 
-## Existing SC220-specific behaviour retained
+## SC220-specific behaviour retained
 
 - headless ASK-P processor; ASK-P editor and Orb visualizer remain excluded;
 - local `sonkupik-sphere-v0.10.4` remains the only visualizer;
@@ -81,27 +88,30 @@ The Signature profile now carries the current P0 calibration, including the roun
 - 80 ms reference processor remains available for parity QA;
 - ASK-P safety/telemetry bridge remains intact: input, pre-safety and output peaks/overs, safety gain reduction and Gain Match telemetry;
 - SC220-specific licence storage isolation remains intact;
-- final lookahead/ceiling policy and existing safety architecture remain owned by the ASK-P processor.
+- final lookahead/ceiling policy remains owned by the approved ASK-P processor.
 
-## Build and validation contract
+## Build behaviour
 
-CMake requires the exact checkpoint commit and the upstream P0.3 generator. It then verifies generated-DSP anchors for:
+`scripts/build-live-windows.ps1` now automatically runs the authority sync helper before CMake configuration. This verifies the exact v0.5.24 gitlink and required upstream source-audit/generator files before compilation.
 
-- `lowerBodyLedVocalTarget`;
-- P6 Tickle Mid `1.21`;
-- P0.2 generated 3D air `0.066 / 0.026 / 0.094`;
-- Signature compressor bypass;
-- warm transient guard `0.58`.
+The production build identity is:
 
-CI additionally checks the gitlink, port boundary, factory profile contract and, when the private ASK-P token is configured, generates and compiles the effective P0.3 DSP together with the current preset source.
+```text
+SC220 Live Embedded Authority v0.5.24 @ 1cf050d
+```
 
-## Release caution
+Optional parity targets also compile the same generated production DSP, with the reference retaining 80 ms macro glide and Live retaining 12 ms.
 
-This port is suitable for SC220 listening/build validation but should not be described as an upstream ASK-P production release. Before a public SC220 release based on this checkpoint, run the full Windows MSVC/audio-device acceptance matrix and listening checks, especially:
+## Validation status
+
+Source integration is aligned to the latest approved ASK-P v0.5.24 product source contract. The previous GitHub Actions attempt was blocked before execution by repository/account runner billing, so full hosted-runner MSVC/audio-device validation still depends on Actions becoming runnable or a local Windows build.
+
+The critical listening/runtime checks remain:
 
 - warm/dark vocal foreground improvement without 2–3 kHz bite;
 - no male-vocal boom or kick/bass false triggering;
 - no return of 2.3 kHz ringing;
 - stable round bass without programme pumping;
 - sparkling air without fizz or centre-image instability;
-- 48/96 kHz and 32/64/128-sample realtime stress tests.
+- 48/96 kHz and 32/64/128-sample realtime stress tests;
+- silence/resume, preset transitions, bypass, automation and crackle/deadline checks.

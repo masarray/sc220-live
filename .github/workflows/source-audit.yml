@@ -43,6 +43,8 @@ jobs:
         run: python qa/audit_sc220_p3_live_ux.py
       - name: Validate P4 speech-aware ducking and clean LUFS UI
         run: python qa/audit_sc220_p4_smart_ducking.py
+      - name: Validate P5 console polish app branding and expander ballistics
+        run: python qa/audit_sc220_p5_console_polish.py
       - name: Validate ASK-P v0.5.23 port boundary
         run: python qa/audit_v0140_askp_v0523_port.py
       - name: Validate SC220 dual-source broadcast bus

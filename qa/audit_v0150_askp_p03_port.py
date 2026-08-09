@@ -63,7 +63,13 @@ check("upstream P0.3 generator required", all(x in cmake for x in [
     "--input \"${ASKP_DSP_CANONICAL_SOURCE}\"",
     "--output \"${ASKP_DSP_SOURCE}\"",
 ]))
-check("source audit runs before generator in CMake", cmake.find("COMMAND \"${Python3_EXECUTABLE}\" \"${ASKP_P03_SOURCE_AUDIT}\"") < cmake.find("COMMAND \"${Python3_EXECUTABLE}\" \"${ASKP_P03_GENERATOR}\""))
+cmake_audit_anchor = 'COMMAND "${Python3_EXECUTABLE}" "${ASKP_P03_SOURCE_AUDIT}"'
+cmake_generator_anchor = 'COMMAND "${Python3_EXECUTABLE}" "${ASKP_P03_GENERATOR}"'
+cmake_audit_pos = cmake.find(cmake_audit_anchor)
+cmake_generator_pos = cmake.find(cmake_generator_anchor)
+check("source audit command is unique in CMake", cmake.count(cmake_audit_anchor) == 1)
+check("generator command is unique in CMake", cmake.count(cmake_generator_anchor) == 1)
+check("source audit runs before generator in CMake", cmake_audit_pos >= 0 and cmake_generator_pos > cmake_audit_pos)
 check("generated production DSP compiled instead of canonical", all(x in cmake for x in [
     "set(ASKP_DSP_CANONICAL_SOURCE",
     "set(ASKP_DSP_SOURCE \"${ASKP_GENERATED_DIR}/arsonkupik_dsp.cpp\")",

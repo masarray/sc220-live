@@ -26,6 +26,20 @@ function Invoke-Gh {
     }
 }
 
+function Invoke-GhCapture {
+    param([Parameter(ValueFromRemainingArguments = $true)][string[]]$Arguments)
+
+    $lines = @(& gh.exe @Arguments 2>&1)
+    $exitCode = $LASTEXITCODE
+    foreach ($line in $lines) {
+        Write-Host ([string]$line)
+    }
+    if ($exitCode -ne 0) {
+        throw "GitHub CLI failed: gh $($Arguments -join ' ')"
+    }
+    return $lines
+}
+
 function Get-GhJson {
     param([Parameter(ValueFromRemainingArguments = $true)][string[]]$Arguments)
     $text = (& gh.exe @Arguments | Out-String)
@@ -87,10 +101,95 @@ function Stop-LocalRunner([System.ServiceProcess.ServiceController]$Service) {
     }
 }
 
+function Sync-CleanAskpSubmodule {
+    $relativePath = 'third_party/askp-vst'
+    $authority = Join-Path $root 'third_party\askp-vst'
+    $gitMarker = Join-Path $authority '.git'
+
+    if (Test-Path -LiteralPath $gitMarker) {
+        $submoduleDirty = (& git.exe -C $authority status --porcelain 2>$null | Out-String).Trim()
+        if ($LASTEXITCODE -ne 0) {
+            Write-Warning 'ASK-P submodule state could not be inspected; leaving it untouched.'
+            return
+        }
+        if ($submoduleDirty) {
+            Write-Host 'ASK-P submodule contains local edits; automatic pointer repair is skipped.' -ForegroundColor Yellow
+            return
+        }
+    }
+
+    & git.exe submodule sync -- $relativePath *> $null
+    if ($LASTEXITCODE -ne 0) {
+        throw 'Unable to synchronize the ASK-P submodule URL.'
+    }
+
+    & git.exe submodule update --init --recursive --force --checkout -- $relativePath
+    if ($LASTEXITCODE -ne 0) {
+        throw 'Unable to synchronize the ASK-P submodule to the commit pinned by SC220 Live.'
+    }
+}
+
+function Get-WorkflowRuns {
+    $result = Get-GhJson run list `
+        --repo $Repository `
+        --workflow 'local-release.yml' `
+        --branch $WorkflowRef `
+        --event workflow_dispatch `
+        --limit 10 `
+        --json 'databaseId,createdAt,status,url,headBranch,headSha,displayTitle'
+
+    if ($null -eq $result) { return @() }
+    return @($result)
+}
+
+function Get-ActiveWorkflowRun {
+    $activeStates = @('queued', 'in_progress', 'waiting', 'pending', 'requested')
+    return @(Get-WorkflowRuns) |
+        Where-Object { $activeStates -contains [string]$_.status } |
+        Sort-Object { [Int64]$_.databaseId } -Descending |
+        Select-Object -First 1
+}
+
+function Get-RunIdFromDispatchOutput([object[]]$Lines) {
+    foreach ($line in @($Lines)) {
+        $text = [string]$line
+        if ($text -match '/actions/runs/([0-9]+)') {
+            return [Int64]$Matches[1]
+        }
+    }
+    return [Int64]0
+}
+
+function Wait-ForNewWorkflowRun([Int64]$PreviousRunId) {
+    for ($attempt = 0; $attempt -lt 15; $attempt++) {
+        if ($attempt -gt 0) { Start-Sleep -Seconds 1 }
+        $run = @(Get-WorkflowRuns) |
+            Where-Object { [Int64]$_.databaseId -gt $PreviousRunId } |
+            Sort-Object { [Int64]$_.databaseId } -Descending |
+            Select-Object -First 1
+        if ($run) { return $run }
+    }
+    return $null
+}
+
+function Watch-ReleaseRun([Int64]$RunId, [string]$RunUrl) {
+    Write-Host "Run URL: $RunUrl" -ForegroundColor Cyan
+    Write-Host "Watching release run #$RunId. The runner will stay online until it finishes." -ForegroundColor DarkCyan
+    & gh.exe run watch $RunId --repo $Repository --exit-status
+    if ($LASTEXITCODE -ne 0) {
+        throw "Local release workflow failed. Open $RunUrl for details."
+    }
+}
+
+function Test-PublicReleaseExists([string]$WantedVersion) {
+    & gh.exe api "repos/$DownloadRepository/releases/tags/v$WantedVersion" *> $null
+    return $LASTEXITCODE -eq 0
+}
+
 $root = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 Set-Location $root
 
-Write-Section 'SC220 Live - local build and automatic public release'
+Write-Section 'SC220 Live - smart local build and automatic public release'
 
 if (-not (Get-Command git.exe -ErrorAction SilentlyContinue)) {
     throw 'Git is missing. Run SETUP-LOCAL-RUNNER.cmd first.'
@@ -109,6 +208,11 @@ $insideRepo = (& git.exe rev-parse --is-inside-work-tree 2>$null | Select-Object
 if ($insideRepo -ne 'true') {
     throw 'RELEASE-SC220.cmd must be run from a cloned sc220-live repository.'
 }
+
+# Repair the common harmless state where the parent repo has moved its ASK-P
+# gitlink but the local clean submodule worktree is still on the previous commit.
+# Never overwrite real edits inside the private ASK-P checkout.
+Sync-CleanAskpSubmodule
 
 $dirty = (& git.exe status --porcelain | Out-String).Trim()
 if ($dirty) {
@@ -136,8 +240,26 @@ $remoteSourceCommit = (& git.exe rev-parse FETCH_HEAD | Select-Object -First 1).
 if ($currentBranch -eq $SourceRef) {
     $localHead = (& git.exe rev-parse HEAD | Select-Object -First 1).Trim()
     if ($localHead -ne $remoteSourceCommit) {
-        throw "Local HEAD ($localHead) is not the pushed source ref ($remoteSourceCommit). Push or pull before releasing."
+        $mergeBase = (& git.exe merge-base $localHead $remoteSourceCommit | Select-Object -First 1)
+        if ($mergeBase -and $mergeBase.Trim() -eq $localHead) {
+            Write-Host "Local $SourceRef is behind origin. Fast-forwarding automatically..." -ForegroundColor Yellow
+            & git.exe merge --ff-only $remoteSourceCommit
+            if ($LASTEXITCODE -ne 0) {
+                throw "Automatic fast-forward of $SourceRef failed. Run git pull --ff-only manually."
+            }
+            Sync-CleanAskpSubmodule
+            $localHead = (& git.exe rev-parse HEAD | Select-Object -First 1).Trim()
+        }
+
+        if ($localHead -ne $remoteSourceCommit) {
+            throw "Local HEAD ($localHead) is not the pushed source ref ($remoteSourceCommit). Push or reconcile the branch before releasing."
+        }
     }
+}
+
+$dirtyAfterSync = (& git.exe status --porcelain | Out-String).Trim()
+if ($dirtyAfterSync) {
+    throw "Release preflight changed or found local files unexpectedly:`n$dirtyAfterSync"
 }
 
 & gh.exe api "repos/$Repository/contents/.github/workflows/local-release.yml?ref=$WorkflowRef" *> $null
@@ -164,7 +286,7 @@ $currentRelease = $null
 try {
     $currentRelease = Invoke-RestMethod -UseBasicParsing `
         -Uri 'https://raw.githubusercontent.com/masarray/sc220-download/main/latest.json' `
-        -Headers @{ 'Cache-Control' = 'no-cache'; 'User-Agent' = 'SC220-Local-Release/1.0' }
+        -Headers @{ 'Cache-Control' = 'no-cache'; 'User-Agent' = 'SC220-Local-Release/1.1' }
 }
 catch {
     Write-Warning 'Could not read sc220-download/latest.json; using a conservative version suggestion.'
@@ -205,56 +327,84 @@ Write-Host "Destination  : $DownloadRepository"
 Write-Host "Build runner : local PC, release-only LocalSystem service"
 Write-Host "Notes        : $ReleaseNotes"
 Write-Host ''
-$confirm = Read-Host 'Type RELEASE to build, test, and publish'
-if ($confirm -cne 'RELEASE') {
+$confirm = (Read-Host 'Type RELEASE to build, test, and publish').Trim()
+if (-not $confirm.Equals('RELEASE', [System.StringComparison]::OrdinalIgnoreCase)) {
     throw 'Release cancelled by user.'
 }
 
+$releaseCompleted = $false
 try {
     $runner = Start-And-WaitForRunner $runnerService
     Write-Host "Runner online : $($runner.name)" -ForegroundColor Green
 
-    $dispatchStarted = [DateTime]::UtcNow
-    $workflowArguments = @(
-        'workflow', 'run', 'local-release.yml',
-        '--repo', $Repository,
-        '--ref', $WorkflowRef,
-        '-f', "version=$Version",
-        '-f', "source_ref=$SourceRef",
-        '-f', 'clean=true',
-        '-f', "release_channel=$Channel",
-        '-f', "release_notes=$ReleaseNotes"
-    )
-    Invoke-Gh @workflowArguments
-    Write-Host 'Workflow queued. Waiting for GitHub to assign a run ID...'
+    # A previous launcher may have crashed after workflow_dispatch succeeded.
+    # Reattach to that unfinished run instead of creating a duplicate release.
+    $activeRun = Get-ActiveWorkflowRun
+    if ($activeRun) {
+        $activeRunId = [Int64]$activeRun.databaseId
+        $activeRunUrl = [string]$activeRun.url
+        Write-Host "Found unfinished release run #$activeRunId ($($activeRun.status)). Reusing it instead of dispatching a duplicate." -ForegroundColor Yellow
+        Watch-ReleaseRun -RunId $activeRunId -RunUrl $activeRunUrl
 
-    $run = $null
-    for ($attempt = 0; $attempt -lt 20 -and -not $run; $attempt++) {
-        Start-Sleep -Seconds 2
-        $runs = @(Get-GhJson run list `
-            --repo $Repository `
-            --workflow 'local-release.yml' `
-            --branch $WorkflowRef `
-            --event workflow_dispatch `
-            --limit 10 `
-            --json 'databaseId,createdAt,status,url,headBranch,displayTitle')
-
-        $run = $runs | Where-Object {
-            ([DateTime]$_.createdAt).ToUniversalTime() -ge $dispatchStarted.AddSeconds(-5)
-        } | Sort-Object { [DateTime]$_.createdAt } -Descending | Select-Object -First 1
-    }
-    if (-not $run) {
-        throw 'Workflow was dispatched, but its run ID could not be located. Check the Actions tab.'
+        if (Test-PublicReleaseExists $Version) {
+            Write-Host "Existing run published v$Version successfully." -ForegroundColor Green
+            $releaseCompleted = $true
+        }
+        else {
+            Write-Host "The previous run completed but did not publish requested v$Version. Dispatching this request now." -ForegroundColor Yellow
+        }
     }
 
-    Write-Host "Run URL: $($run.url)" -ForegroundColor Cyan
-    & gh.exe run watch $run.databaseId --repo $Repository --exit-status
-    if ($LASTEXITCODE -ne 0) {
-        throw "Local release workflow failed. Open $($run.url) for details."
+    if (-not $releaseCompleted) {
+        $runsBeforeDispatch = @(Get-WorkflowRuns)
+        $previousRunId = if ($runsBeforeDispatch.Count -gt 0) {
+            [Int64](($runsBeforeDispatch | Sort-Object { [Int64]$_.databaseId } -Descending | Select-Object -First 1).databaseId)
+        } else {
+            [Int64]0
+        }
+
+        $workflowArguments = @(
+            'workflow', 'run', 'local-release.yml',
+            '--repo', $Repository,
+            '--ref', $WorkflowRef,
+            '-f', "version=$Version",
+            '-f', "source_ref=$SourceRef",
+            '-f', 'clean=true',
+            '-f', "release_channel=$Channel",
+            '-f', "release_notes=$ReleaseNotes"
+        )
+
+        $dispatchOutput = @(Invoke-GhCapture @workflowArguments)
+        $runId = Get-RunIdFromDispatchOutput -Lines $dispatchOutput
+        $runUrl = if ($runId -gt 0) { "https://github.com/$Repository/actions/runs/$runId" } else { '' }
+
+        if ($runId -le 0) {
+            Write-Host 'Workflow accepted. Resolving run ID with a short numeric fallback...' -ForegroundColor DarkCyan
+            $newRun = Wait-ForNewWorkflowRun -PreviousRunId $previousRunId
+            if (-not $newRun) {
+                throw 'Workflow was dispatched, but its run ID could not be located. The runner remains protected by the finally block.'
+            }
+            $runId = [Int64]$newRun.databaseId
+            $runUrl = [string]$newRun.url
+        }
+        else {
+            Write-Host "Workflow run ID received immediately: $runId" -ForegroundColor Green
+        }
+
+        Watch-ReleaseRun -RunId $runId -RunUrl $runUrl
+
+        if (-not (Test-PublicReleaseExists $Version)) {
+            throw "Workflow completed without a verifiable public release tag v$Version in $DownloadRepository."
+        }
+        $releaseCompleted = $true
     }
 }
 finally {
     Stop-LocalRunner $runnerService
+}
+
+if (-not $releaseCompleted) {
+    throw "Release v$Version did not reach the verified public-release state."
 }
 
 $releaseUrl = "https://github.com/$DownloadRepository/releases/tag/v$Version"

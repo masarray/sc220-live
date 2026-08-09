@@ -13,15 +13,18 @@ if(MSVC)
 endif()
 
 # ---------------------------------------------------------------------------
-# Pinned ArSonKuPik v0.5.23 audio authority
+# Pinned ArSonKuPik P0.3 development audio authority
 # ---------------------------------------------------------------------------
 # The full ASK-P repository is mounted as a git submodule at one reviewed
-# commit. Sonkupik compiles only DSP, profile, processor and licence authority;
-# the ASK-P editor remains excluded from the SC220 Live surface.
-set(SONKUPIK_ASKP_COMMIT "5757119cab7a1a75f09dcf0edea6e3be97975439")
+# development checkpoint. Canonical v0.5.23 DSP remains the base source, while
+# the upstream fail-closed P0/P0.1/P0.2/P0.3 generator materialises the exact
+# listening-approved effective DSP compiled by SC220 Live. The ASK-P editor
+# remains excluded from the SC220 Live surface.
+set(SONKUPIK_ASKP_COMMIT "240b9d3be3ca1fbdedfa5b7027e465c22a56b0ea")
 set(ASKP_PORT_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/third_party/askp-vst")
 set(ASKP_ENGINE_DIR "${ASKP_PORT_ROOT}/engine")
 set(ASKP_PROCESSOR_DIR "${ASKP_PORT_ROOT}/src")
+set(ASKP_P03_GENERATOR "${ASKP_PORT_ROOT}/scripts/generate_p0_musical_rebalance_dsp.py")
 set(SONKUPIK_SPHERE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/third_party/sonkupik-sphere-v0.10.4")
 
 foreach(_required IN ITEMS
@@ -33,10 +36,11 @@ foreach(_required IN ITEMS
         "${ASKP_PROCESSOR_DIR}/PluginProcessor.h"
         "${ASKP_PROCESSOR_DIR}/LicenseManager.cpp"
         "${ASKP_PROCESSOR_DIR}/LicenseManager.h"
-        "${ASKP_PROCESSOR_DIR}/LicensePublicKey.h")
+        "${ASKP_PROCESSOR_DIR}/LicensePublicKey.h"
+        "${ASKP_P03_GENERATOR}")
     if(NOT EXISTS "${_required}")
         message(FATAL_ERROR
-            "Pinned ASK-P v0.5.23 authority is missing: ${_required}\n"
+            "Pinned ASK-P P0.3 authority is missing: ${_required}\n"
             "Run: git submodule update --init --recursive third_party/askp-vst")
     endif()
 endforeach()
@@ -59,7 +63,7 @@ if(Git_FOUND)
     endif()
 endif()
 
-set(ASKP_DSP_SOURCE "${ASKP_ENGINE_DIR}/arsonkupik_dsp.cpp")
+set(ASKP_DSP_CANONICAL_SOURCE "${ASKP_ENGINE_DIR}/arsonkupik_dsp.cpp")
 set(ASKP_PRESET_SOURCE "${ASKP_ENGINE_DIR}/arsonkupik_presets.cpp")
 set(ASKP_REFERENCE_PROCESSOR_SOURCE "${ASKP_PROCESSOR_DIR}/PluginProcessor.cpp")
 set(ASKP_REFERENCE_PROCESSOR_HEADER "${ASKP_PROCESSOR_DIR}/PluginProcessor.h")
@@ -87,22 +91,51 @@ sonkupik_assert_sha256("${SONKUPIK_ORB_SOURCE}"
 
 file(READ "${ASKP_ENGINE_DIR}/arsonkupik_dsp.hpp" _askp_header)
 if(NOT _askp_header MATCHES "ASKP_DSP_HEADER_REVISION 2026073102")
-    message(FATAL_ERROR "Expected ArSonKuPik v0.5.23 engine revision 2026073102 was not found")
+    message(FATAL_ERROR "Expected ArSonKuPik v0.5.23 base engine revision 2026073102 was not found")
 endif()
 file(READ "${ASKP_PRESET_SOURCE}" _askp_presets)
 if(NOT _askp_presets MATCHES "profiles.reserve\\(13\\)")
     message(FATAL_ERROR "Expected the reviewed 13-profile ASK-P platform")
 endif()
+if(NOT _askp_presets MATCHES "P0 Musical Rebalance")
+    message(FATAL_ERROR "Expected P0/P0.1/P0.2/P0.3 preset calibration was not found")
+endif()
 
 # ---------------------------------------------------------------------------
-# Deterministic headless processor variants
+# Deterministic P0.3 DSP + headless processor variants
 # ---------------------------------------------------------------------------
-# ASK-P remains exact at the pinned commit. Configure-time generated copies only
-# remove the VST editor from the standalone rack; the Live variant additionally
-# changes the creative-control glide from 80 ms to 12 ms. The reference variant
-# retains 80 ms for parity renders.
-set(ASKP_GENERATED_DIR "${CMAKE_CURRENT_BINARY_DIR}/generated/askp-v0.5.23")
+# Upstream deliberately keeps P0.3 as a development checkpoint generated from
+# the canonical v0.5.23 DSP. Run the exact pinned generator here instead of
+# pretending the unchanged canonical arsonkupik_dsp.cpp already contains P0.3.
+set(ASKP_GENERATED_DIR "${CMAKE_CURRENT_BINARY_DIR}/generated/askp-p0.3-240b9d3")
 file(MAKE_DIRECTORY "${ASKP_GENERATED_DIR}")
+find_package(Python3 REQUIRED COMPONENTS Interpreter)
+set(ASKP_DSP_SOURCE "${ASKP_GENERATED_DIR}/arsonkupik_dsp_p0_3.cpp")
+execute_process(
+    COMMAND "${Python3_EXECUTABLE}" "${ASKP_P03_GENERATOR}"
+            --input "${ASKP_DSP_CANONICAL_SOURCE}"
+            --output "${ASKP_DSP_SOURCE}"
+    RESULT_VARIABLE _askp_p03_result
+    OUTPUT_VARIABLE _askp_p03_stdout
+    ERROR_VARIABLE _askp_p03_stderr)
+if(NOT _askp_p03_result EQUAL 0)
+    message(FATAL_ERROR
+        "ASK-P P0.3 DSP generation failed.\n"
+        "stdout: ${_askp_p03_stdout}\n"
+        "stderr: ${_askp_p03_stderr}")
+endif()
+file(READ "${ASKP_DSP_SOURCE}" _askp_p03_dsp)
+foreach(_p03_anchor IN ITEMS
+        "lowerBodyLedVocalTarget"
+        "tickleMidLift = 1.21"
+        "runtime.gen_air_base = additive(w.high_width, 0.066, 0.026, 0.094)"
+        "working_.compressor.enabled = false"
+        "runtime.warm_transient_guard = 0.58")
+    string(FIND "${_askp_p03_dsp}" "${_p03_anchor}" _p03_anchor_pos)
+    if(_p03_anchor_pos EQUAL -1)
+        message(FATAL_ERROR "ASK-P P0.3 effective DSP anchor missing: ${_p03_anchor}")
+    endif()
+endforeach()
 
 # Keep the proven ASK-P 365-day state machine and RSA activation format, but
 # isolate SC220 Live's trial clock and activation from the VST product. The
@@ -191,10 +224,11 @@ file(WRITE "${ASKP_GENERATED_DIR}/PluginProcessor_Live.cpp"
 set(ASKP_LIVE_PROCESSOR_SOURCE "${ASKP_GENERATED_DIR}/PluginProcessor_Live.cpp")
 set(ASKP_HEADLESS_REFERENCE_SOURCE "${ASKP_GENERATED_DIR}/PluginProcessor_Reference.cpp")
 
-message(STATUS "SC220 Live enhancer authority: ArSonKuPik v0.5.23 @ ${SONKUPIK_ASKP_COMMIT}")
-message(STATUS "SC220 Live engine revision: 2026073102; profiles: 13; Live glide: 12 ms")
+message(STATUS "SC220 Live enhancer authority: ASK-P P0.3 checkpoint @ ${SONKUPIK_ASKP_COMMIT}")
+message(STATUS "SC220 Live base engine: v0.5.23 revision 2026073102; profiles: 13; Live glide: 12 ms")
+message(STATUS "SC220 Live effective DSP: P0/P0.1/P0.2/P0.3 musical rebalance")
 
-# Relaxed contraction stays confined to the DSP translation unit.
+# Relaxed contraction stays confined to the generated effective DSP translation unit.
 set_property(SOURCE "${ASKP_DSP_SOURCE}" APPEND PROPERTY COMPILE_OPTIONS
     "$<$<AND:$<CONFIG:Release>,$<CXX_COMPILER_ID:MSVC>>:/fp:fast>"
     "$<$<AND:$<CONFIG:Release>,$<NOT:$<CXX_COMPILER_ID:MSVC>>>:-fno-math-errno>"
@@ -347,7 +381,7 @@ target_compile_definitions(SC220Live PRIVATE
     JucePlugin_Version=0.5.23
     JucePlugin_VersionCode=0x517
     JucePlugin_VersionString="0.5.23"
-    ASKP_BUILD_CHANNEL="SC220 Live Embedded Authority v0.5.23"
+    ASKP_BUILD_CHANNEL="SC220 Live Embedded Authority P0.3 @ 240b9d3"
     SONKUPIK_ENGINE_REVISION=2026073102
     SONKUPIK_LICENSE_API_URL="https://masarray-license-api.masari.workers.dev"
     SONKUPIK_LICENSE_PRODUCT_ID="sc220-live"
@@ -375,7 +409,7 @@ endif()
 # Optional preset-by-preset parity renderers
 # ---------------------------------------------------------------------------
 option(SONKUPIK_BUILD_PARITY_QA
-    "Build ASK-P v0.5.23 reference and Sonkupik Live offline parity renderers" OFF)
+    "Build ASK-P P0.3 checkpoint reference and Sonkupik Live offline parity renderers" OFF)
 
 if(SONKUPIK_BUILD_PARITY_QA)
     function(sonkupik_add_parity_renderer target_name product_name processor_source variant_name)
@@ -403,7 +437,7 @@ if(SONKUPIK_BUILD_PARITY_QA)
             JucePlugin_EditorRequiresKeyboardFocus=0
             JucePlugin_Version=0.5.23 JucePlugin_VersionCode=0x517
             JucePlugin_VersionString="0.5.23"
-            ASKP_BUILD_CHANNEL="Sonkupik Live v0.5.23 Parity"
+            ASKP_BUILD_CHANNEL="Sonkupik Live P0.3 Checkpoint Parity"
             SONKUPIK_PARITY_VARIANT="${variant_name}"
         )
         target_link_libraries(${target_name} PRIVATE
@@ -422,13 +456,13 @@ if(SONKUPIK_BUILD_PARITY_QA)
 
     sonkupik_add_parity_renderer(
         SonkupikParityReference
-        "ASK-P v0.5.23 Reference Renderer"
+        "ASK-P P0.3 Checkpoint Reference Renderer"
         "${ASKP_HEADLESS_REFERENCE_SOURCE}"
-        "askp-v0.5.23-headless-80ms")
+        "askp-p0.3-headless-80ms")
 
     sonkupik_add_parity_renderer(
         SonkupikParityLive
-        "Sonkupik v0.5.23 Live Renderer"
+        "Sonkupik P0.3 Live Renderer"
         "${ASKP_LIVE_PROCESSOR_SOURCE}"
-        "sonkupik-live-12ms")
+        "sonkupik-p0.3-live-12ms")
 endif()

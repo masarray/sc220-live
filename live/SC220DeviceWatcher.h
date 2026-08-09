@@ -86,6 +86,12 @@ private:
         hardwarePresent = presentNow;
         hasPolled = true;
 
+        // One authoritative Windows endpoint scan drives both voice/music
+        // creative entitlements. SC220 connected = hardware access. No SC220 =
+        // the embedded software-only licence/trial state owns editing access.
+        audioEngine.getVoiceEnhancerBridge().setHardwareEntitled (presentNow);
+        audioEngine.getMusicEnhancerBridge().setHardwareEntitled (presentNow);
+
         if (! presentNow)
         {
             // Remove only the vanished SC220 input from JUCE's active setup.

@@ -3,14 +3,15 @@
 ## Authority
 
 - Source repository: `masarray/askp-vst`
-- Latest audited upstream HEAD: `9b275b42e6668c958ac4367b86c6e8660922c8cb`
+- Latest audited upstream HEAD: `f91aa04e953cf14eb0682a1bc305138b6507d73a`
 - Latest approved release: **v0.5.24**
 - Approved product source commit: `1cf050d40338cbcb5d8cddd9fc2de5f23e3d625f`
+- Current approved release-helper commit: `811b7376dd784ce9f64e03512c7baf7de5e77425`
 - DSP header revision: `2026073102`
 - Factory profiles: `13`
 - P0.3 feature: **Smart Warm Vocal Enhancement**
 
-The approved upstream release request explicitly names `1cf050d4...` as the immutable product source commit. SC220 Live pins that product source rather than following the moving repository HEAD. The later upstream commits through `9b275b42...` change release-request / release-audit helper metadata only; the product DSP, presets and processor source remain the approved v0.5.24 source.
+The approved upstream release request explicitly names `1cf050d4...` as the immutable product source commit. SC220 Live pins that product source rather than following the moving repository HEAD. The later upstream commits through `f91aa04e...` change release-request, release-audit, macOS/Pages setup and verification helpers only; the product DSP, presets, processor and production CMake source remain the approved v0.5.24 source.
 
 ## Production DSP source contract
 

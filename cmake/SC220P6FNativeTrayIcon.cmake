@@ -49,7 +49,7 @@ foreach(_required IN ITEMS
         "BinaryData::getNamedResource (\"favicon_96x96_png\""
         "BinaryData::getNamedResource (\"favicon_512x512_png\""
         "trayImage = juce::Image (juce::Image::ARGB, 32, 32, true)"
-        "setIconImage (trayImage, trayImage)"
+        "setIconImage (trayImage, {})"
         "SC220 Live - running in background")
     string(FIND "${_app}" "${_required}" _position)
     if(_position EQUAL -1)

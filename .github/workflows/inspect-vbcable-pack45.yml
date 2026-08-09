@@ -2,6 +2,10 @@ name: Inspect VB-CABLE Pack45
 
 on:
   workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/inspect-vbcable-pack45.yml
 
 permissions:
   contents: read
@@ -92,16 +96,16 @@ jobs:
           @"
           ## Official VB-CABLE Pack45 review
 
-          - Package: `VBCABLE_Driver_Pack45.zip`
-          - SHA-256: `$hash`
-          - Setup signature: `$($setupSignature.Status)`
-          - Setup signer: `$($setupSignature.SignerCertificate.Subject)`
-          - Driver catalogues: `$($catalogs.Count)` valid
+          - Package: ``VBCABLE_Driver_Pack45.zip``
+          - SHA-256: ``$hash``
+          - Setup signature: ``$($setupSignature.Status)``
+          - Setup signer: ``$($setupSignature.SignerCertificate.Subject)``
+          - Driver catalogues: ``$($catalogs.Count)`` valid
           - A/B/C/D material: not present
 
-          After independently reviewing this report, copy the package SHA-256 to the repository variable:
+          Reviewed repository value:
 
-          `VBCABLE_PACK45_SHA256=$hash`
+          ``VBCABLE_PACK45_SHA256=$hash``
           "@ | Add-Content -LiteralPath $env:GITHUB_STEP_SUMMARY -Encoding UTF8
 
       - name: Upload review report only

@@ -5,6 +5,8 @@ param(
 
     [string]$VBCableZipPath = '',
     [string]$VBCableSha256 = $env:VBCABLE_PACK45_SHA256,
+    [string]$VCRedistPath = '',
+    [string]$VCRedistSha256 = $env:VC_REDIST_X64_SHA256,
     [string]$InnoCompiler = '',
 
     [switch]$Clean,
@@ -18,11 +20,28 @@ $officialVBCableUrl = 'https://download.vb-audio.com/Download_CABLE/VBCABLE_Driv
 $root = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 $dist = Join-Path $root 'dist'
 $work = Join-Path $root ".release-work\installer-v$Version"
-$downloadedZip = Join-Path $work 'VBCABLE_Driver_Pack45.zip'
-$expanded = Join-Path $work 'vbcable-pack45'
+$downloadedVBCableZip = Join-Path $work 'VBCABLE_Driver_Pack45.zip'
+$expandedVBCable = Join-Path $work 'vbcable-pack45'
+$downloadedVCRedist = Join-Path $work 'VC_redist.x64.exe'
 $generatedIss = Join-Path $work 'SC220Live.generated.iss'
 $installerTemplate = Join-Path $root 'installer\SC220Live.iss'
+$prerequisiteProbe = Join-Path $root 'installer\SC220PrerequisiteProbe.ps1'
 $vbNotice = Join-Path $root 'installer\VB_AUDIO_NOTICE.txt'
+$vcAuthorityLock = Join-Path $root 'VC_REDIST_AUTHORITY.lock'
+
+function Read-AuthorityLock([string]$Path) {
+    if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) {
+        throw "Authority lock is missing: $Path"
+    }
+
+    $result = @{}
+    foreach ($line in Get-Content -LiteralPath $Path) {
+        if ($line -match '^([^=]+)=(.*)$') {
+            $result[$Matches[1].Trim()] = $Matches[2].Trim()
+        }
+    }
+    return $result
+}
 
 function Resolve-InnoCompiler([string]$RequestedPath) {
     $candidates = [System.Collections.Generic.List[string]]::new()
@@ -59,25 +78,71 @@ function Write-IsppDefine([System.Text.StringBuilder]$Builder, [string]$Name, [s
     [void]$Builder.AppendLine("#define $Name `"$Value`"")
 }
 
+function Copy-Or-Download(
+    [string]$SuppliedPath,
+    [string]$SourceUrl,
+    [string]$Destination,
+    [string]$Description
+) {
+    if ($SuppliedPath) {
+        if (-not (Test-Path -LiteralPath $SuppliedPath -PathType Leaf)) {
+            throw "Supplied $Description package does not exist: $SuppliedPath"
+        }
+        Copy-Item -LiteralPath $SuppliedPath -Destination $Destination -Force
+        return
+    }
+
+    Write-Host "==> Downloading $Description"
+    [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+    Invoke-WebRequest -UseBasicParsing -MaximumRedirection 5 `
+        -Uri $SourceUrl `
+        -OutFile $Destination `
+        -UserAgent 'SC220-Live-Release-Builder/0.2'
+}
+
 if ([Environment]::OSVersion.Platform -ne [PlatformID]::Win32NT) {
     throw 'SC220 installer packaging must run on Windows.'
 }
 if (-not [Environment]::Is64BitOperatingSystem) {
     throw 'SC220 Live requires a 64-bit Windows build and packaging host.'
 }
-if (-not (Test-Path -LiteralPath $installerTemplate -PathType Leaf)) {
-    throw "Installer template is missing: $installerTemplate"
+foreach ($required in @($installerTemplate, $prerequisiteProbe, $vbNotice, $vcAuthorityLock)) {
+    if (-not (Test-Path -LiteralPath $required -PathType Leaf)) {
+        throw "Installer source is missing: $required"
+    }
 }
-if (-not (Test-Path -LiteralPath $vbNotice -PathType Leaf)) {
-    throw "VB-Audio notice is missing: $vbNotice"
+
+$vcLock = Read-AuthorityLock $vcAuthorityLock
+$officialVCRedistUrl = [string]$vcLock['source']
+$lockedVCRedistHash = [string]$vcLock['package_sha256']
+$vcSignerExpectation = [string]$vcLock['setup_signer_contains']
+
+if ($officialVCRedistUrl -notmatch '^https://download\.visualstudio\.microsoft\.com/') {
+    throw 'VC_REDIST_AUTHORITY.lock must pin an immutable download.visualstudio.microsoft.com URL.'
 }
+if ($lockedVCRedistHash -notmatch '^[A-Fa-f0-9]{64}$') {
+    throw 'VC_REDIST_AUTHORITY.lock does not contain a valid package_sha256.'
+}
+if ([string]::IsNullOrWhiteSpace($vcSignerExpectation)) {
+    throw 'VC_REDIST_AUTHORITY.lock does not define setup_signer_contains.'
+}
+if ([string]::IsNullOrWhiteSpace($VCRedistSha256)) {
+    $VCRedistSha256 = $lockedVCRedistHash
+}
+if ($VCRedistSha256 -notmatch '^[A-Fa-f0-9]{64}$') {
+    throw 'VC_REDIST_X64_SHA256 must contain the reviewed SHA-256 of VC_redist.x64.exe.'
+}
+if ($VCRedistSha256.ToLowerInvariant() -ne $lockedVCRedistHash.ToLowerInvariant()) {
+    throw 'The requested VC Redistributable hash does not match VC_REDIST_AUTHORITY.lock.'
+}
+$expectedVCRedistHash = $VCRedistSha256.ToLowerInvariant()
 
 if ([string]::IsNullOrWhiteSpace($VBCableSha256) -or
     $VBCableSha256 -notmatch '^[A-Fa-f0-9]{64}$') {
     throw @'
 VBCABLE_PACK45_SHA256 must contain the reviewed SHA-256 of the current official
 VBCABLE_Driver_Pack45.zip. The workflow intentionally refuses an unpinned driver.
-Set repository variable VBCABLE_PACK45_SHA256 or pass -VBCableSha256 explicitly.
+Set VBCABLE_PACK45_SHA256 or pass -VBCableSha256 explicitly.
 '@
 }
 $expectedVBCableHash = $VBCableSha256.ToLowerInvariant()
@@ -101,26 +166,18 @@ if (-not $appExe -or -not (Test-Path -LiteralPath $appExe -PathType Leaf)) {
 foreach ($path in @($work, $dist)) {
     New-Item -ItemType Directory -Force -Path $path | Out-Null
 }
-if (Test-Path -LiteralPath $expanded) {
-    Remove-Item -LiteralPath $expanded -Recurse -Force
+if (Test-Path -LiteralPath $expandedVBCable) {
+    Remove-Item -LiteralPath $expandedVBCable -Recurse -Force
 }
-New-Item -ItemType Directory -Force -Path $expanded | Out-Null
+New-Item -ItemType Directory -Force -Path $expandedVBCable | Out-Null
 
-if ($VBCableZipPath) {
-    if (-not (Test-Path -LiteralPath $VBCableZipPath -PathType Leaf)) {
-        throw "Supplied VB-CABLE package does not exist: $VBCableZipPath"
-    }
-    Copy-Item -LiteralPath $VBCableZipPath -Destination $downloadedZip -Force
-} else {
-    Write-Host '==> Downloading official VB-Audio VBCABLE_Driver_Pack45.zip'
-    [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-    Invoke-WebRequest -UseBasicParsing -MaximumRedirection 5 `
-        -Uri $officialVBCableUrl `
-        -OutFile $downloadedZip `
-        -UserAgent 'SC220-Live-Release-Builder/0.1'
-}
+Copy-Or-Download `
+    -SuppliedPath $VBCableZipPath `
+    -SourceUrl $officialVBCableUrl `
+    -Destination $downloadedVBCableZip `
+    -Description 'official VB-Audio VBCABLE_Driver_Pack45.zip'
 
-$actualVBCableHash = (Get-FileHash -LiteralPath $downloadedZip -Algorithm SHA256).Hash.ToLowerInvariant()
+$actualVBCableHash = (Get-FileHash -LiteralPath $downloadedVBCableZip -Algorithm SHA256).Hash.ToLowerInvariant()
 if ($actualVBCableHash -ne $expectedVBCableHash) {
     throw @"
 VB-CABLE supply-chain verification failed.
@@ -131,9 +188,9 @@ Review the official package before updating VBCABLE_PACK45_SHA256.
 "@
 }
 
-Expand-Archive -LiteralPath $downloadedZip -DestinationPath $expanded -Force
+Expand-Archive -LiteralPath $downloadedVBCableZip -DestinationPath $expandedVBCable -Force
 
-$forbiddenAdditionalCable = Get-ChildItem -LiteralPath $expanded -Recurse -File | Where-Object {
+$forbiddenAdditionalCable = Get-ChildItem -LiteralPath $expandedVBCable -Recurse -File | Where-Object {
     $_.Name -match '(?i)VBCABLE[_-]?[ABCD](?:_|-|\.)' -or
     $_.FullName -match '(?i)VBCABLE_[ABCD]_Driver'
 }
@@ -141,7 +198,7 @@ if (@($forbiddenAdditionalCable).Count -gt 0) {
     throw "The standard bundle unexpectedly contains A/B/C/D cable material: $($forbiddenAdditionalCable.FullName -join ', ')"
 }
 
-$vbSetup = Get-ChildItem -LiteralPath $expanded -Recurse -File -Filter 'VBCABLE_Setup_x64.exe' |
+$vbSetup = Get-ChildItem -LiteralPath $expandedVBCable -Recurse -File -Filter 'VBCABLE_Setup_x64.exe' |
     Select-Object -First 1
 if (-not $vbSetup) {
     throw 'Official package does not contain VBCABLE_Setup_x64.exe.'
@@ -158,10 +215,10 @@ foreach ($extension in @('.inf', '.sys', '.cat')) {
     }
 }
 
-$setupSignature = Get-AuthenticodeSignature -LiteralPath $vbSetup.FullName
-if ($setupSignature.Status -ne [System.Management.Automation.SignatureStatus]::Valid -or
-    -not $setupSignature.SignerCertificate) {
-    throw "VBCABLE_Setup_x64.exe does not have a valid Authenticode signature: $($setupSignature.Status)"
+$vbSetupSignature = Get-AuthenticodeSignature -LiteralPath $vbSetup.FullName
+if ($vbSetupSignature.Status -ne [System.Management.Automation.SignatureStatus]::Valid -or
+    -not $vbSetupSignature.SignerCertificate) {
+    throw "VBCABLE_Setup_x64.exe does not have a valid Authenticode signature: $($vbSetupSignature.Status)"
 }
 
 $catalogs = @(Get-ChildItem -LiteralPath $vbPackageRoot -Recurse -File -Filter '*.cat')
@@ -175,6 +232,33 @@ foreach ($catalog in $catalogs) {
     }
 }
 
+Copy-Or-Download `
+    -SuppliedPath $VCRedistPath `
+    -SourceUrl $officialVCRedistUrl `
+    -Destination $downloadedVCRedist `
+    -Description 'pinned Microsoft Visual C++ Redistributable x64'
+
+$actualVCRedistHash = (Get-FileHash -LiteralPath $downloadedVCRedist -Algorithm SHA256).Hash.ToLowerInvariant()
+if ($actualVCRedistHash -ne $expectedVCRedistHash) {
+    throw @"
+Microsoft VC++ Redistributable supply-chain verification failed.
+Expected: $expectedVCRedistHash
+Actual:   $actualVCRedistHash
+Source:   $officialVCRedistUrl
+Review Microsoft package changes before updating VC_REDIST_AUTHORITY.lock.
+"@
+}
+
+$vcSignature = Get-AuthenticodeSignature -LiteralPath $downloadedVCRedist
+if ($vcSignature.Status -ne [System.Management.Automation.SignatureStatus]::Valid -or
+    -not $vcSignature.SignerCertificate) {
+    throw "VC_redist.x64.exe does not have a valid Authenticode signature: $($vcSignature.Status)"
+}
+if ($vcSignature.SignerCertificate.Subject -notlike "*$vcSignerExpectation*") {
+    throw "Unexpected VC Redistributable signer: $($vcSignature.SignerCertificate.Subject)"
+}
+$vcFileVersion = (Get-Item -LiteralPath $downloadedVCRedist).VersionInfo.FileVersion
+
 $iscc = Resolve-InnoCompiler $InnoCompiler
 $defines = [System.Text.StringBuilder]::new()
 Write-IsppDefine $defines 'AppVersion' $Version
@@ -184,6 +268,8 @@ Write-IsppDefine $defines 'PurchaseTermsSource' (Resolve-Path -LiteralPath (Join
 Write-IsppDefine $defines 'ThirdPartySource' (Resolve-Path -LiteralPath (Join-Path $root 'THIRD_PARTY_NOTICES.md')).Path
 Write-IsppDefine $defines 'VBNoticeSource' (Resolve-Path -LiteralPath $vbNotice).Path
 Write-IsppDefine $defines 'VBPackageSource' (Resolve-Path -LiteralPath $vbPackageRoot).Path
+Write-IsppDefine $defines 'VCRedistSource' (Resolve-Path -LiteralPath $downloadedVCRedist).Path
+Write-IsppDefine $defines 'PrerequisiteProbeSource' (Resolve-Path -LiteralPath $prerequisiteProbe).Path
 Write-IsppDefine $defines 'OutputDir' (Resolve-Path -LiteralPath $dist).Path
 [void]$defines.AppendLine("#include `"$installerTemplate`"")
 Set-Content -LiteralPath $generatedIss -Value $defines.ToString() -Encoding UTF8
@@ -219,6 +305,22 @@ $manifest = [ordered]@{
     source_commit = $sourceCommit
     installer_file = [IO.Path]::GetFileName($installer)
     installer_sha256 = $installerHash
+    smart_prerequisites = [ordered]@{
+        probe = 'Tools/SC220PrerequisiteProbe.ps1'
+        vc_runtime_registry = 'HKLM/SOFTWARE/Microsoft/VisualStudio/14.0/VC/Runtimes/x64'
+        audio_services = @('AudioEndpointBuilder', 'Audiosrv')
+        vb_cable_endpoints = @('CABLE Input', 'CABLE Output')
+    }
+    vc_runtime = [ordered]@{
+        product = 'Microsoft Visual C++ Redistributable v14 x64'
+        package = 'VC_redist.x64.exe'
+        source = $officialVCRedistUrl
+        sha256 = $actualVCRedistHash
+        file_version = $vcFileVersion
+        signer = $vcSignature.SignerCertificate.Subject
+        authenticode = $vcSignature.Status.ToString()
+        install_arguments = '/install /passive /norestart'
+    }
     vb_cable = [ordered]@{
         product = 'VB-Audio VB-CABLE standard'
         package = 'VBCABLE_Driver_Pack45.zip'
@@ -228,25 +330,28 @@ $manifest = [ordered]@{
         embedded_package_root = [IO.Path]::GetFileName($vbPackageRoot)
         embedded_file_count = $vbPackageFiles.Count
         required_support_files = @('.inf', '.sys', '.cat')
-        signer = $setupSignature.SignerCertificate.Subject
-        authenticode = $setupSignature.Status.ToString()
+        signer = $vbSetupSignature.SignerCertificate.Subject
+        authenticode = $vbSetupSignature.Status.ToString()
         donationware_notice = 'installer/VB_AUDIO_NOTICE.txt'
     }
     built_utc = [DateTime]::UtcNow.ToString('o')
 }
-$manifest | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $manifestPath -Encoding UTF8
+$manifest | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath $manifestPath -Encoding UTF8
 
-Write-Host "`nSC220 LIVE INSTALLER BUNDLE OK" -ForegroundColor Green
+Write-Host "`nSC220 LIVE SMART INSTALLER BUNDLE OK" -ForegroundColor Green
 Write-Host "Installer       : $installer"
 Write-Host "SHA-256        : $installerHash"
+Write-Host "VC++ Runtime   : $actualVCRedistHash [$vcFileVersion]"
+Write-Host "VC++ Signer    : $($vcSignature.SignerCertificate.Subject)"
 Write-Host "VB-CABLE       : $actualVBCableHash"
-Write-Host "Embedded files : $($vbPackageFiles.Count)"
-Write-Host "Signer         : $($setupSignature.SignerCertificate.Subject)"
+Write-Host "VB files       : $($vbPackageFiles.Count)"
+Write-Host "VB signer      : $($vbSetupSignature.SignerCertificate.Subject)"
 
 [pscustomobject]@{
     Installer = $installer
     HashFile = $hashPath
     Manifest = $manifestPath
     Sha256 = $installerHash
+    VCRedistSha256 = $actualVCRedistHash
     VBCableSha256 = $actualVBCableHash
 }

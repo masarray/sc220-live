@@ -240,14 +240,15 @@ foreach(_required IN ITEMS
     endif()
 endforeach()
 
-foreach(_forbidden IN ITEMS
-        "BinaryData::getNamedResource (\"favicon_96x96_png\""
-        "BinaryData::getNamedResource (\"favicon_512x512_png\"")
-    string(FIND "${_app}" "${_forbidden}" _position)
-    if(NOT _position EQUAL -1)
-        message(FATAL_ERROR "SC220 P6F stale PNG tray renderer remains: ${_forbidden}")
-    endif()
-endforeach()
+# Only the old tray-specific declaration is forbidden. P6D intentionally still
+# uses the 96 px PNG inside the compact-controller header, which is unrelated to
+# the Windows notification-area icon and must not trip this guard.
+string(FIND "${_app}"
+    "const char* iconData = BinaryData::getNamedResource (\"favicon_96x96_png\", iconBytes);"
+    _legacy_tray_png)
+if(NOT _legacy_tray_png EQUAL -1)
+    message(FATAL_ERROR "SC220 P6F stale PNG tray renderer remains")
+endif()
 
 if(NOT CMAKE_SCRIPT_MODE_FILE)
     get_filename_component(_p6f_root "${CMAKE_CURRENT_LIST_DIR}/.." ABSOLUTE)

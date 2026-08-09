@@ -1,0 +1,13 @@
+authority=VB-Audio VB-CABLE standard
+package=VBCABLE_Driver_Pack45.zip
+source=https://download.vb-audio.com/Download_CABLE/VBCABLE_Driver_Pack45.zip
+reviewed_utc=2026-08-05T22:04:39.9916073Z
+package_size=1318877
+package_sha256=b950e39f01af1d04ea623c8f6d8eb9b6ea5c477c637295fabf20631c85116bfb
+setup=VBCABLE_Setup_x64.exe
+setup_sha256=734c35dfa6d98f48782a451633ceb471166ec70d60482fd89a1123d0ee3c4f41
+setup_signature=Valid
+setup_signer=CN=BUREL VINCENT Entrepreneur individuel, O=BUREL VINCENT Entrepreneur individuel, C=FR
+certificate_thumbprint=A77952D93229D0EC36E2543081EEA7D125732B9C
+catalogues_valid=8
+additional_cable_material=false

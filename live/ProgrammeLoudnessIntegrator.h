@@ -7,10 +7,10 @@
 
 namespace askp::live {
 
-// Allocation-free ITU-R BS.1770 / EBU R128 integrated-loudness gate.
+// Allocation-free ITU-R BS.1770 / EBU R128 loudness measurement.
 // K-weighting is performed by LiveAudioEngine before frames reach this class.
-// Four adjacent 100 ms segments form each 400 ms measurement block, providing
-// the prescribed 75% overlap without retaining an unbounded programme history.
+// Four adjacent 100 ms segments form each 400 ms momentary block with 75%
+// overlap. Integrated loudness retains the absolute and relative R128 gates.
 class ProgrammeLoudnessIntegrator final
 {
 public:
@@ -38,6 +38,7 @@ public:
         measuredFrames = 0;
         acceptedBlocks = 0;
         integrated = -120.0f;
+        momentary = -120.0f;
     }
 
     // weightedChannelEnergy is the sum of squared K-weighted channel samples
@@ -53,10 +54,15 @@ public:
     }
 
     float integratedLufs() const noexcept { return integrated; }
+    float momentaryLufs() const noexcept { return momentary; }
     std::uint64_t blockCount() const noexcept { return acceptedBlocks; }
     double elapsedSeconds() const noexcept
     {
         return static_cast<double> (measuredFrames) / sampleRate;
+    }
+    bool momentaryReady() const noexcept
+    {
+        return segmentsReady >= static_cast<int> (segmentEnergy.size());
     }
     bool ready() const noexcept
     {
@@ -103,12 +109,12 @@ private:
         }
 
         const double blockMeanEnergy = blockEnergySum / std::max (1, blockFrames);
-        const float blockLufs = lufsFromEnergy (blockMeanEnergy);
-        if (blockLufs < absoluteGateLufs)
+        momentary = lufsFromEnergy (blockMeanEnergy);
+        if (momentary < absoluteGateLufs)
             return;
 
         const int bin = std::clamp (
-            static_cast<int> ((blockLufs - histogramMinimumLufs) / histogramStepLu),
+            static_cast<int> ((momentary - histogramMinimumLufs) / histogramStepLu),
             0, histogramBins - 1);
         histogramEnergy[static_cast<std::size_t> (bin)] += blockMeanEnergy;
         ++histogramCount[static_cast<std::size_t> (bin)];
@@ -163,6 +169,7 @@ private:
     std::uint64_t measuredFrames = 0;
     std::uint64_t acceptedBlocks = 0;
     float integrated = -120.0f;
+    float momentary = -120.0f;
 };
 
 } // namespace askp::live

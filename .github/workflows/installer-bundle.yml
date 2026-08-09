@@ -1,0 +1,130 @@
+name: SC220 Live installer bundle
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Semantic version to package
+        required: true
+        default: 0.1.0
+        type: string
+      clean:
+        description: Perform a clean SC220 Live build
+        required: true
+        default: true
+        type: boolean
+
+permissions:
+  contents: read
+
+jobs:
+  windows-installer-bundle:
+    runs-on: windows-2022
+    timeout-minutes: 120
+    env:
+      ASKP_REPO_TOKEN: ${{ secrets.ASKP_REPO_TOKEN }}
+      VBCABLE_PACK45_SHA256: ${{ vars.VBCABLE_PACK45_SHA256 }}
+      RELEASE_VERSION: ${{ inputs.version }}
+      CLEAN_BUILD: ${{ inputs.clean }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: false
+
+      - name: Require pinned private and third-party authorities
+        shell: pwsh
+        run: |
+          if ([string]::IsNullOrWhiteSpace($env:ASKP_REPO_TOKEN)) {
+            throw 'Repository secret ASKP_REPO_TOKEN is required.'
+          }
+          if ($env:VBCABLE_PACK45_SHA256 -notmatch '^[A-Fa-f0-9]{64}$') {
+            throw 'Repository variable VBCABLE_PACK45_SHA256 must contain the reviewed official Pack45 SHA-256.'
+          }
+          if ($env:RELEASE_VERSION -notmatch '^\d+\.\d+\.\d+$') {
+            throw "Invalid release version: $env:RELEASE_VERSION"
+          }
+
+      - name: Checkout pinned private ASK-P authority
+        uses: actions/checkout@v4
+        with:
+          repository: masarray/askp-vst
+          ref: 5757119cab7a1a75f09dcf0edea6e3be97975439
+          token: ${{ secrets.ASKP_REPO_TOKEN }}
+          path: third_party/askp-vst
+
+      - name: Install pinned Inno Setup compiler
+        shell: pwsh
+        run: choco install innosetup --version=6.7.1 --no-progress -y
+
+      - name: Validate release and installer contracts
+        shell: pwsh
+        run: |
+          .\scripts\check-sc220-release-contract.ps1
+          python .\qa\audit_sc220_installer_bundle.py
+
+      - name: Build verified Windows x64 installer bundle
+        shell: pwsh
+        run: |
+          $packageArgs = @{
+            Version = $env:RELEASE_VERSION
+            VBCableSha256 = $env:VBCABLE_PACK45_SHA256
+          }
+          if ($env:CLEAN_BUILD -eq 'true') { $packageArgs.Clean = $true }
+          & .\scripts\package-sc220-installer.ps1 @packageArgs
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Smoke install application payload without driver changes
+        shell: pwsh
+        run: |
+          $installer = Get-ChildItem .\dist -File -Filter "SC220-Live-v$env:RELEASE_VERSION-Setup-win-x64.exe" |
+            Select-Object -First 1
+          if (-not $installer) { throw 'Installer bundle was not produced.' }
+
+          $smokeDir = Join-Path $env:RUNNER_TEMP 'SC220 Live Installer Smoke'
+          $installArgs = @(
+            '/VERYSILENT',
+            '/SUPPRESSMSGBOXES',
+            '/NORESTART',
+            '/TASKS="!vbcable,!desktopicon"',
+            "/DIR=`"$smokeDir`""
+          )
+          $process = Start-Process -FilePath $installer.FullName -ArgumentList $installArgs -Wait -PassThru
+          if ($process.ExitCode -ne 0) {
+            throw "Installer smoke test failed with exit code $($process.ExitCode)."
+          }
+
+          $installedExe = Join-Path $smokeDir 'SC220 Live.exe'
+          if (-not (Test-Path -LiteralPath $installedExe -PathType Leaf)) {
+            throw 'Installer completed without the SC220 Live executable.'
+          }
+          foreach ($file in @(
+            'Legal\EULA.txt',
+            'Legal\PURCHASE_TERMS.txt',
+            'Legal\THIRD_PARTY_NOTICES.md',
+            'Legal\VB_AUDIO_NOTICE.txt'
+          )) {
+            if (-not (Test-Path -LiteralPath (Join-Path $smokeDir $file) -PathType Leaf)) {
+              throw "Installer smoke payload is missing: $file"
+            }
+          }
+
+          $uninstaller = Join-Path $smokeDir 'unins000.exe'
+          if (Test-Path -LiteralPath $uninstaller -PathType Leaf) {
+            $uninstall = Start-Process -FilePath $uninstaller `
+              -ArgumentList @('/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART') `
+              -Wait -PassThru
+            if ($uninstall.ExitCode -ne 0) {
+              throw "Installer smoke uninstall failed with exit code $($uninstall.ExitCode)."
+            }
+          }
+
+      - name: Upload verified installer bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: SC220-Live-v${{ inputs.version }}-installer-bundle
+          if-no-files-found: error
+          retention-days: 14
+          path: |
+            dist/SC220-Live-v${{ inputs.version }}-Setup-win-x64.exe
+            dist/SC220-Live-v${{ inputs.version }}-Setup-win-x64.exe.sha256
+            dist/SC220-Live-v${{ inputs.version }}-Setup-win-x64.manifest.json

@@ -2,8 +2,24 @@
   "product": "SC220 Live",
   "version": "{{VERSION}}",
   "published": "{{DATE}}",
-  "platform": "windows-x64",
-  "download": "{{DOWNLOAD_URL}}",
-  "sha256": "{{SHA256}}",
-  "checksum": "{{HASH_URL}}"
+  "platform": "windows-10-11-x64",
+  "installer": {
+    "download": "{{DOWNLOAD_URL}}",
+    "size": "{{SIZE}}",
+    "sha256": "{{SHA256}}",
+    "checksum": "{{HASH_URL}}",
+    "manifest": "{{MANIFEST_URL}}"
+  },
+  "portable": {
+    "download": "{{PORTABLE_URL}}",
+    "size": "{{PORTABLE_SIZE}}",
+    "checksum": "{{PORTABLE_HASH_URL}}"
+  },
+  "vb_cable": {
+    "product": "VB-Audio VB-CABLE standard",
+    "package": "VBCABLE_Driver_Pack45.zip",
+    "sha256": "{{VBCABLE_SHA256}}",
+    "optional": true,
+    "donationware": true
+  }
 }

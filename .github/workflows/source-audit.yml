@@ -35,12 +35,30 @@ jobs:
         run: python qa/audit_sc220_dual_source_bus.py
       - name: Validate SC220 premium UX contract
         run: python qa/audit_sc220_premium_ux.py
-      - name: Validate aligned console and analyzer bridge
+      - name: Validate aligned console and atomic band visualizer
         run: python qa/audit_sc220_console_alignment.py
-      - name: Validate independent physical Monitor Bus
+      - name: Validate synthetic band-pass response
+        run: python qa/audit_sc220_spectralizer_response.py
+      - name: Validate atomic post-limiter telemetry
+        run: python qa/audit_sc220_atomic_bands.py
+      - name: Compile atomic band telemetry
+        run: g++ -std=c++17 -O2 qa/programme_band_telemetry_test.cpp -o /tmp/programme-band-test
+      - name: Run atomic band telemetry
+        run: /tmp/programme-band-test
+      - name: Validate OBS-style native WASAPI Monitor Bus
         run: python qa/audit_sc220_monitor_bus.py
       - name: Validate selectable PC endpoint and anti-loop routing
         run: python qa/audit_sc220_pc_endpoint_routing.py
+      - name: Validate truthful Windows Stream Output endpoint identities
+        run: python qa/audit_sc220_real_stream_endpoints.py
+      - name: Validate PC source versus monitor safety and capture recovery
+        run: python qa/audit_sc220_pc_monitor_safety.py
+      - name: Validate PC music-only atomic analyzer and safe cable source
+        run: python qa/audit_sc220_pc_music_only.py
+      - name: Validate public release gate and guidance
+        run: python qa/audit_sc220_public_release.py
+      - name: Validate verified VB-CABLE installer bundle
+        run: python qa/audit_sc220_installer_bundle.py
       - name: Validate clean-build executable unlock order
         run: python qa/audit_sc220_clean_build.py
       - name: Validate fixed transform reference
@@ -65,3 +83,39 @@ jobs:
       - name: Run current profile and DSP audit
         if: ${{ env.ASKP_REPO_TOKEN != '' }}
         run: /tmp/sonkupik-preset-profile-audit
+
+  windows-wasapi-monitor:
+    name: windows-wasapi-monitor
+    runs-on: windows-2022
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: false
+      - name: Configure standalone WASAPI monitor and capture smoke target
+        run: >-
+          cmake
+          -S qa/wasapi_monitor_smoke
+          -B build-wasapi-monitor
+          -G "Visual Studio 17 2022"
+          -A x64
+      - name: Compile native WASAPI monitor and capture with MSVC
+        run: cmake --build build-wasapi-monitor --config Release --parallel 2
+      - name: Run native monitor and capture lifecycle smoke test
+        shell: pwsh
+        run: .\build-wasapi-monitor\Release\SC220WasapiMonitorSmoke.exe
+
+  windows-installer-template:
+    name: windows-installer-template
+    runs-on: windows-2022
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: false
+      - name: Install pinned Inno Setup compiler
+        shell: pwsh
+        run: choco install innosetup --version=6.7.1 --no-progress -y
+      - name: Compile SC220 installer template with inert payloads
+        shell: pwsh
+        run: .\qa\compile_sc220_installer_template_smoke.ps1

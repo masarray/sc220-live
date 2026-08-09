@@ -27,3 +27,22 @@ The embedded ASK-P Signature DSP, profile bank, headless processor, and local
 activation foundation are proprietary materials supplied by and owned by
 Tutorial Mas Ari / MasArray. SC220 Live pins the reviewed authority commit
 `5757119cab7a1a75f09dcf0edea6e3be97975439`.
+
+## VB-Audio VB-CABLE standard
+
+The Windows installer may include the standard VB-Audio VB-CABLE driver as an
+optional component. VB-CABLE is developed, owned, and distributed by VB-Audio
+Software under its donationware model. The installer bundle uses the official
+`VBCABLE_Driver_Pack45.zip`, verifies a reviewed SHA-256 and the Windows
+Authenticode/catalogue signatures, and embeds `VBCABLE_Setup_x64.exe` unchanged.
+
+End users can identify VB-CABLE as a VB-Audio product and remain free to donate
+or purchase a licence if they find it useful:
+
+- Product and download information: https://vb-audio.com/Cable/
+- Donation/licensing: https://shop.vb-audio.com/en/win-apps/11-vb-cable.html
+
+VB-CABLE is a separate product. Inclusion does not imply sponsorship,
+endorsement, support, or affiliation between VB-Audio and SC220 Live, Tutorial
+Mas Ari, MasArray, or Recording Tech. The public bundle does not include
+VB-CABLE A+B or C+D.

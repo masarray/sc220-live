@@ -23,14 +23,15 @@ gitattributes = read(".gitattributes")
 sync_script = read("scripts/sync-askp-v0523.ps1")
 build_script = read("scripts/build-live-windows.ps1")
 workflow = read(".github/workflows/source-audit.yml")
+release_workflow = read(".github/workflows/local-release.yml")
 historical_doc = read("docs/ASKP_V0523_ENGINE_PORT.md")
 
-# Latest approved ASK-P v0.5.24 release request names this exact immutable
-# product source commit. Later upstream HEAD commits adjust release request,
-# release audit and cross-platform helper policy rather than product audio source.
-source_commit = "1cf050d40338cbcb5d8cddd9fc2de5f23e3d625f"
-latest_audited_head = "f91aa04e953cf14eb0682a1bc305138b6507d73a"
+# Latest approved ASK-P v0.5.24 release request names this immutable product
+# source commit. HEAD only advances once more to repin the release request.
+source_commit = "2c764f82b0fc99eaff04d918cef4f839db7509e5"
+latest_audited_head = "44b7d1657fbbd2c13cd490e251e8867734238623"
 release_helper_commit = "811b7376dd784ce9f64e03512c7baf7de5e77425"
+check("SC220 app version is v0.1.1", "project(SC220Live VERSION 0.1.1" in cmake)
 check("ASK-P v0.5.24 approved source pinned", source_commit in cmake and source_commit in lock and source_commit in sync_script)
 check("latest upstream audited head recorded", latest_audited_head in lock)
 check("current approved release helper recorded", release_helper_commit in lock)
@@ -83,8 +84,10 @@ check("preset calibration guarded", "P0 Musical Rebalance" in cmake)
 check("production release state recorded", all(x in lock for x in [
     "checkpoint_release_ready=true", "release_request_approved=true", "engine_version=0.5.24"]))
 check("engine version is v0.5.24", 'engineVersion = "0.5.24"' in bridge_h and "JucePlugin_Version=0.5.24" in cmake and "JucePlugin_VersionCode=0x518" in cmake)
-check("build channel names approved v0.5.24 source", "Embedded Authority v0.5.24 @ 1cf050d" in cmake)
+check("build channel names approved v0.5.24 source", "Embedded Authority v0.5.24 @ 2c764f8" in cmake)
 check("Signature Smart Bass fallback follows P0", "getParameter (smartBassId, 70.0f)" in bridge_cpp)
+check("Gain Match remains disabled by default in SC220", "setGainMatchEnabled (false);" in bridge_cpp)
+check("Gain Match remains intentionally absent from public UI contract", "gain_match_ui_exposed=false" in lock)
 check("headless editor generation", "return nullptr" in cmake and "hasEditor() const override { return false; }" in cmake)
 check("reference keeps 80 ms", "PluginProcessor_Reference.cpp" in cmake and "0.08" in cmake)
 check("Live glide 12 ms", "PluginProcessor_Live.cpp" in cmake and "0.012" in cmake)
@@ -110,6 +113,9 @@ workflow_audit = workflow.find("Run upstream ASK-P v0.5.24 P0.3 production sourc
 workflow_generate = workflow.find("Generate approved ASK-P v0.5.24 effective DSP")
 check("CI runs upstream source audit before generator", workflow_audit >= 0 and workflow_generate > workflow_audit)
 check("CI compiles generated effective DSP", "/tmp/arsonkupik_dsp_v0524.cpp" in workflow and "arsonkupik_presets.cpp" in workflow)
+check("public release workflow checks out approved source", source_commit in release_workflow)
+check("public release workflow verifies ASKP_AUTHORITY.lock", "ASKP_AUTHORITY.lock" in release_workflow and "ASK-P checkout mismatch" in release_workflow)
+check("public release reruns ASK-P port audit", "audit_v0150_askp_p03_port.py" in release_workflow)
 check("historical v0.5.23 document cannot masquerade as current", "Historical record only" in historical_doc and "superseded" in historical_doc.lower())
 
 failed = [name for name, ok in checks if not ok]

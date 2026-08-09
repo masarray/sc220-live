@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.22)
 
-project(SC220Live VERSION 0.1.0 LANGUAGES C CXX)
+project(SC220Live VERSION 0.1.1 LANGUAGES C CXX)
 
 include(CTest)
 
@@ -20,7 +20,7 @@ endif()
 # mirrors ASK-P's production source contract: audit the canonical source first,
 # generate the deterministic P0/P0.1/P0.2/P0.3 translation unit, then compile
 # that generated unit everywhere. The ASK-P editor remains excluded here.
-set(SONKUPIK_ASKP_COMMIT "1cf050d40338cbcb5d8cddd9fc2de5f23e3d625f")
+set(SONKUPIK_ASKP_COMMIT "2c764f82b0fc99eaff04d918cef4f839db7509e5")
 set(ASKP_PORT_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/third_party/askp-vst")
 set(ASKP_ENGINE_DIR "${ASKP_PORT_ROOT}/engine")
 set(ASKP_PROCESSOR_DIR "${ASKP_PORT_ROOT}/src")
@@ -109,7 +109,7 @@ endif()
 # Match the approved ASK-P production sequence exactly: the upstream source
 # audit validates every sonic invariant and generator replacement first; only
 # then do we materialise and compile the effective DSP translation unit.
-set(ASKP_GENERATED_DIR "${CMAKE_CURRENT_BINARY_DIR}/generated/askp-v0.5.24-1cf050d")
+set(ASKP_GENERATED_DIR "${CMAKE_CURRENT_BINARY_DIR}/generated/askp-v0.5.24-2c764f8")
 file(MAKE_DIRECTORY "${ASKP_GENERATED_DIR}")
 find_package(Python3 REQUIRED COMPONENTS Interpreter)
 
@@ -400,7 +400,7 @@ target_compile_definitions(SC220Live PRIVATE
     JucePlugin_Version=0.5.24
     JucePlugin_VersionCode=0x518
     JucePlugin_VersionString="0.5.24"
-    ASKP_BUILD_CHANNEL="SC220 Live Embedded Authority v0.5.24 @ 1cf050d"
+    ASKP_BUILD_CHANNEL="SC220 Live Embedded Authority v0.5.24 @ 2c764f8"
     SONKUPIK_ENGINE_REVISION=2026073102
     SONKUPIK_LICENSE_API_URL="https://masarray-license-api.masari.workers.dev"
     SONKUPIK_LICENSE_PRODUCT_ID="sc220-live"

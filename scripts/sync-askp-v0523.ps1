@@ -5,7 +5,10 @@ param(
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 
-$commit = '5757119cab7a1a75f09dcf0edea6e3be97975439'
+# Historical filename retained because existing local build shortcuts may call it.
+# The pinned authority is now the ASK-P P0.3 development checkpoint; its canonical
+# base engine still reports v0.5.23 until upstream performs the production fold.
+$commit = '240b9d3be3ca1fbdedfa5b7027e465c22a56b0ea'
 $relativePath = 'third_party/askp-vst'
 $authority = Join-Path $RepositoryRoot 'third_party\askp-vst'
 $authorityParent = Split-Path -Parent $authority
@@ -119,7 +122,7 @@ function Normalize-TextFileToLf {
 
 # Fail early when the local branch does not actually contain the reviewed
 # submodule gitlink. This usually means the user has not fetched/checked out the
-# complete port branch yet.
+# complete DSP port branch yet.
 $treeResult = Invoke-Git -Arguments @(
     '-C', $RepositoryRoot,
     'ls-tree', 'HEAD', '--', $relativePath
@@ -128,12 +131,11 @@ $treeLine = ($treeResult.Lines | ForEach-Object { $_.ToString() }) -join "`n"
 if ($treeResult.ExitCode -ne 0 -or
     $treeLine -notmatch "^160000\s+commit\s+$commit\s+") {
     throw @"
-The current Sonkupik branch does not contain the pinned ASK-P v0.5.23 gitlink.
+The current SC220 Live branch does not contain the pinned ASK-P P0.3 gitlink.
 Expected: $relativePath -> $commit
 
-Refresh the port branch first:
+Refresh the current SC220 Live branch first:
   git fetch origin
-  git checkout port/askp-v0.5.23
   git pull --ff-only
 "@
 }
@@ -144,7 +146,7 @@ if ($null -eq $actual) {
 }
 
 if ($actual -ne $commit) {
-    Write-Host '==> Initialising ASK-P v0.5.23 authority submodule' -ForegroundColor Yellow
+    Write-Host '==> Initialising ASK-P P0.3 authority submodule' -ForegroundColor Yellow
 
     # Clear broken administrative state left by interrupted or older submodule
     # layouts. Failure here is harmless when the module was never initialised.
@@ -204,10 +206,16 @@ if ($actual -ne $commit) {
     throw "ASK-P authority mismatch. Expected $commit but found $actual"
 }
 
+$generator = Join-Path $authority 'scripts\generate_p0_musical_rebalance_dsp.py'
+if (-not (Test-Path -LiteralPath $generator -PathType Leaf)) {
+    throw "ASK-P P0.3 effective-DSP generator is missing: $generator"
+}
+
 # Git for Windows may materialise tracked source as CRLF when an older checkout
 # predates .gitattributes. CMake's immutable SHA gate is byte-based, so normalise
 # only the reviewed sphere source before configuration. Any real source edit
 # still produces a different SHA and remains fail-closed.
 Normalize-TextFileToLf -Path (Join-Path $RepositoryRoot 'third_party\sonkupik-sphere-v0.10.4\OrbVisualizer.cpp')
 
-Write-Host "==> ASK-P authority verified: v0.5.23 @ $commit" -ForegroundColor Green
+Write-Host "==> ASK-P authority verified: P0.3 checkpoint @ $commit" -ForegroundColor Green
+Write-Host '==> Effective SC220 DSP will be generated fail-closed from the pinned upstream P0/P0.1/P0.2/P0.3 calibration.' -ForegroundColor Green

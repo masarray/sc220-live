@@ -30,14 +30,15 @@ for needle, label in [
     ('restartButton.setBounds (146, 142, 154, 36)', "restart spacing"),
     ('presetBox.setBounds (146, 204, 154, 38)', "preset box spacing"),
     ('miniWindow->setSize (320, 324)', "larger compact controller"),
-    ('BinaryData::getNamedResource ("favicon_96x96_png"', "primary SC220 tray icon"),
-    ('BinaryData::getNamedResource ("favicon_512x512_png"', "SC220 tray icon fallback"),
+    ('BinaryData::getNamedResource ("favicon_96x96_png"', "primary SC220 compact-panel icon"),
     ('SC220 Live - running in background', "compact tray tooltip"),
+    ('SC220P6ETrayReliabilityAndSoftwareTrial.cmake', "P6E tray reliability chain"),
+    ('SC220P6FNativeTrayIcon.cmake', "P6F final ICO tray authority chain"),
 ]:
     require(P6D, needle, label)
 
 # The legacy ASK-P/VST icon may appear only as the replacement anchor that P6D
-# explicitly removes; it must never appear in the replacement side.
+# explicitly removes; it must never appear in a replacement side.
 if P6D.count("askp_app_logo_png") != 1:
     raise AssertionError("P6D should reference the ASK-P tray icon exactly once as the stale anchor to remove")
 

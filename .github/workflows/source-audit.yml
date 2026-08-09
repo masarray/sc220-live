@@ -47,6 +47,8 @@ jobs:
         run: python qa/audit_sc220_p5_console_polish.py
       - name: Validate P6A UI-only fader icon spacing and MUTE safety polish
         run: python qa/audit_sc220_p6a_ui_polish.py
+      - name: Validate P6B frozen hiss cleanup and single-shape MUTE blink
+        run: python qa/audit_sc220_p6b_noise_cleanup.py
       - name: Validate ASK-P v0.5.23 port boundary
         run: python qa/audit_v0140_askp_v0523_port.py
       - name: Validate SC220 dual-source broadcast bus

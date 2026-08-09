@@ -54,11 +54,17 @@ file(READ "${SC220_APP_GENERATED_SOURCE}" _app)
 # registration retries. P6F only locks its image resources to the canonical
 # favicon bundle. Resource names remain stable because the JUCE aliases retain
 # their historic filenames while sharing the exact canonical Git blobs.
+#
+# Deliberately check only the setIconImage(trayImage...) call prefix here. P6E
+# currently publishes the Windows tray image as setIconImage(trayImage, {}), and
+# the optional second JUCE image argument is not part of the branding contract.
+# Hard-coding that argument previously made this configure guard reject the
+# already-generated, valid P6E tray path before C++ compilation could begin.
 foreach(_required IN ITEMS
         "BinaryData::getNamedResource (\"favicon_96x96_png\""
         "BinaryData::getNamedResource (\"favicon_512x512_png\""
         "trayImage = juce::Image (juce::Image::ARGB, 32, 32, true)"
-        "setIconImage (trayImage, trayImage)"
+        "setIconImage (trayImage"
         "SC220 Live - running in background")
     string(FIND "${_app}" "${_required}" _position)
     if(_position EQUAL -1)

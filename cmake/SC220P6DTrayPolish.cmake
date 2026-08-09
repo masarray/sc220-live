@@ -17,8 +17,9 @@ function(sc220_p6d_once variable_name label anchor replacement)
     set(${variable_name} "${_value}" PARENT_SCOPE)
 endfunction()
 
-# Compact controller header now uses the same SC220 favicon authority as the
-# Windows application/tray instead of the generic waveform cue.
+# Compact controller header now uses the SC220 favicon authority instead of the
+# generic waveform cue. This header artwork is intentionally independent from
+# the final Windows notification-area ICO path owned by P6F.
 sc220_p6d_once(_app "compact header SC220 icon"
 [=[
         if (auto icon = createLucideIcon ("audio_waveform_svg", colours::cyan))
@@ -72,8 +73,9 @@ sc220_p6d_once(_app "compact controller window size"
     "            miniWindow->setSize (300, 290);"
     "            miniWindow->setSize (320, 324);")
 
-# Never fall back to the legacy ASK-P/VST artwork for the Windows tray icon.
-# Both accepted resources are canonical SC220 application-icon mirrors.
+# Remove the legacy ASK-P/VST fallback from the pre-P6F tray stage. P6E then
+# owns registration lifetime/retry; P6F finally replaces this PNG stage with the
+# actual multi-size favicon.ico before compilation.
 sc220_p6d_once(_app "canonical SC220 system tray icon"
 [=[
         int iconBytes = 0;
@@ -129,9 +131,9 @@ endforeach()
 file(WRITE "${SC220_APP_GENERATED_SOURCE}" "${_app}")
 message(STATUS "SC220 P6D: compact tray panel spacing + canonical SC220 tray icon")
 
-# P6E owns the final Windows tray registration reliability and the commercial
-# policy: SC220 hardware remains entitled; software-only use gets 90 days then
-# the existing Midtrans licence flow becomes a required polished modal gate.
+# P6E owns Windows tray registration lifetime/retry and the commercial policy:
+# SC220 hardware remains entitled; software-only use gets 90 days then the
+# existing Midtrans licence flow becomes a required polished modal gate.
 include("${CMAKE_CURRENT_LIST_DIR}/SC220P6ETrayReliabilityAndSoftwareTrial.cmake")
 
 # P6F is the final tray-artwork authority. It replaces P6E's web-PNG raster with

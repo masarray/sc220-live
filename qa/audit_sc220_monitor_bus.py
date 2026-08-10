@@ -9,7 +9,6 @@ engine_cpp = (ROOT / "live/LiveAudioEngine.cpp").read_text(encoding="utf-8")
 monitor_h = (ROOT / "live/MonitorOutputClient.h").read_text(encoding="utf-8")
 monitor_cpp = (ROOT / "live/MonitorOutputClient.cpp").read_text(encoding="utf-8")
 ui_h = (ROOT / "live/SC220MainComponent.h").read_text(encoding="utf-8")
-ui_cpp = (ROOT / "live/SC220MainComponent.cpp").read_text(encoding="utf-8")
 engine_gen = (ROOT / "cmake/GenerateSC220MonitorEngine.cmake").read_text(encoding="utf-8")
 ui_gen = (ROOT / "cmake/GenerateSC220MonitorUi.cmake").read_text(encoding="utf-8")
 state_gen = (ROOT / "cmake/GenerateSC220BroadcastState.cmake").read_text(encoding="utf-8")
@@ -46,18 +45,23 @@ except AssertionError as exc:
 else:
     check("engine generator applies exactly once", True)
 
-# UI monitor generator consumes the already aligned source. Its specific anchors
-# are audited directly here; the aligned generator has a separate exact audit.
 check(
-    "monitor client owns a second output-only AudioDeviceManager",
-    "juce::AudioDeviceManager deviceManager" in monitor_h
-    and "deviceManager.initialise (0, 0" in monitor_cpp
-    and "deviceManager.addAudioCallback (this)" in monitor_cpp,
+    "monitor uses independent native WASAPI output instead of a second JUCE device manager",
+    "juce::AudioDeviceManager" not in monitor_h + monitor_cpp
+    and all(
+        token in monitor_cpp
+        for token in (
+            "IAudioClient",
+            "IAudioRenderClient",
+            "WASAPI SHARED / OBS-STYLE",
+            "TryAcquireSRWLockExclusive",
+        )
+    ),
 )
 check(
     "monitor transport is bounded and prefilled",
     all(
-        token in monitor_h + monitor_cpp
+        token in monitor_cpp
         for token in (
             "juce::AbstractFifo fifo",
             "fifoCapacitySamples",
@@ -77,35 +81,9 @@ check(
     ),
 )
 check(
-    "monitor endpoint enforces nominal stream sample rate",
-    all(
-        token in monitor_cpp
-        for token in (
-            "setup.sampleRate = preferredSampleRate",
-            "std::abs (actualRate - expectedRate) > 1.0",
-            "must support the stream sample rate",
-        )
-    ),
-)
-
-callback_match = re.search(
-    r"void MonitorOutputClient::audioDeviceIOCallbackWithContext.*?\n}\n\n"
-    r"void MonitorOutputClient::audioDeviceAboutToStart",
-    monitor_cpp,
-    flags=re.S,
-)
-callback = callback_match.group(0) if callback_match else ""
-check(
-    "monitor callback is lock-free and allocation-free",
-    bool(callback)
-    and "ScopedLock" not in callback
-    and "setSize" not in callback
-    and "new " not in callback
-    and "std::vector" not in callback,
-)
-check(
-    "monitor callback uses a deterministic smoothed gain ramp",
-    all(token in callback for token in ("gainLinear", "gainStep", "output[sample] *= gain")),
+    "monitor push enqueues one selected source without a second programme mix",
+    "impl->enqueueLocked (source, numSamples);" in monitor_cpp
+    and "impl->renderAvailableLocked (getGainDb(), isMuted());" in monitor_cpp,
 )
 
 check(
@@ -142,16 +120,34 @@ check(
 
 if generated_engine:
     music_process = generated_engine.find("musicEnhancerBridge.process (musicBlock, musicMidi);")
-    cue_copy = generated_engine.find("musicCueBlock.copyFrom")
+    duck_gain = generated_engine.find("musicBlock.applyGainRamp", music_process)
+    cue_copy = generated_engine.find("musicCueBlock.copyFrom", duck_gain)
     cue_gain = generated_engine.find("musicCueBlock.applyGainRamp")
-    duck_gain = generated_engine.find("musicBlock.applyGainRamp", cue_gain)
+    detector_control = generated_engine.find("const float targetDuck")
     limiter = generated_engine.find("masterLimiter.process (masterContext);")
     monitor_publish = generated_engine.find("monitorOutput.push")
     stream_gate = generated_engine.find("if (! outputMuted.load())", monitor_publish)
+
     check(
-        "Music Cue is enhanced and fader-controlled before ducking",
-        -1 not in (music_process, cue_copy, cue_gain, duck_gain)
-        and music_process < cue_copy < cue_gain < duck_gain,
+        "PC monitor copies the already-ducked enhanced music lane",
+        -1 not in (music_process, detector_control, duck_gain, cue_copy)
+        and music_process < detector_control < duck_gain < cue_copy,
+    )
+    check(
+        "Music Cue has no second duck or fader gain stage",
+        cue_gain == -1
+        and generated_engine.count("musicBlock.applyGainRamp") == 1,
+    )
+    check(
+        "post-duck monitor copy is plain sample copy only",
+        "Structural anti-double-duck guarantee" in generated_engine
+        and "musicCueBlock.copyFrom" in generated_engine,
+    )
+    check(
+        "monitor publishes exactly one selected source per callback",
+        generated_engine.count("monitorOutput.push (musicCueBlock, numSamples);") == 1
+        and generated_engine.count("monitorOutput.push (voiceBlock, numSamples);") == 1
+        and "if (monitorSource.load() == MonitorSource::musicCue)" in generated_engine,
     )
     check(
         "Program monitor publishes the protected master independently of GO LIVE",

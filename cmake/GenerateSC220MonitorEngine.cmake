@@ -202,13 +202,12 @@ set(_music_lane_replacement [=[
     }
     else
     {
-        // Program audio receives its own ASK-P Signature pass. Music Cue takes
-        // the enhanced, user-fader level before voice ducking; Program keeps the
-        // same tone and fader but applies the voice-priority gain envelope.
+        // PC music receives one ASK-P Signature pass and one voice-priority duck
+        // envelope. Music Cue is copied only after that shared fader+duck ramp,
+        // so headphones hear the same ducked PC lane without a delayed self-mic
+        // and without a second detector or a second duck gain stage.
         musicMidi.clear();
         musicEnhancerBridge.process (musicBlock, musicMidi);
-        for (int channel = 0; channel < processingChannels; ++channel)
-            musicCueBlock.copyFrom (channel, 0, musicBlock, channel, 0, numSamples);
 
         const float keyPeak = juce::jmax (sc220PeakL, sc220PeakR);
         const bool voicePresent = dbFromPeak (keyPeak) > -36.0f;
@@ -224,16 +223,21 @@ set(_music_lane_replacement [=[
         pcGainLinear.setTargetValue (juce::Decibels::decibelsToGain (pcAudioGainDb.load()));
         const float pcFaderStart = pcGainLinear.getCurrentValue();
         const float pcFaderEnd = pcGainLinear.skip (numSamples);
-        musicCueBlock.applyGainRamp (0, numSamples, pcFaderStart, pcFaderEnd);
         musicBlock.applyGainRamp (0, numSamples,
                                   pcFaderStart * duckGainLinear,
                                   pcFaderEnd * nextDuck);
+
+        // Structural anti-double-duck guarantee: the monitor buffer is a plain
+        // post-duck copy. Never run a second duck envelope on musicCueBlock.
+        for (int channel = 0; channel < processingChannels; ++channel)
+            musicCueBlock.copyFrom (channel, 0, musicBlock, channel, 0, numSamples);
+
         duckGainLinear = nextDuck;
         duckGainDb.store (juce::Decibels::gainToDecibels (
             juce::jmax (nextDuck, 1.0e-6f), -120.0f));
     }
 ]=])
-sc220_engine_replace_once(_engine "enhanced music cue before ducking"
+sc220_engine_replace_once(_engine "enhanced music cue after shared ducking"
     "${_music_lane_anchor}" "${_music_lane_replacement}")
 
 set(_monitor_push_anchor [=[
@@ -245,7 +249,8 @@ set(_monitor_push_replacement [=[
     updateMeters (voiceBlock, preLimiterPeakDb);
 
     // Confidence monitoring is independent of GO LIVE. Program hears the exact
-    // protected stream mix; Music Cue hears enhanced PC music before ducking.
+    // protected stream mix; Music Cue hears the enhanced, fader-controlled,
+    // post-duck PC lane only, with no delayed software-monitor copy of the mic.
     if (monitorSource.load() == MonitorSource::musicCue)
         monitorOutput.push (musicCueBlock, numSamples);
     else

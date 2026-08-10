@@ -330,7 +330,8 @@ begin
     MsgBox(
       'Microsoft Visual C++ Runtime setup returned exit code ' +
       IntToStr(ResultCode) + '. SC220 Live will not be launched automatically.' +
-      #13#10 + #13#10 + 'Diagnostic log: ' + LogPath,
+      Chr(13) + Chr(10) + Chr(13) + Chr(10) +
+      'Diagnostic log: ' + LogPath,
       mbError, MB_OK);
 end;
 

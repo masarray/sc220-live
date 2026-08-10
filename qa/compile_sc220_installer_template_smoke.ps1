@@ -20,6 +20,8 @@ New-Item -ItemType Directory -Force -Path $payload, $vbPackage, $output | Out-Nu
 
 $app = Join-Path $payload 'SC220 Live.exe'
 $vbSetup = Join-Path $vbPackage 'VBCABLE_Setup_x64.exe'
+$vcRedist = Join-Path $payload 'VC_redist.x64.exe'
+$prerequisiteProbe = Join-Path $payload 'SC220PrerequisiteProbe.ps1'
 $eula = Join-Path $payload 'EULA.txt'
 $purchase = Join-Path $payload 'PURCHASE_TERMS.txt'
 $thirdParty = Join-Path $payload 'THIRD_PARTY_NOTICES.md'
@@ -27,6 +29,8 @@ $vbNotice = Join-Path $payload 'VB_AUDIO_NOTICE.txt'
 
 Set-Content -LiteralPath $app -Value 'SC220 installer template smoke payload' -Encoding ASCII
 Set-Content -LiteralPath $vbSetup -Value 'VB-CABLE installer placeholder - never executed' -Encoding ASCII
+Set-Content -LiteralPath $vcRedist -Value 'VC Runtime installer placeholder - never executed' -Encoding ASCII
+Set-Content -LiteralPath $prerequisiteProbe -Value 'exit 0' -Encoding ASCII
 Set-Content -LiteralPath (Join-Path $vbPackage 'vbaudio_cable64_win10.inf') -Value 'dummy INF' -Encoding ASCII
 Set-Content -LiteralPath (Join-Path $vbPackage 'vbaudio_cable64_win10.sys') -Value 'dummy SYS' -Encoding ASCII
 Set-Content -LiteralPath (Join-Path $vbPackage 'vbaudio_cable64_win10.cat') -Value 'dummy CAT' -Encoding ASCII
@@ -61,6 +65,8 @@ $lines = @(
     "#define ThirdPartySource `"$(Escape-Ispp $thirdParty)`"",
     "#define VBNoticeSource `"$(Escape-Ispp $vbNotice)`"",
     "#define VBPackageSource `"$(Escape-Ispp $vbPackage)`"",
+    "#define VCRedistSource `"$(Escape-Ispp $vcRedist)`"",
+    "#define PrerequisiteProbeSource `"$(Escape-Ispp $prerequisiteProbe)`"",
     "#define OutputDir `"$(Escape-Ispp $output)`"",
     "#include `"$(Escape-Ispp $template)`""
 )

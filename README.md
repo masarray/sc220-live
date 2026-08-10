@@ -1,8 +1,20 @@
 # SC220 Live
 
-Native Windows audio console for Recording Tech SC220. SC220 Live combines an optional SC220 voice input with a selectable Windows playback endpoint, processes Voice and Music through independent ASK-P Signature engines, and sends the protected programme to VB-CABLE for OBS or another live application.
+Native Windows audio console for Recording Tech SC220. SC220 Live combines an optional SC220 voice input with a selectable Windows playback endpoint, processes Voice and Music through independent ASK-P Signature engines, and sends the protected programme to a Windows stream endpoint such as standard VB-CABLE for OBS, TikTok Live Studio, or another live application.
 
 ![SC220 Live console](docs/SC220_LIVE_UX_LOCKED.png)
+
+## Current public release
+
+**SC220 Live v0.1.1** was published on 10 August 2026.
+
+- Public distribution: `masarray/sc220-download`
+- Release source commit: `994b983a7f02b6a2285c41781ecb77dc07e3b217`
+- Installer: `SC220-Live-v0.1.1-Setup-win-x64.exe`
+- Installer SHA-256: `589b174357cb36c62611d7a0e89bfa6a7d25251fc27015b5dd5b25fb54c04686`
+- Platform: Windows 10/11 x64
+
+The public repository contains compiled distribution assets and end-user documentation only. Application source, DSP source, build infrastructure, credentials, signing material, and private submodules remain private.
 
 ## Product signal path
 
@@ -10,44 +22,62 @@ Native Windows audio console for Recording Tech SC220. SC220 Live combines an op
 Recording Tech SC220
   -> Input Trim -> Voice Signature -> Voice fader ---------------------+
                                                                         |
-Selected Windows playback endpoint                                     +-> Master protection / -1 dB limiter
+Selected Windows playback endpoint                                     +-> Master protection / limiter
   -> WASAPI loopback -> Music Signature -> PC fader -> SC220 ducking --+       |
-                                                                                +-> standard VB-CABLE -> OBS / live application
+                                                                                +-> stream endpoint -> OBS / live application
 ```
 
-SC220 is optional for PC Music operation. The main programme graph can run with PC Audio only, and SC220 is selected automatically when a matching `MIXER`, `SC220`, or `Recording Tech` endpoint becomes available.
+SC220 is optional for PC Music operation. The programme graph can run with PC Audio only, and SC220 is selected automatically when a matching `MIXER`, `SC220`, or `Recording Tech` endpoint becomes available.
 
-## Current implementation
+## Current audio authority
+
+SC220 Live pins the approved ASK-P v0.5.24 production authority:
+
+- private authority repository: `masarray/askp-vst`;
+- approved product source: `2c764f82b0fc99eaff04d918cef4f839db7509e5`;
+- latest audited upstream HEAD for this release line: `44b7d1657fbbd2c13cd490e251e8867734238623`;
+- DSP header revision: `2026073102`;
+- factory profiles: `13`;
+- production DSP contract: canonical source -> fail-closed source audit -> deterministic P0/P0.1/P0.2/P0.3 generator -> generated translation unit;
+- Voice and Music use independent processor instances;
+- Live creative-control glide: 12 ms; reference parity glide: 80 ms.
+
+The approved processor includes the latest v0.5.24 Gain Match settle-controller fix for source parity, but **SC220 Live keeps Gain Match disabled by default and does not expose a Gain Match control in the public UI**.
+
+See [docs/ASKP_SOURCE_SYNC.md](docs/ASKP_SOURCE_SYNC.md) and [docs/ASKP_P03_DSP_PORT.md](docs/ASKP_P03_DSP_PORT.md).
+
+## Runtime capabilities
 
 - Native JUCE 8 / C++17 Windows 10/11 x64 application.
-- Pinned private ASK-P v0.5.23 authority at commit `5757119cab7a1a75f09dcf0edea6e3be97975439`.
-- Independent Voice Signature and Music Signature processor instances.
+- Independent Voice Signature and Music Signature engines.
 - Selectable Windows WASAPI loopback source for PC Audio.
-- Event-driven capture with polling fallback, automatic endpoint retry, and honest silence telemetry.
+- Event-driven capture with fallback, endpoint retry, and honest silence telemetry.
 - SC220-keyed PC Audio ducking after Music Signature processing.
-- Protected final programme bus with trim and a `-1 dB` limiter.
-- Native OBS-style WASAPI shared-mode Monitor Bus with endpoint-native format conversion.
+- Protected final programme bus with safety metering and limiting.
+- Physical Monitor Bus with anti-feedback routing protection.
 - `PROGRAM` and pre-ducking `MUSIC CUE` monitoring modes.
-- Fixed 14-band post-limiter programme analyzer with pink-noise calibration and per-band rhythm activity.
-- Integrated LUFS-I, responsive 400 ms LUFS-M needle movement, true peak, and stereo meters.
-- Stream and Monitor start muted; explicit user actions enable them.
+- Programme analyzer, LUFS-I/LUFS-M, true-peak, stereo meters, faders, mute, and explicit GO LIVE control.
+- Smart installer with prerequisite checks for Windows audio, Microsoft Visual C++ Runtime, and optional standard VB-CABLE routing.
 
 ## Quick Stream routing
 
-The public installer can optionally install the standard VB-Audio VB-CABLE donationware driver. The default release route uses that single cable only for the processed Stream Output:
+The public installer can optionally install the standard VB-Audio VB-CABLE donationware driver. The normal stream route is:
 
 ```text
 Music / browser / player
   -> normal Windows speaker or headphone
   -> SC220 Live PC AUDIO SOURCE captures that playback endpoint
-  -> Voice + Music DSP and protection
-  -> CABLE Input (VB-Audio Virtual Cable)
-  -> OBS / live application selects CABLE Output
+
+SC220 + PC Audio
+  -> Voice/Music ASK-P processing
+  -> ducking + programme protection
+  -> CABLE Input
+
+OBS / TikTok Live Studio
+  -> selects CABLE Output
 ```
 
-In this mode the user hears the normal Windows playback directly while the audience receives the processed SC220 Live programme. Keep the SC220 Live Monitor Bus off unless a different physical endpoint is available.
-
-A physical playback endpoint cannot be both the captured PC Audio source and the processed Monitor Output. Doing that plays the original application directly and returns a delayed DSP copy to the same endpoint, causing doubling or recursive feedback. Processed-only monitoring requires a second independent endpoint or virtual cable that is not bundled with the public installer.
+A physical playback endpoint must not be used simultaneously as the captured PC Audio source and processed Monitor Output. That creates direct + delayed playback or recursive feedback. Processed monitoring should use a genuinely separate physical endpoint.
 
 ## Clone the private source authority
 
@@ -56,11 +86,19 @@ git clone --recurse-submodules https://github.com/masarray/sc220-live.git
 cd sc220-live
 ```
 
-The ASK-P repository is private. Your GitHub account or CI token must have access before the submodule can initialise.
+The ASK-P repository is private. The GitHub account or CI token must have access before the submodule can initialise.
+
+For an existing checkout, the reviewed authority can be repaired with:
+
+```powershell
+.\scripts\sync-askp-v0523.ps1
+```
+
+The filename is historical; the script now verifies the approved **ASK-P v0.5.24** source commit.
 
 ## One-click Windows build
 
-Double-click [build-sc220-windows.bat](build-sc220-windows.bat), or run:
+Double-click `build-sc220-windows.bat`, or run:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\scripts\build-sc220-one-click.ps1 -Configuration Release -Clean
@@ -71,60 +109,33 @@ Requirements:
 - Windows 10 or 11 x64;
 - Visual Studio with **Desktop development with C++** and a Windows SDK;
 - Git for Windows;
-- internet access on the first build unless a local JUCE source tree is configured.
+- Python 3;
+- Inno Setup 6 for installer packaging;
+- private ASK-P repository access.
 
-## Verified installer bundle
+## Smart public release
 
-The installer pipeline downloads only the official standard `VBCABLE_Driver_Pack45.zip`, verifies its reviewed SHA-256 and Authenticode signatures, then embeds `VBCABLE_Setup_x64.exe` unchanged as an optional task.
+The release launcher is:
 
-Local build:
-
-```bat
-set VBCABLE_PACK45_SHA256=<reviewed 64-character SHA-256>
-build-sc220-installer.bat 0.1.0 clean
+```powershell
+.\RELEASE-SC220.cmd
 ```
 
-GitHub Actions workflow:
+It is designed to fail closed: source must be clean and pushed, the ASK-P authority must match the lock, the release runner is brought online only for the release session, and publication is accepted only after the release path verifies the published tag/assets.
 
-```text
-SC220 Live installer bundle
-```
-
-Required repository configuration:
-
-- secret `ASKP_REPO_TOKEN` with read access to `masarray/askp-vst`;
-- repository variable `VBCABLE_PACK45_SHA256` containing the reviewed official Pack45 hash.
-
-The workflow:
-
-1. checks out the pinned private ASK-P authority;
-2. installs pinned Inno Setup 6.7.1;
-3. downloads VB-CABLE only from the official VB-Audio URL;
-4. rejects a hash mismatch, invalid setup signature, invalid driver catalogue, or A/B/C/D package material;
-5. builds the SC220 Live Release executable;
-6. creates a Windows 10/11 x64 installer with optional VB-CABLE installation;
-7. smoke-installs and uninstalls the application payload without changing drivers on the CI runner;
-8. publishes the installer, SHA-256, and supply-chain manifest as workflow artifacts.
-
-The installer presents VB-Audio ownership and donationware terms, keeps the driver task optional, allows the Windows security prompt to remain visible, and requests a restart after successful VB-CABLE installation.
-
-## Verified public release
-
-Public release remains fail-closed. It must originate from a clean reviewed `main` commit, pass the physical listening test, and publish only compiled assets and approved end-user documents to `masarray/sc220-download`.
-
-SC220 Live is proprietary closed-source software. Public packages never contain application source, DSP source, CMake files, debug symbols, credentials, or private keys.
+The release tooling can repair a clean submodule pointer mismatch, fast-forward a clean local branch, reuse an unfinished Actions run rather than dispatching a duplicate, and retain a verified JUCE 8.0.14 cache to reduce repeated clean-build setup time.
 
 ## Repository boundary
 
-- `masarray/sc220-live` — private canonical source, release scripts, design authority, installer workflow, and private DSP submodule reference.
-- `masarray/sc220-download` — public landing page, checksums, manifests, and compiled release assets only.
+- `masarray/sc220-live` — private canonical source, release automation, design authority, installer workflow, and private DSP submodule reference.
+- `masarray/sc220-download` — public landing pages, release metadata, checksums, manifests, end-user documentation, and compiled release assets.
 
-See [docs/RELEASE_BOUNDARY.md](docs/RELEASE_BOUNDARY.md) and [docs/PUBLIC_RELEASE_GATE.md](docs/PUBLIC_RELEASE_GATE.md).
+See [docs/RELEASE_BOUNDARY.md](docs/RELEASE_BOUNDARY.md), [docs/PUBLIC_RELEASE_GATE.md](docs/PUBLIC_RELEASE_GATE.md), and [docs/RELEASE_V0.1.1_RECEIPT.md](docs/RELEASE_V0.1.1_RECEIPT.md).
 
 ## Safety notes
 
-- VB-CABLE is a separate VB-Audio donationware product and is installed only when the user selects that installer task.
+- VB-CABLE is a separate VB-Audio donationware product and is installed only when selected by the user.
 - Keep Stream and Monitor muted while selecting endpoints and setting gain.
 - Never select the same endpoint or virtual-cable family as both PC Audio Source and Stream/Monitor destination.
-- Restart Windows after installing or uninstalling VB-CABLE.
-- Avoid red meter segments and verify the full signal path before a production broadcast.
+- Restart Windows after installing or repairing an audio driver when requested.
+- Avoid clipping and verify the complete signal path before a production broadcast.

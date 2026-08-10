@@ -8,49 +8,60 @@ third_party/askp-vst/
 
 ## Approved production authority
 
-The latest audited ASK-P repository HEAD is:
+For the SC220 Live v0.1.1 release line:
 
-```text
-f91aa04e953cf14eb0682a1bc305138b6507d73a
-```
+- latest audited ASK-P repository HEAD: `44b7d1657fbbd2c13cd490e251e8867734238623`;
+- approved v0.5.24 product source commit: `2c764f82b0fc99eaff04d918cef4f839db7509e5`;
+- approved release-helper commit: `811b7376dd784ce9f64e03512c7baf7de5e77425`;
+- DSP header revision: `2026073102`;
+- factory profiles: `13`.
 
-Its approved v0.5.24 release request still names this exact **product source commit**:
+SC220 Live pins the **approved product source commit**, not the moving repository HEAD. The final upstream HEAD commit after the approved product source only repins release metadata; the approved product source itself contains the latest Gain Match settle-controller implementation and the matching source-audit contract.
 
-```text
-1cf050d40338cbcb5d8cddd9fc2de5f23e3d625f
-```
-
-The current approved release-helper commit is `811b7376dd784ce9f64e03512c7baf7de5e77425`.
-
-SC220 Live pins the submodule to the approved product source commit rather than following the moving repository HEAD. Commits after `1cf050d4...` currently change release-request, release-audit, macOS/Pages setup and verification helpers; the product DSP, presets, processor and production CMake source contract are unchanged.
-
-ASK-P product metadata is now **v0.5.24** with DSP header revision `2026073102` and 13 factory profiles.
+The core tonal DSP/preset blobs and P0/P0.1/P0.2/P0.3 generator remain the same approved v0.5.24 sonic calibration used by the preceding SC220 port. The processor-level difference that arrived after the older `1cf050d4...` pin is the Gain Match settle-controller fix and its source-audit alignment.
 
 ## Production DSP contract
 
-v0.5.24 intentionally keeps the large canonical `engine/arsonkupik_dsp.cpp` as immutable input and builds the approved P0/P0.1/P0.2/P0.3 sound through a deterministic fail-closed production sequence:
+ASK-P v0.5.24 production keeps the canonical `engine/arsonkupik_dsp.cpp` as immutable input and materialises the approved effective DSP through a fail-closed sequence:
 
 1. run `tools/p0_musical_rebalance_source_audit.py`;
-2. refuse configuration if any sonic invariant or replacement anchor has drifted;
+2. refuse configuration if a sonic invariant or generator replacement anchor has drifted;
 3. run `scripts/generate_p0_musical_rebalance_dsp.py`;
-4. compile the generated DSP translation unit for the product and parity targets.
+4. compile the generated DSP translation unit for product and parity targets.
 
-SC220 Live now mirrors the same ordering. Its own small generated-DSP anchor checks are supplemental only; the complete upstream source audit remains authoritative.
+SC220 Live mirrors this ordering. Its additional generated-DSP anchors supplement, rather than replace, the complete upstream audit.
 
-For an existing checkout, initialise/repair the authority with:
+## Existing checkout sync
+
+Run:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\sync-askp-v0523.ps1
+.\scripts\sync-askp-v0523.ps1
 ```
 
-The historical script filename is retained for compatibility with existing local shortcuts. `scripts/build-live-windows.ps1` also invokes this sync helper automatically before configuring CMake, so normal one-click local builds cannot silently use a stale ASK-P checkout.
+The script filename is historical and retained for compatibility. Its current authority is ASK-P **v0.5.24 @ `2c764f82...`**.
 
-The approved Sonkupik sphere remains independently owned by this repository under:
+Normal one-click builds also invoke this authority sync before CMake, preventing a clean local checkout from silently compiling a stale submodule pointer.
+
+For a raw Git repair:
+
+```powershell
+git submodule sync -- third_party/askp-vst
+git submodule update --init --recursive --force --checkout third_party/askp-vst
+git -C third_party/askp-vst rev-parse HEAD
+```
+
+The final command must print:
 
 ```text
-third_party/sonkupik-sphere-v0.10.4/
+2c764f82b0fc99eaff04d918cef4f839db7509e5
 ```
 
-ASK-P's editor and Orb visualizer are not compiled into SC220 Live.
+## SC220-specific boundaries
 
-Future ASK-P upgrades must update together: the approved source gitlink, `ASKP_AUTHORITY.lock`, CMake audit/generator contract, CI checkout ref, bridge version/defaults, sync/build helpers, runtime audits and port documentation.
+- local visualizer authority remains `third_party/sonkupik-sphere-v0.10.4/`;
+- ASK-P editor and ASK-P Orb visualizer are not compiled into SC220 Live;
+- Live macro glide remains 12 ms, reference glide remains 80 ms;
+- Gain Match source/runtime logic is present for processor parity, but `EnhancerEngineBridge` keeps it disabled by default and the SC220 UI does not expose it.
+
+Future ASK-P upgrades must update together: submodule gitlink, `ASKP_AUTHORITY.lock`, CMake source contract, source-audit workflow, release workflows, bridge metadata/defaults, QA, and port documentation.

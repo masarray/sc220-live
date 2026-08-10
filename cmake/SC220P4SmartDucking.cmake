@@ -114,9 +114,12 @@ if(_caption_pos EQUAL -1)
 endif()
 string(REPLACE "${_target_caption}" "" _ui "${_ui}")
 
-# Fail closed against the two regressions P4 exists to prevent.
+# Fail closed against legacy detection and against any second monitor-side duck
+# stage. The PC-only confidence monitor must be a plain copy of musicBlock after
+# the one shared PC fader + duck ramp has already been applied.
 foreach(_forbidden IN ITEMS
         "dbFromPeak (keyPeak) > -36.0f"
+        "musicCueBlock.applyGainRamp"
         "YT / TIKTOK  -14  |  TP <= -1")
     string(FIND "${_engine}${_ui}" "${_forbidden}" _position)
     if(NOT _position EQUAL -1)
@@ -124,11 +127,20 @@ foreach(_forbidden IN ITEMS
     endif()
 endforeach()
 
+string(FIND "${_engine}" "musicBlock.applyGainRamp" _music_duck_pos)
+string(FIND "${_engine}" "musicCueBlock.copyFrom" _music_cue_copy_pos)
+if(_music_duck_pos EQUAL -1 OR _music_cue_copy_pos EQUAL -1
+   OR _music_cue_copy_pos LESS_EQUAL _music_duck_pos)
+    message(FATAL_ERROR
+        "SC220 P4 monitor routing must copy PC audio only after the shared duck ramp")
+endif()
+
 foreach(_required IN ITEMS
         "SmartVoiceDuckDetector"
         "smartVoiceDuckDetector.process"
         "noiseClean.hasProfile(), noiseClean.getEstimatedNoiseFloorDb()"
-        "targetDuck < duckGainLinear ? 0.055 : 0.650")
+        "targetDuck < duckGainLinear ? 0.055 : 0.650"
+        "musicCueBlock.copyFrom")
     string(FIND "${_engine}${_ui}" "${_required}" _position)
     if(_position EQUAL -1)
         message(FATAL_ERROR "SC220 P4 smart-ducking authority missing: ${_required}")

@@ -7,7 +7,7 @@ on:
       source_ref:
         description: SC220 Live branch, tag, or commit to build
         required: true
-        default: fix/pc-cable-source-analyzer
+        default: main
         type: string
       version:
         description: Semantic version
@@ -32,7 +32,7 @@ jobs:
     runs-on: windows-2022
     timeout-minutes: 120
     env:
-      SOURCE_REF: ${{ inputs.source_ref || 'fix/pc-cable-source-analyzer' }}
+      SOURCE_REF: ${{ inputs.source_ref || 'main' }}
       RELEASE_VERSION: ${{ inputs.version || '0.1.0' }}
       CLEAN_BUILD: ${{ inputs.clean || 'true' }}
       ASKP_REPO_TOKEN: ${{ secrets.ASKP_REPO_TOKEN }}
@@ -90,7 +90,7 @@ jobs:
 
           - SC220 Live ref: ``$env:SOURCE_REF``
           - SC220 Live commit: ``$sourceCommit``
-          - ASK-P commit: ``5757119cab7a1a75f09dcf0edea6e3be97975439``
+          - ASK-P commit: ``2c764f82b0fc99eaff04d918cef4f839db7509e5``
           - VB-CABLE Pack45 SHA-256: ``$($vbHash.ToLowerInvariant())``
           "@ | Add-Content -LiteralPath $env:GITHUB_STEP_SUMMARY -Encoding UTF8
 
@@ -98,7 +98,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: masarray/askp-vst
-          ref: 5757119cab7a1a75f09dcf0edea6e3be97975439
+          ref: 2c764f82b0fc99eaff04d918cef4f839db7509e5
           token: ${{ secrets.ASKP_REPO_TOKEN }}
           path: third_party/askp-vst
           fetch-depth: 1

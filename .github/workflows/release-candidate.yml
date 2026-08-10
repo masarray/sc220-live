@@ -38,7 +38,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: masarray/askp-vst
-          ref: 5757119cab7a1a75f09dcf0edea6e3be97975439
+          ref: 2c764f82b0fc99eaff04d918cef4f839db7509e5
           token: ${{ secrets.ASKP_REPO_TOKEN }}
           path: third_party/askp-vst
 

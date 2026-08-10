@@ -24,6 +24,14 @@ sync_script = read("scripts/sync-askp-v0523.ps1")
 build_script = read("scripts/build-live-windows.ps1")
 workflow = read(".github/workflows/source-audit.yml")
 release_workflow = read(".github/workflows/local-release.yml")
+candidate_workflows = {
+    path: read(path)
+    for path in (
+        ".github/workflows/installer-bundle.yml",
+        ".github/workflows/installer-release-candidate.yml",
+        ".github/workflows/release-candidate.yml",
+    )
+}
 historical_doc = read("docs/ASKP_V0523_ENGINE_PORT.md")
 
 # Latest approved ASK-P v0.5.24 release request names this immutable product
@@ -116,6 +124,15 @@ check("CI compiles generated effective DSP", "/tmp/arsonkupik_dsp_v0524.cpp" in 
 check("public release workflow checks out approved source", source_commit in release_workflow)
 check("public release workflow verifies ASKP_AUTHORITY.lock", "ASKP_AUTHORITY.lock" in release_workflow and "ASK-P checkout mismatch" in release_workflow)
 check("public release reruns ASK-P port audit", "audit_v0150_askp_p03_port.py" in release_workflow)
+check(
+    "Windows release-candidate workflows use approved v0.5.24 source",
+    all(source_commit in workflow for workflow in candidate_workflows.values()),
+)
+check(
+    "Windows release-candidate workflows reject superseded v0.5.23 pin",
+    all("5757119cab7a1a75f09dcf0edea6e3be97975439" not in workflow
+        for workflow in candidate_workflows.values()),
+)
 check("historical v0.5.23 document cannot masquerade as current", "Historical record only" in historical_doc and "superseded" in historical_doc.lower())
 
 failed = [name for name, ok in checks if not ok]

@@ -2,6 +2,7 @@
 
 #include "MusicalNoiseClean.h"
 #include "EnhancerEngineBridge.h"
+#include "SmartPleasantPresence.h"
 #include "MonitorOutputClient.h"
 #include "PcAudioLoopbackCapture.h"
 #include "ProgrammeLoudnessIntegrator.h"
@@ -44,6 +45,8 @@ public:
         float voiceGainReductionDb = 0.0f;
         float musicGainReductionDb = 0.0f;
         float masterGainReductionDb = 0.0f;
+        float pleasantMidHighReductionDb = 0.0f;
+        float deEssReductionDb = 0.0f;
         float expanderReductionDb = 0.0f;
         float duckGainDb = 0.0f;
         float loudnessLufs = -120.0f;
@@ -241,6 +244,7 @@ private:
     SmoothDownwardExpander expander;
     EnhancerEngineBridge voiceEnhancerBridge;
     EnhancerEngineBridge musicEnhancerBridge;
+    SmartPleasantPresence pleasantPresence;
     askp::ScopeTap programmeAnalyzer;
     PcAudioLoopbackCapture pcLoopback;
     MonitorOutputClient monitorOutput;

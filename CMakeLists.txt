@@ -294,6 +294,23 @@ target_compile_definitions(SC220ProgrammeAnalyzerAudit PRIVATE
 )
 add_test(NAME SC220ProgrammeAnalyzerAudit COMMAND SC220ProgrammeAnalyzerAudit)
 
+add_executable(SC220PleasantPresenceAudit
+    qa/SmartPleasantPresenceAudit.cpp
+    live/SmartPleasantPresence.cpp
+)
+target_include_directories(SC220PleasantPresenceAudit PRIVATE
+    "${CMAKE_CURRENT_SOURCE_DIR}/live"
+)
+target_link_libraries(SC220PleasantPresenceAudit PRIVATE
+    juce::juce_audio_utils
+    juce::juce_dsp
+)
+target_compile_definitions(SC220PleasantPresenceAudit PRIVATE
+    JUCE_WEB_BROWSER=0
+    JUCE_USE_CURL=0
+)
+add_test(NAME SC220PleasantPresenceAudit COMMAND SC220PleasantPresenceAudit)
+
 # ---------------------------------------------------------------------------
 # Embedded UI assets
 # ---------------------------------------------------------------------------
@@ -366,6 +383,7 @@ target_sources(SC220Live PRIVATE
     live/MusicalNoiseClean.cpp
     live/PcAudioLoopbackCapture.cpp
     live/LiveAudioEngine.cpp
+    live/SmartPleasantPresence.cpp
     live/LiveTheme.cpp
     live/LiveIcons.cpp
     live/LiveWidgets.cpp

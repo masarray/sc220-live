@@ -418,6 +418,9 @@ LiveAudioEngine::Status LiveAudioEngine::getStatus() const
     status.voiceGainReductionDb = voiceGainReduction.load();
     status.musicGainReductionDb = musicGainReduction.load();
     status.masterGainReductionDb = masterGainReduction.load();
+    const auto pleasantSnapshot = pleasantPresence.snapshot();
+    status.pleasantMidHighReductionDb = pleasantSnapshot.midHighReductionDb;
+    status.deEssReductionDb = pleasantSnapshot.deEssReductionDb;
     status.expanderReductionDb = expander.getGainReductionDb();
     status.duckGainDb = duckGainDb.load();
     status.loudnessLufs = loudnessLufs.load();
@@ -527,6 +530,23 @@ void LiveAudioEngine::audioDeviceIOCallbackWithContext (
 
     voiceMidi.clear();
     voiceEnhancerBridge.process (voiceBlock, voiceMidi);
+    if (! voiceEnhancerBypassed.load (std::memory_order_relaxed))
+    {
+        // Coordinate protection with the amount of generated brilliance. It
+        // remains restrained at low macro values and gains authority only as
+        // Enhance/Smart Treble make the voice more forward.
+        const float brilliance = juce::jmax (voiceEnhancerBridge.enhance(),
+                                             voiceEnhancerBridge.smartTreble());
+        pleasantPresence.setStrength (juce::jlimit (0.58f, 1.0f,
+            0.52f + 0.0052f * brilliance));
+        pleasantPresence.process (voiceBlock);
+    }
+    else
+    {
+        // Do not leave stale detector state or reduction telemetry visible
+        // while the complete vocal enhancement lane is bypassed.
+        pleasantPresence.reset();
+    }
 
     sc220MixGainLinear.setTargetValue (juce::Decibels::decibelsToGain (sc220FaderDb.load()));
     const float sc220MuteGain = sc220Muted.load() ? 0.0f : 1.0f;
@@ -661,6 +681,7 @@ void LiveAudioEngine::audioDeviceAboutToStart (juce::AudioIODevice* device)
 
     voiceEnhancerBridge.prepare (sampleRate, blockSize);
     musicEnhancerBridge.prepare (sampleRate, blockSize);
+    pleasantPresence.prepare (sampleRate, blockSize, channels);
     updateInputTrimRouting();
     updateOutputTrimRouting();
     voiceEnhancerBridge.setBypassed (voiceEnhancerBypassed.load());
@@ -734,6 +755,7 @@ void LiveAudioEngine::audioDeviceStopped()
     pcLoopback.stop();
     voiceEnhancerBridge.release();
     musicEnhancerBridge.release();
+    pleasantPresence.reset();
     masterLimiter.reset();
     running.store (false);
     deviceOpen.store (false);

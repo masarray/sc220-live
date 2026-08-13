@@ -154,3 +154,7 @@ include("${CMAKE_CURRENT_LIST_DIR}/SC220P6BNoiseCleanup.cmake")
 # P6C is UI-only: replace loose DSP/Smart-Protect dot labels with compact glowing
 # status chips that make active/bypass state readable at a glance.
 include("${CMAKE_CURRENT_LIST_DIR}/SC220P6CStatusChips.cmake")
+
+# P7 reduces default footprint and visual weight without removing any operator
+# control. It runs last so the compact grid describes the exact final surface.
+include("${CMAKE_CURRENT_LIST_DIR}/SC220P7CompactPleasant.cmake")

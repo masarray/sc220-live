@@ -3,6 +3,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 header = (ROOT / "live/SC220MainComponent.h").read_text(encoding="utf-8")
 source = (ROOT / "live/SC220MainComponent.cpp").read_text(encoding="utf-8")
+generated_path = ROOT / "build-sc220/generated/sc220-monitor/SC220MainComponent_Monitor.cpp"
+generated = generated_path.read_text(encoding="utf-8") if generated_path.exists() else source
 
 checks: list[tuple[str, bool]] = []
 
@@ -38,7 +40,11 @@ check("post-master analyzer renders lightweight real-audio bars", all(token in s
 check("voice and music visual taps are enabled", all(token in source for token in (
     "getVoiceEnhancerBridge().setVisualTapEnabled (true)",
     "getMusicEnhancerBridge().setVisualTapEnabled (true)")))
-check("main surface uses native Windows premium typography", 'font.setTypefaceName ("Segoe UI Variable")' in source)
+check("main surface uses embedded Inter typography", all(token in source for token in (
+    "embeddedInterRegular", "embeddedInterMedium", "embeddedInterSemibold",
+    "BinaryData::inter_regular_ttf", "BinaryData::inter_medium_ttf",
+    "BinaryData::inter_semibold_ttf", "setDefaultSansSerifTypeface",
+)) and 'font.setTypefaceName ("Segoe UI Variable")' not in source)
 check("hardware controls match approved dot-calibrated metal surface", all(token in source for token in (
     "for (int i = 0; i <= 20; ++i)",
     "const auto dotSize",
@@ -56,11 +62,10 @@ check("full-height fader caps remain inside their endpoint bounds", all(token in
     "return 34;",
     "sliderPos - 34.0f, 40.0f, 68.0f",
 )))
-check("macro controls preserve approved endpoint labels", all(token in source for token in (
-    'g.drawText ("0%"',
-    'g.drawText ("100%"',
+check("macro controls keep values without repeated endpoint noise", all(token in generated for token in (
+    'g.drawText (juce::String (knob.getValue(), 0) + "%"',
     "knob.setTextBoxStyle (juce::Slider::NoTextBox",
-)))
+)) and 'g.drawText ("0%"' not in generated and 'g.drawText ("100%"' not in generated)
 check("SC220 device art uses a focused source crop", all(token in source for token in (
     "const int sourceY",
     "const int sourceWidth",

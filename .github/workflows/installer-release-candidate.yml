@@ -1,28 +1,9 @@
 # Rebuild trigger: truthful Windows Stream Output endpoint identities
 name: SC220 Live installer release candidate
 
-on:
-  workflow_dispatch:
-    inputs:
-      source_ref:
-        description: SC220 Live branch, tag, or commit to build
-        required: true
-        default: main
-        type: string
-      version:
-        description: Semantic version
-        required: true
-        default: 0.1.0
-        type: string
-      clean:
-        description: Perform a clean build
-        required: true
-        default: true
-        type: boolean
-  push:
-    branches: [main]
-    paths:
-      - .github/workflows/installer-release-candidate.yml
+# Intentionally disabled in the private repository. Release candidates are
+# produced by the local Windows toolchain.
+on: []
 
 permissions:
   contents: read

@@ -49,10 +49,17 @@ else:
 # UI monitor generator consumes the already aligned source. Its specific anchors
 # are audited directly here; the aligned generator has a separate exact audit.
 check(
-    "monitor client owns a second output-only AudioDeviceManager",
-    "juce::AudioDeviceManager deviceManager" in monitor_h
-    and "deviceManager.initialise (0, 0" in monitor_cpp
-    and "deviceManager.addAudioCallback (this)" in monitor_cpp,
+    "monitor client owns an independent native WASAPI shared endpoint",
+    all(
+        token in monitor_cpp
+        for token in (
+            "ComPtr<IAudioClient>",
+            "ComPtr<IAudioRenderClient>",
+            "GetMixFormat",
+            "AUDCLNT_SHAREMODE_SHARED",
+        )
+    )
+    and "juce::AudioDeviceManager deviceManager" not in monitor_h + monitor_cpp,
 )
 check(
     "monitor transport is bounded and prefilled",
@@ -77,35 +84,58 @@ check(
     ),
 )
 check(
-    "monitor endpoint enforces nominal stream sample rate",
+    "monitor adapts the source bus to the endpoint native mix format",
     all(
         token in monitor_cpp
         for token in (
-            "setup.sampleRate = preferredSampleRate",
-            "std::abs (actualRate - expectedRate) > 1.0",
-            "must support the stream sample rate",
+            "GetMixFormat",
+            "outputRate.store",
+            "juce::LagrangeInterpolator",
+            "adaptiveRatio",
+            "rateConversionActive.store",
         )
     ),
 )
 
-callback_match = re.search(
-    r"void MonitorOutputClient::audioDeviceIOCallbackWithContext.*?\n}\n\n"
-    r"void MonitorOutputClient::audioDeviceAboutToStart",
+push_match = re.search(
+    r"void MonitorOutputClient::push.*?\n}\n\n"
+    r"MonitorOutputClient::Status MonitorOutputClient::getStatus",
     monitor_cpp,
     flags=re.S,
 )
-callback = callback_match.group(0) if callback_match else ""
+push_path = push_match.group(0) if push_match else ""
 check(
-    "monitor callback is lock-free and allocation-free",
-    bool(callback)
-    and "ScopedLock" not in callback
-    and "setSize" not in callback
-    and "new " not in callback
-    and "std::vector" not in callback,
+    "monitor push path is bounded, nonblocking and allocation-free",
+    bool(push_path)
+    and "TryAcquireSRWLockExclusive" in push_path
+    and "enqueueLocked" in push_path
+    and "renderAvailableLocked" in push_path
+    and "ScopedLock" not in push_path
+    and "setSize" not in push_path
+    and "new " not in push_path
+    and "std::vector" not in push_path
+    and all(
+        token in monitor_cpp
+        for token in (
+            "ringBuffer.setSize",
+            "resampleInput.setSize",
+            "resampleOutput.setSize",
+        )
+    ),
 )
 check(
-    "monitor callback uses a deterministic smoothed gain ramp",
-    all(token in callback for token in ("gainLinear", "gainStep", "output[sample] *= gain")),
+    "monitor rendering uses a deterministic smoothed gain ramp",
+    all(
+        token in monitor_cpp
+        for token in (
+            "gainLinear.setTargetValue",
+            "const float gainStart",
+            "const float gainEnd",
+            "const float gainStep",
+            "left[frame] * gain",
+            "right[frame] * gain",
+        )
+    ),
 )
 
 check(

@@ -1,9 +1,9 @@
 name: SC220 Live source audit
 
-on:
-  push:
-  pull_request:
-  workflow_dispatch:
+# Intentionally disabled. This private source repository is validated only by
+# scripts/run-sc220-local-qa.ps1. Public release automation lives in
+# masarray/sc220-download/publish-draft-release.yml.
+on: []
 
 permissions:
   contents: read

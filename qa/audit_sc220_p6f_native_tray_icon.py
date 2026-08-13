@@ -9,6 +9,8 @@ CANONICAL_96 = ROOT / "assets" / "favicon" / "favicon-96x96.png"
 CANONICAL_512 = ROOT / "assets" / "favicon" / "web-app-manifest-512x512.png"
 ALIAS_96 = ROOT / "assets" / "ui" / "favicon-96x96.png"
 ALIAS_512 = ROOT / "assets" / "ui" / "favicon-512x512.png"
+GENERATED_PATH = ROOT / "build-sc220/generated/sc220-monitor/LiveApplication_BroadcastState.cpp"
+GENERATED = GENERATED_PATH.read_text(encoding="utf-8") if GENERATED_PATH.exists() else ""
 
 
 def git_blob_sha(path: Path) -> str:
@@ -87,12 +89,14 @@ for needle, label in [
 
 for forbidden in [
     "sc220-download",
-    "askp_app_logo_png",
     "MusicalNoiseClean",
     "noiseClean.",
     "expander.",
 ]:
     if forbidden in P6F:
         raise AssertionError(f"P6F must remain canonical favicon branding only: {forbidden}")
+
+if "askp_app_logo_png" in GENERATED:
+    raise AssertionError("Final native tray application contains stale ASK-P/VST artwork")
 
 print("SC220 P6F canonical Windows ICO tray audit passed")

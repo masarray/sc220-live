@@ -3,6 +3,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 P6D = (ROOT / "cmake" / "SC220P6DTrayPolish.cmake").read_text(encoding="utf-8")
 P6C = (ROOT / "cmake" / "SC220P6CStatusChips.cmake").read_text(encoding="utf-8")
+GENERATED_PATH = ROOT / "build-sc220/generated/sc220-monitor/LiveApplication_BroadcastState.cpp"
+GENERATED = GENERATED_PATH.read_text(encoding="utf-8") if GENERATED_PATH.exists() else ""
 
 
 def require(text: str, needle: str, label: str) -> None:
@@ -36,7 +38,9 @@ for needle, label in [
 ]:
     require(P6D, needle, label)
 
-if P6D.count("askp_app_logo_png") != 1:
-    raise AssertionError("P6D should reference the ASK-P tray icon exactly once as the stale anchor to remove")
+if "askp_app_logo_png" in GENERATED:
+    raise AssertionError("Final tray application must contain no ASK-P/VST artwork fallback")
+if "SC220CanonicalTrayIconData::favicon_ico" not in GENERATED:
+    raise AssertionError("Final tray application must use the canonical embedded SC220 ICO")
 
 print("SC220 P6D tray polish audit passed")

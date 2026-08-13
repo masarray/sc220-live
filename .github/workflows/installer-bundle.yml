@@ -1,18 +1,8 @@
 name: SC220 Live installer bundle
 
-on:
-  workflow_dispatch:
-    inputs:
-      version:
-        description: Semantic version to package
-        required: true
-        default: 0.1.0
-        type: string
-      clean:
-        description: Perform a clean SC220 Live build
-        required: true
-        default: true
-        type: boolean
+# Intentionally disabled in the private repository. Build and package locally,
+# then upload the binary-only draft to masarray/sc220-download.
+on: []
 
 permissions:
   contents: read

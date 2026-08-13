@@ -6,12 +6,15 @@ cmake = (ROOT / "CMakeLists.txt").read_text(encoding="utf-8")
 readme = (ROOT / "README.md").read_text(encoding="utf-8")
 portable = (ROOT / "scripts" / "package-sc220-windows.ps1").read_text(encoding="utf-8")
 installer = (ROOT / "scripts" / "package-sc220-installer.ps1").read_text(encoding="utf-8")
-release = (ROOT / "scripts" / "release-sc220-windows.ps1").read_text(encoding="utf-8")
+local_release = (ROOT / "scripts" / "start-sc220-local-release.ps1").read_text(encoding="utf-8")
+handoff = (ROOT / "scripts" / "publish-sc220-download.ps1").read_text(encoding="utf-8")
 approve = (ROOT / "scripts" / "approve-sc220-public-release.ps1").read_text(encoding="utf-8")
 landing = (ROOT / "release-site" / "index.html").read_text(encoding="utf-8")
 latest = (ROOT / "release-site" / "latest.json").read_text(encoding="utf-8")
-portable_workflow = (ROOT / ".github" / "workflows" / "release-candidate.yml").read_text(encoding="utf-8")
-installer_workflow = (ROOT / ".github" / "workflows" / "installer-bundle.yml").read_text(encoding="utf-8")
+private_workflows = "\n".join(
+    path.read_text(encoding="utf-8")
+    for path in sorted((ROOT / ".github" / "workflows").glob("*.yml"))
+)
 gate = (ROOT / "docs" / "PUBLIC_RELEASE_GATE.md").read_text(encoding="utf-8")
 notes = (ROOT / "docs" / "RELEASE_NOTES_v0.1.0.md").read_text(encoding="utf-8")
 third_party = (ROOT / "THIRD_PARTY_NOTICES.md").read_text(encoding="utf-8")
@@ -24,18 +27,20 @@ def check(name: str, condition: bool) -> None:
 
 
 check(
-    "initial public version and release notes agree",
-    "project(SC220Live VERSION 0.1.0" in cmake
-    and "# SC220 Live v0.1.0" in notes,
+    "current source and public receipt agree on v0.1.1",
+    "project(SC220Live VERSION 0.1.1" in cmake
+    and "SC220 Live v0.1.1" in readme
+    and "Current published receipt" in gate
+    and "v0.1.1" in gate,
 )
 check(
     "README describes current selectable source and Quick Stream architecture",
     all(token in readme for token in (
         "selectable Windows playback endpoint",
-        "OBS-style WASAPI shared-mode Monitor Bus",
+        "Physical Monitor Bus",
         "Quick Stream routing",
         "standard VB-Audio VB-CABLE",
-        "CABLE Input (VB-Audio Virtual Cable)",
+        "CABLE Input",
         "CABLE Output",
     )),
 )
@@ -92,40 +97,30 @@ check(
     )),
 )
 check(
-    "release script only accepts a clean canonical private main commit",
-    all(token in release for token in (
-        "Public release must run from main",
-        "Working tree has unstaged changes",
-        "Working tree has staged changes",
-        "Fetching canonical private main branch",
-        "$sourceCommit = (& git rev-parse HEAD).Trim()",
-        "$remoteCommit = (& git rev-parse origin/main).Trim()",
-        "if ($sourceCommit -ne $remoteCommit)",
-        "HEAD must exactly match origin/main",
-    ))
-    and "Pushing private source authority" not in release
-    and "Committing private source" not in release,
+    "local release accepts only a clean synchronized private main commit",
+    all(token in local_release for token in (
+        "$branch -ne 'main'",
+        "status --porcelain",
+        "fetch origin main",
+        "$sourceCommit = (& git.exe rev-parse HEAD).Trim()",
+        "$remoteCommit = (& git.exe rev-parse origin/main).Trim()",
+        "$sourceCommit -ne $remoteCommit",
+    )),
 )
 check(
-    "public HEAD-to-main push is confined to isolated download checkout",
-    all(token in release for token in (
-        "Push-Location $publicCheckout",
-        "Pushing public landing page",
-        "git push -u origin HEAD:main",
-        "Pop-Location",
-    ))
-    and release.find("Push-Location $publicCheckout")
-        < release.find("git push -u origin HEAD:main")
-        < release.find("Pop-Location"),
+    "private GitHub Actions are inert",
+    private_workflows.count("on: []") == len(list((ROOT / ".github" / "workflows").glob("*.yml")))
+    and "workflow_dispatch:" not in private_workflows
+    and "push:" not in private_workflows,
 )
 check(
-    "release script requires exact recent validation receipt",
-    all(token in release for token in (
-        "public-release-validation.json",
-        "$receipt.version -ne $Version",
-        "$receipt.commit -ne $sourceCommit",
-        "TotalHours -gt 72",
-        "approve-sc220-public-release.ps1",
+    "local release builds audits and packages before public handoff",
+    all(token in local_release for token in (
+        "run-sc220-local-qa.ps1",
+        "package-sc220-installer.ps1",
+        "publish-sc220-download.ps1",
+        "QA/build/package: local Windows workstation",
+        "binary-only draft -> public sc220-download workflow",
     )),
 )
 check(
@@ -139,51 +134,34 @@ check(
     )),
 )
 check(
-    "manual portable release candidate builds full private authority package",
-    all(token in portable_workflow for token in (
-        "workflow_dispatch",
-        "ASKP_REPO_TOKEN",
-        "repository: masarray/askp-vst",
-        "5757119cab7a1a75f09dcf0edea6e3be97975439",
-        "package-sc220-windows.ps1",
-        "actions/upload-artifact@v4",
+    "binary handoff uploads the exact audited public asset set as a draft",
+    all(token in handoff for token in (
+        "$installerName",
+        "$checksumName",
+        "$manifestName",
         "BUILD_COMMIT.txt",
+        "VC_REDIST_X64_SHA256.txt",
+        "VB_CABLE_PACK45_SHA256.txt",
+        "--draft",
     )),
 )
 check(
-    "manual installer workflow pins private ASK-P and official VB-CABLE authority",
-    all(token in installer_workflow for token in (
-        "workflow_dispatch",
-        "ASKP_REPO_TOKEN",
-        "vars.VBCABLE_PACK45_SHA256",
-        "repository: masarray/askp-vst",
-        "5757119cab7a1a75f09dcf0edea6e3be97975439",
-        "package-sc220-installer.ps1",
-        "actions/upload-artifact@v4",
-    )),
-)
-check(
-    "public release builds and publishes installer checksum manifest and portable",
-    all(token in release for token in (
-        "package-sc220-installer.ps1",
-        "VBCABLE_PACK45_SHA256",
-        "$installerPackage.Installer",
-        "$installerPackage.HashFile",
-        "$installerPackage.Manifest",
-        "$portablePackage.Zip",
-        "$portablePackage.HashFile",
-        "VB-CABLE Pack45 SHA-256",
-    )),
+    "only the public repository workflow can publish the draft",
+    "publish-draft-release.yml" in handoff
+    and "--repo $TargetRepository" in handoff
+    and "Invoke-Gh run watch" in handoff
+    and "release edit" not in handoff
+    and "git push" not in handoff,
 )
 check(
     "release gate requires installer physical listening presentation and screenshot checks",
     all(token in gate for token in (
-        "Full `SC220 Live.exe` clean Release build",
+        "Windows x64 Release executable",
         "Mandatory Quick Stream listening test",
         "Installer qualification",
-        "Ten-minute playback",
-        "SC220_LIVE_UX_LOCKED.png",
-        "VBCABLE_PACK45_SHA256",
+        "extended playback",
+        "screenshot and UI copy",
+        "VB-CABLE Pack45 SHA-256",
     )),
 )
 check(

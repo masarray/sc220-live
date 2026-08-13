@@ -326,6 +326,9 @@ juce_add_binary_data(SC220LiveAssets
         assets/ui/sc220_mkii_device.png
         assets/ui/favicon-96x96.png
         assets/ui/favicon-512x512.png
+        assets/fonts/inter_regular.ttf
+        assets/fonts/inter_medium.ttf
+        assets/fonts/inter_semibold.ttf
         assets/fonts/plus_jakarta_sans_regular.ttf
         assets/fonts/plus_jakarta_sans_semibold.ttf
         assets/icons/activity.svg

@@ -104,8 +104,8 @@ check(
         "selectPcAudioEndpoint",
         "isUnsafeVirtualEndpoint (endpoint.name)",
         "endpointWouldConflict",
-        "The Stream output cannot be the same endpoint captured by PC Audio",
-        "PC Audio capture was blocked",
+        "selected source overlaps Stream Output",
+        "pcAudioLoopBlocked.store (true)",
     )),
 )
 check(
@@ -115,7 +115,7 @@ check(
         'pcSourceBox.setTextWhenNothingSelected ("SELECT PC AUDIO")',
         "audioEngine.selectPcAudioEndpoint",
         '"Unsafe PC Audio routing"',
-        '"PLAYBACK CAPTURE ACTIVE"',
+        '"CAPTURE ACTIVE"',
         '"ROUTING BLOCKED"',
     )),
 )

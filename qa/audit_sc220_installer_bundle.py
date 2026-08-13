@@ -307,10 +307,11 @@ check(
 )
 
 check(
-    "release workflow still validates and builds the installer contract",
+    "archived installer workflow retains its contract while remaining inert",
     all(
         token in workflow
         for token in (
+            "on: []",
             "audit_sc220_installer_bundle.py",
             "package-sc220-installer.ps1",
             "innosetup --version=6.7.1",
@@ -322,11 +323,11 @@ check(
 )
 
 check(
-    "Pack45 inspection workflow still reviews hash signatures and extra cable material",
+    "archived Pack45 inspection remains inert but preserves review logic",
     all(
         token in inspect
         for token in (
-            "workflow_dispatch",
+            "on: []",
             "VBCABLE_Driver_Pack45.zip",
             "Get-FileHash -LiteralPath $zip -Algorithm SHA256",
             "Get-AuthenticodeSignature -LiteralPath $setup.FullName",

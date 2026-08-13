@@ -1,11 +1,7 @@
 name: Inspect VB-CABLE Pack45
 
-on:
-  workflow_dispatch:
-  push:
-    branches: [main]
-    paths:
-      - .github/workflows/inspect-vbcable-pack45.yml
+# Intentionally disabled in the private repository. Run the inspection locally.
+on: []
 
 permissions:
   contents: read

@@ -74,9 +74,11 @@ check(
     )),
 )
 check(
-    "compact pass remains the final generated UI authority",
+    "compact pass precedes the final premium alignment authority",
     "SC220P7CompactPleasant.cmake" in state
-    and state.rfind("SC220P7CompactPleasant.cmake") > state.rfind("SC220P6CStatusChips.cmake"),
+    and "SC220P8PremiumAlignment.cmake" in state
+    and state.rfind("SC220P8PremiumAlignment.cmake")
+        > state.rfind("SC220P7CompactPleasant.cmake"),
 )
 check(
     "compact layout specifies smaller default and safe resize limits",
@@ -92,7 +94,7 @@ check(
     generated_ui_path.exists() and generated_app_path.exists()
     and all(token in generated_ui + generated_app for token in (
         "centreWithSize (1280, 720)", "setResizeLimits (1080, 680, 1760, 1080)",
-        "headerArea = area.removeFromTop (58)", "masterColumnGap = 12",
+        "headerArea = area.removeFromTop (58)", "masterColumnGap = 14",
         "spectrumDisplay->getBottom() + 42", "sharedFaderWidth = 60",
     )),
 )

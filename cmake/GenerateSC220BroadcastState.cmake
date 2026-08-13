@@ -158,3 +158,7 @@ include("${CMAKE_CURRENT_LIST_DIR}/SC220P6CStatusChips.cmake")
 # P7 reduces default footprint and visual weight without removing any operator
 # control. It runs last so the compact grid describes the exact final surface.
 include("${CMAKE_CURRENT_LIST_DIR}/SC220P7CompactPleasant.cmake")
+
+# P8 is presentation-only and runs last: embedded typography, quiet copy, and
+# collision-free top rows for Input, Loudness, Stream, and Monitor.
+include("${CMAKE_CURRENT_LIST_DIR}/SC220P8PremiumAlignment.cmake")

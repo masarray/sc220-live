@@ -1,35 +1,9 @@
 name: SC220 Live local build and public release
 
-on:
-  workflow_dispatch:
-    inputs:
-      version:
-        description: Semantic version without v
-        required: true
-        type: string
-      source_ref:
-        description: SC220 Live branch, tag, or commit to build
-        required: true
-        default: main
-        type: string
-      clean:
-        description: Remove the previous build tree before compiling
-        required: true
-        default: true
-        type: boolean
-      release_channel:
-        description: Public release channel
-        required: true
-        default: stable
-        type: choice
-        options:
-          - stable
-          - prerelease
-      release_notes:
-        description: One-line release highlight
-        required: false
-        default: ''
-        type: string
+# Archived implementation only. Never dispatch this workflow: private source
+# builds and QA run directly on the Windows workstation, while publication is
+# performed by the public sc220-download draft workflow.
+on: []
 
 permissions:
   contents: read

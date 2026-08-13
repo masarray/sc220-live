@@ -34,12 +34,43 @@ juce::Image loadImage (const char* resourceName)
     return {};
 }
 
+juce::Typeface::Ptr embeddedInterRegular()
+{
+    static const auto face = juce::Typeface::createSystemTypefaceFor (
+        BinaryData::inter_regular_ttf, BinaryData::inter_regular_ttfSize);
+    return face;
+}
+
+juce::Typeface::Ptr embeddedInterMedium()
+{
+    static const auto face = juce::Typeface::createSystemTypefaceFor (
+        BinaryData::inter_medium_ttf, BinaryData::inter_medium_ttfSize);
+    return face;
+}
+
+juce::Typeface::Ptr embeddedInterSemibold()
+{
+    static const auto face = juce::Typeface::createSystemTypefaceFor (
+        BinaryData::inter_semibold_ttf, BinaryData::inter_semibold_ttfSize);
+    return face;
+}
+
 juce::Font interFont (float size, bool semibold = false)
 {
-    juce::Font font { juce::FontOptions { size } };
-    font.setTypefaceName ("Segoe UI Variable");
-    font.setBold (semibold);
-    return font;
+    const auto face = semibold ? embeddedInterSemibold() : embeddedInterRegular();
+    if (face != nullptr)
+        return juce::Font { juce::FontOptions { face }.withHeight (size) };
+
+    auto fallback = juce::Font { juce::FontOptions { size } };
+    return semibold ? fallback.boldened() : fallback;
+}
+
+juce::Font interMediumFont (float size)
+{
+    const auto face = embeddedInterMedium();
+    return face != nullptr
+        ? juce::Font { juce::FontOptions { face }.withHeight (size) }
+        : interFont (size);
 }
 
 float normaliseDb (float db, float floor = -84.0f) noexcept
@@ -76,6 +107,9 @@ class SC220MainComponent::SurfaceLookAndFeel final : public juce::LookAndFeel_V4
 public:
     SurfaceLookAndFeel()
     {
+        if (const auto face = embeddedInterRegular())
+            setDefaultSansSerifTypeface (face);
+
         setColour (juce::ComboBox::backgroundColourId, palette::surface);
         setColour (juce::ComboBox::textColourId, palette::ink);
         setColour (juce::ComboBox::outlineColourId, palette::border);
@@ -96,7 +130,7 @@ public:
 
     juce::Font getComboBoxFont (juce::ComboBox& box) override
     {
-        return interFont (juce::jlimit (10.0f, 13.0f, box.getHeight() * 0.34f));
+        return interMediumFont (juce::jlimit (10.0f, 13.0f, box.getHeight() * 0.34f));
     }
 
     juce::Font getPopupMenuFont() override
@@ -107,6 +141,16 @@ public:
     juce::Font getLabelFont (juce::Label&) override
     {
         return interFont (12.0f);
+    }
+
+    juce::Typeface::Ptr getTypefaceForFont (const juce::Font& font) override
+    {
+        if (font.isBold())
+            if (const auto face = embeddedInterSemibold())
+                return face;
+        if (const auto face = embeddedInterRegular())
+            return face;
+        return juce::LookAndFeel_V4::getTypefaceForFont (font);
     }
 
     void drawButtonBackground (juce::Graphics& g, juce::Button& button,

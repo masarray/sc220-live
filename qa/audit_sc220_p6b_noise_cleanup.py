@@ -3,6 +3,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 P6B = (ROOT / "cmake" / "SC220P6BNoiseCleanup.cmake").read_text(encoding="utf-8")
 PIPELINE = (ROOT / "cmake" / "GenerateSC220BroadcastState.cmake").read_text(encoding="utf-8")
+GENERATED_PATH = ROOT / "build-sc220/generated/sc220-monitor/LiveAudioEngine_Monitor.cpp"
+GENERATED = GENERATED_PATH.read_text(encoding="utf-8") if GENERATED_PATH.exists() else ""
 
 
 def require(text: str, needle: str, label: str) -> None:
@@ -31,14 +33,17 @@ for needle, label in [
 
 # No continuous FFT or adaptive profile learning is allowed in P6B.
 for forbidden in [
-    "noiseClean.process (voiceBlock)",
     "startLearning",
     "profileAccumulator",
     "updateNoiseProfile",
     "FixedFft",
 ]:
-    if forbidden in P6B:
+    if forbidden in GENERATED:
         raise AssertionError(f"P6B introduced forbidden adaptive/FFT runtime path: {forbidden}")
+
+if (GENERATED.count("noiseClean.process (voiceBlock);") != 1
+        or "if (noiseClean.shouldCaptureProfile())\n        noiseClean.process (voiceBlock);" not in GENERATED):
+    raise AssertionError("Final engine must call the FFT profiler only during explicit Learn capture")
 
 # MUTE must remain one component silhouette; no drawing outside button bounds.
 for needle, label in [

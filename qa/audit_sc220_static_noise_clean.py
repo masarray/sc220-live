@@ -6,6 +6,8 @@ FINAL = (ROOT / "cmake" / "FinalizeSC220NaturalLivePath.cmake").read_text(encodi
 CHAIN = (ROOT / "cmake" / "GenerateSC220BroadcastState.cmake").read_text(encoding="utf-8")
 NOISE_H = (ROOT / "live" / "MusicalNoiseClean.h").read_text(encoding="utf-8")
 NOISE_CPP = (ROOT / "live" / "MusicalNoiseClean.cpp").read_text(encoding="utf-8")
+GENERATED_PATH = ROOT / "build-sc220/generated/sc220-monitor/LiveAudioEngine_Monitor.cpp"
+GENERATED = GENERATED_PATH.read_text(encoding="utf-8") if GENERATED_PATH.exists() else ""
 
 checks: list[tuple[str, bool]] = []
 
@@ -28,9 +30,9 @@ check(
 )
 check(
     "frozen learned floor is mandatory before expander processing",
-    "noiseClean.hasProfile() && noiseClean.isEnabled() && expander.isEnabled()" in FINAL
-    and "noiseClean.getEstimatedNoiseFloorDb()" in FINAL
-    and ": -72.0f" not in FINAL,
+    "noiseClean.hasProfile() && noiseClean.isEnabled() && expander.isEnabled()" in GENERATED
+    and "noiseClean.getEstimatedNoiseFloorDb()" in GENERATED
+    and ": -72.0f" not in GENERATED,
 )
 check(
     "Noise Clean OFF is true runtime bypass",
@@ -44,10 +46,10 @@ check(
 )
 check(
     "voice enhancer remains before linked expander",
-    "voiceEnhancerBridge.process (voiceBlock, voiceMidi);" in INTEGRATION
-    and "expander.process (voiceBlock, detectorBlock);" in INTEGRATION
-    and INTEGRATION.index("voiceEnhancerBridge.process (voiceBlock, voiceMidi);")
-        < INTEGRATION.index("expander.process (voiceBlock, detectorBlock);"),
+    "voiceEnhancerBridge.process (voiceBlock, voiceMidi);" in GENERATED
+    and "expander.process (voiceBlock, detectorBlock);" in GENERATED
+    and GENERATED.index("voiceEnhancerBridge.process (voiceBlock, voiceMidi);")
+        < GENERATED.index("expander.process (voiceBlock, detectorBlock);"),
 )
 check(
     "final natural policy runs after original Sonkupik integration",

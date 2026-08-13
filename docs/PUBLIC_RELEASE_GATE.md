@@ -90,10 +90,10 @@ Before a new public tag:
 
 Do not call a release complete until the public tag/assets can be read back and the public metadata/landing pages are synchronized.
 
-For the normal local launcher:
+For the normal local release and public handoff:
 
 ```powershell
 .\RELEASE-SC220.cmd
 ```
 
-The launcher should bring the release-only runner online only for the release session, avoid duplicate dispatches, and return the runner offline after completion/failure.
+The launcher runs the clean Windows build, source audits, compiled tests, and installer packaging locally. It then uploads only the allowlisted binary assets to an unpublished draft in `masarray/sc220-download`; that public repository's `publish-draft-release.yml` workflow performs the independent payload/source-marker gates and is the only authority that publishes the release. Private-repository GitHub Actions must remain disabled.

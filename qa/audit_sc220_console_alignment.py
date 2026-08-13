@@ -58,7 +58,7 @@ check(
 check(
     "Stream and Monitor selectors remain separated",
     all(token in generated_ui for token in (
-        "masterColumnGap = 12", "outputBox.setBounds", "monitorOutputBox.setBounds",
+        "masterColumnGap = 14", "outputBox.setBounds", "monitorOutputBox.setBounds",
         "programMonitorButton.setBounds", "musicCueButton.setBounds",
     )),
 )

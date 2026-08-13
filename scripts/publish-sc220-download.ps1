@@ -52,34 +52,12 @@ function Get-GhJson {
     return $text | ConvertFrom-Json
 }
 
-function Set-RepositoryTextFile {
-    param(
-        [Parameter(Mandatory = $true)][string]$Path,
-        [Parameter(Mandatory = $true)][string]$Content,
-        [Parameter(Mandatory = $true)][string]$CommitMessage
-    )
-
-    $existing = Get-GhJson api "repos/$TargetRepository/contents/$Path`?ref=main"
-    $bytes = [Text.Encoding]::UTF8.GetBytes($Content)
-    $payload = [ordered]@{
-        message = $CommitMessage
-        content = [Convert]::ToBase64String($bytes)
-        branch = 'main'
-    }
-    if ($existing -and $existing.sha) { $payload.sha = [string]$existing.sha }
-
-    $json = $payload | ConvertTo-Json -Depth 4 -Compress
-    $json | & gh.exe api --method PUT "repos/$TargetRepository/contents/$Path" --input - *> $null
-    if ($LASTEXITCODE -ne 0) {
-        throw "Unable to update $TargetRepository/$Path"
-    }
-}
-
 if (-not (Get-Command gh.exe -ErrorAction SilentlyContinue)) {
-    throw 'GitHub CLI is required on the local runner.'
+    throw 'GitHub CLI is required for the public draft handoff.'
 }
-if ([string]::IsNullOrWhiteSpace($env:GH_TOKEN)) {
-    throw 'GH_TOKEN is required and must be scoped to masarray/sc220-download Contents: write.'
+& gh.exe auth status *> $null
+if ($LASTEXITCODE -ne 0) {
+    throw 'GitHub CLI must be authenticated with write access to masarray/sc220-download.'
 }
 
 $tag = "v$Version"
@@ -165,7 +143,7 @@ $highlight
 - VB-CABLE Pack45 SHA-256: `$($vbHash.ToLowerInvariant())`
 - Platform: Windows 10/11 x64
 
-The installer was built on the repository-only SC220 self-hosted Windows runner, audited, smoke-installed without driver changes, and smoke-uninstalled before publication.
+The installer was built and audited directly on the approved local Windows workstation. The public sc220-download workflow independently inspects the binary-only draft before publication.
 
 Windows SmartScreen may still show an unknown-publisher warning until a dedicated application code-signing certificate is deployed.
 "@
@@ -191,8 +169,8 @@ if ($existingRelease) {
     $digestMatches = $installerAsset -and
         $installerAsset.digest -eq "sha256:$installerHash"
 
-    if ($missing.Count -eq 0 -and $digestMatches -and -not $ReplaceExisting) {
-        Write-Host "Existing verified release $tag will be reused." -ForegroundColor Yellow
+    if ($missing.Count -eq 0 -and $digestMatches -and $existingRelease.isDraft -and -not $ReplaceExisting) {
+        Write-Host "Existing verified draft $tag will be reused." -ForegroundColor Yellow
     }
     elseif ($ReplaceExisting) {
         Write-Host "Deleting existing release $tag before replacement..." -ForegroundColor Yellow
@@ -200,7 +178,7 @@ if ($existingRelease) {
         $existingRelease = $null
     }
     else {
-        throw "Release $tag already exists but is incomplete or has a different installer digest. Use an unused version or explicit replacement."
+        throw "Release $tag already exists, is published, incomplete, or has a different installer digest. Use an unused version or explicit replacement."
     }
 }
 
@@ -210,50 +188,58 @@ if (-not $existingRelease) {
         '--repo', $TargetRepository,
         '--target', 'main',
         '--title', "SC220 Live $tag",
-        '--notes-file', $notesPath
+        '--notes-file', $notesPath,
+        '--draft'
     )
     if ($Channel -eq 'prerelease') { $arguments += '--prerelease' }
     $arguments += $assets
     Invoke-Gh @arguments
 }
 
-$published = Get-GhJson release view $tag --repo $TargetRepository --json 'url,assets,isDraft,isPrerelease,tagName,publishedAt'
-if (-not $published -or $published.isDraft) {
-    throw "Release $tag was not published successfully."
+$draft = Get-GhJson release view $tag --repo $TargetRepository --json 'url,assets,isDraft,isPrerelease,tagName,publishedAt'
+if (-not $draft -or -not $draft.isDraft -or $draft.publishedAt) {
+    throw "Binary handoff $tag is not an unpublished draft."
 }
-$publishedNames = @($published.assets | ForEach-Object { $_.name })
-$missingAfterPublish = @($requiredAssetNames | Where-Object { $publishedNames -notcontains $_ })
-if ($missingAfterPublish.Count -gt 0) {
-    throw "Published release is missing assets: $($missingAfterPublish -join ', ')"
+$draftNames = @($draft.assets | ForEach-Object { $_.name })
+$missingAfterUpload = @($requiredAssetNames | Where-Object { $draftNames -notcontains $_ })
+if ($missingAfterUpload.Count -gt 0) {
+    throw "Draft release is missing assets: $($missingAfterUpload -join ', ')"
 }
 
-$releaseBase = "https://github.com/$TargetRepository/releases/download/$tag"
-$latest = [ordered]@{
-    product = 'SC220 Live'
-    version = $Version
-    published = [DateTime]::UtcNow.ToString('yyyy-MM-dd')
-    platform = 'windows-x64'
-    status = $Channel
-    download = "$releaseBase/$installerName"
-    sha256 = $installerHash
-    checksum = "$releaseBase/$checksumName"
-    manifest = "$releaseBase/$manifestName"
-    source_commit = $SourceCommit
-    smart_installer = $true
-    vc_runtime_bundled = $true
-    vb_cable_optional = $true
-}
-$latestText = ($latest | ConvertTo-Json -Depth 5) + "`n"
-Set-RepositoryTextFile `
-    -Path 'latest.json' `
-    -Content $latestText `
-    -CommitMessage "release: point website to SC220 Live $tag"
-Set-RepositoryTextFile `
-    -Path "RELEASE_NOTES_v$Version.md" `
-    -Content ($releaseBody + "`n") `
-    -CommitMessage "docs: publish SC220 Live $tag release notes"
+$dispatchStarted = [DateTime]::UtcNow.AddMinutes(-1)
+Invoke-Gh workflow run 'publish-draft-release.yml' `
+    --repo $TargetRepository `
+    -f "version=$Version"
 
-Write-Host "`nSC220 DOWNLOAD RELEASE OK" -ForegroundColor Green
-Write-Host "Release : $($published.url)"
-Write-Host "SHA-256: $installerHash"
-Write-Host "Website : latest.json updated on $TargetRepository/main"
+$publicRun = $null
+for ($attempt = 0; $attempt -lt 20 -and -not $publicRun; $attempt++) {
+    Start-Sleep -Seconds 1
+    $runs = Get-GhJson run list `
+        --repo $TargetRepository `
+        --workflow 'publish-draft-release.yml' `
+        --event workflow_dispatch `
+        --limit 10 `
+        --json 'databaseId,status,conclusion,url,createdAt'
+    $publicRun = @($runs | Where-Object {
+        [DateTime]$_.createdAt -ge $dispatchStarted
+    } | Sort-Object { [long]$_.databaseId } -Descending) | Select-Object -First 1
+}
+if (-not $publicRun) {
+    throw 'Public publish-draft-release workflow was dispatched but no run ID appeared.'
+}
+
+Invoke-Gh run watch ([string]$publicRun.databaseId) `
+    --repo $TargetRepository `
+    --exit-status
+
+$published = Get-GhJson release view $tag --repo $TargetRepository --json 'url,assets,isDraft,tagName,publishedAt'
+$latest = Get-GhJson api "repos/$TargetRepository/releases/latest"
+if (-not $published -or $published.isDraft -or -not $published.publishedAt -or
+    -not $latest -or [string]$latest.tag_name -ne $tag) {
+    throw "Public workflow completed without publishing and promoting $tag."
+}
+
+Write-Host "`nSC220 PUBLIC DRAFT HANDOFF OK" -ForegroundColor Green
+Write-Host "Public CI : $($publicRun.url)"
+Write-Host "Release   : $($published.url)"
+Write-Host "SHA-256  : $installerHash"

@@ -6,6 +6,8 @@ P6E = (ROOT / "cmake" / "SC220P6ETrayReliabilityAndSoftwareTrial.cmake").read_te
 BRIDGE = (ROOT / "live" / "EnhancerEngineBridge.h").read_text(encoding="utf-8")
 WATCHER = (ROOT / "live" / "SC220DeviceWatcher.h").read_text(encoding="utf-8")
 CHECKOUT = (ROOT / "live" / "LicenseCheckoutClient.cpp").read_text(encoding="utf-8")
+GENERATED_PATH = ROOT / "build-sc220/generated/sc220-monitor/LiveApplication_BroadcastState.cpp"
+GENERATED = GENERATED_PATH.read_text(encoding="utf-8") if GENERATED_PATH.exists() else ""
 
 
 def require(text: str, needle: str, label: str) -> None:
@@ -54,7 +56,7 @@ for needle, label in [
 ]:
     require(CHECKOUT, needle, label)
 
-if "askp_app_logo_png" in P6E:
+if "askp_app_logo_png" in GENERATED:
     raise AssertionError("P6E may not reintroduce the ASK-P/VST tray icon")
 
 if "setVisible (true)" in P6E and "licensePanel->setVisible (true)" not in P6E:

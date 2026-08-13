@@ -1,13 +1,7 @@
 name: SC220 Live release candidate
 
-on:
-  workflow_dispatch:
-    inputs:
-      version:
-        description: Semantic version to package
-        required: true
-        default: 0.1.0
-        type: string
+# Intentionally disabled in the private repository. Use local QA and packaging.
+on: []
 
 permissions:
   contents: read

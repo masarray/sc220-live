@@ -8,21 +8,25 @@
 
 namespace askp::live {
 namespace palette {
-const auto ivory = juce::Colour (0xfff4f1ea);
-const auto surface = juce::Colour (0xfffbfaf7);
-const auto surfaceAlt = juce::Colour (0xfff0ede6);
-const auto ink = juce::Colour (0xff121416);
-const auto graphite = juce::Colour (0xff2a2d2f);
-const auto muted = juce::Colour (0xff737672);
-const auto border = juce::Colour (0xffcbc6bb);
-const auto borderSoft = juce::Colour (0xffded9cf);
-const auto orange = juce::Colour (0xffdf6d14);
-const auto green = juce::Colour (0xff23834a);
-const auto amber = juce::Colour (0xffd99a22);
-const auto red = juce::Colour (0xffc94332);
-const auto metalHi = juce::Colour (0xfff5f4ef);
-const auto metalMid = juce::Colour (0xffb9bbb8);
-const auto metalLo = juce::Colour (0xff717572);
+const auto ivory = juce::Colour (0xff10151a);
+const auto surface = juce::Colour (0xff151b21);
+const auto surfaceAlt = juce::Colour (0xff1d252d);
+const auto header = juce::Colour (0xff090d11);
+const auto screen = juce::Colour (0xff080d11);
+const auto ink = juce::Colour (0xffedf3f6);
+const auto graphite = juce::Colour (0xffc1cbd1);
+const auto muted = juce::Colour (0xff84919a);
+const auto border = juce::Colour (0xff36434d);
+const auto borderSoft = juce::Colour (0xff27323a);
+const auto cyan = juce::Colour (0xff35c4d8);
+const auto cyanDeep = juce::Colour (0xff176d7c);
+const auto orange = juce::Colour (0xffe8792f);
+const auto green = juce::Colour (0xff3ac985);
+const auto amber = juce::Colour (0xffe4b34b);
+const auto red = juce::Colour (0xffe05b55);
+const auto metalHi = juce::Colour (0xffd5dce0);
+const auto metalMid = juce::Colour (0xff77838b);
+const auto metalLo = juce::Colour (0xff303a42);
 }
 
 namespace {
@@ -111,11 +115,11 @@ public:
             setDefaultSansSerifTypeface (face);
 
         setColour (juce::ComboBox::backgroundColourId, palette::surface);
-        setColour (juce::ComboBox::textColourId, palette::ink);
+        setColour (juce::ComboBox::textColourId, palette::cyan);
         setColour (juce::ComboBox::outlineColourId, palette::border);
         setColour (juce::PopupMenu::backgroundColourId, palette::surface);
         setColour (juce::PopupMenu::textColourId, palette::ink);
-        setColour (juce::PopupMenu::highlightedBackgroundColourId, palette::ink);
+        setColour (juce::PopupMenu::highlightedBackgroundColourId, palette::cyanDeep);
         setColour (juce::PopupMenu::highlightedTextColourId, juce::Colours::white);
         setColour (juce::Slider::textBoxTextColourId, palette::ink);
         setColour (juce::Slider::textBoxOutlineColourId, juce::Colours::transparentBlack);
@@ -158,7 +162,7 @@ public:
     {
         const auto area = button.getLocalBounds().toFloat().reduced (0.7f);
         const bool liveButton = button.getButtonText() == "GO LIVE" || button.getButtonText() == "LIVE";
-        auto fill = button.getToggleState() ? palette::ink : palette::surface;
+        auto fill = button.getToggleState() ? palette::cyanDeep : palette::surfaceAlt;
         if (liveButton)
             fill = button.getToggleState() ? palette::green : palette::orange;
         if (highlighted)
@@ -166,7 +170,7 @@ public:
         if (down)
             fill = fill.darker (0.12f);
 
-        g.setColour (juce::Colours::black.withAlpha (0.10f));
+        g.setColour (juce::Colours::black.withAlpha (0.38f));
         g.fillRoundedRectangle (area.translated (0.0f, 1.5f), 5.0f);
         g.setColour (fill);
         g.fillRoundedRectangle (area, 5.0f);
@@ -194,7 +198,7 @@ public:
                                                    static_cast<float> (height - 1));
         g.setColour (palette::surface);
         g.fillRoundedRectangle (area, 5.0f);
-        g.setColour (box.isMouseOverOrDragging() ? palette::orange.withAlpha (0.70f)
+        g.setColour (box.isMouseOverOrDragging() ? palette::cyan.withAlpha (0.78f)
                                                   : palette::border);
         g.drawRoundedRectangle (area, 5.0f, 1.0f);
 
@@ -296,7 +300,7 @@ public:
         juce::Path arc;
         arc.addCentredArc (centre.x, centre.y, radius + 3.2f, radius + 3.2f, 0.0f,
                            accentStart, endAngle, true);
-        g.setColour (palette::orange.withAlpha (alpha));
+        g.setColour (palette::cyan.withAlpha (alpha));
         g.strokePath (arc, juce::PathStrokeType (2.0f, juce::PathStrokeType::curved,
                                                  juce::PathStrokeType::rounded));
 
@@ -501,7 +505,7 @@ public:
     void paint (juce::Graphics& g) override
     {
         const auto area = getLocalBounds().toFloat().reduced (1.0f);
-        g.setColour (palette::ink);
+        g.setColour (palette::screen);
         g.fillRoundedRectangle (area, 7.0f);
         g.setColour (juce::Colour (0xff3d4040));
         g.drawRoundedRectangle (area, 7.0f, 1.0f);
@@ -999,7 +1003,7 @@ void SC220MainComponent::mouseDoubleClick (const juce::MouseEvent& event)
 
 void SC220MainComponent::paint (juce::Graphics& g)
 {
-    g.fillAll (palette::ivory);
+    g.fillAll (palette::header);
     drawHeader (g);
     drawInputSurface (g);
     drawSignatureSurface (g);
@@ -1009,7 +1013,7 @@ void SC220MainComponent::paint (juce::Graphics& g)
 
 void SC220MainComponent::drawHeader (juce::Graphics& g)
 {
-    g.setColour (palette::ink);
+    g.setColour (palette::header);
     g.fillRect (headerArea);
 
     if (recordingTechLogo.isValid())

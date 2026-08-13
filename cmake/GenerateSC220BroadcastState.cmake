@@ -162,3 +162,7 @@ include("${CMAKE_CURRENT_LIST_DIR}/SC220P7CompactPleasant.cmake")
 # P8 is presentation-only and runs last: embedded typography, quiet copy, and
 # collision-free top rows for Input, Loudness, Stream, and Monitor.
 include("${CMAKE_CURRENT_LIST_DIR}/SC220P8PremiumAlignment.cmake")
+
+# P9 is the final visual authority: one graphite/cyan digital-console chassis
+# across Input, Signature, Stream, Monitor, controls, meters, and readouts.
+include("${CMAKE_CURRENT_LIST_DIR}/SC220P9DigitalConsoleStyle.cmake")

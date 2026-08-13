@@ -42,7 +42,7 @@ sc220_p6c_once(_ui "DSP ON/BYPASS illuminated chip"
                                          float glow)
     {
         const auto bezel = bounds.expanded (2.0f);
-        g.setColour (palette::ink.withAlpha (0.20f));
+        g.setColour (juce::Colours::black.withAlpha (0.62f));
         g.fillRoundedRectangle (bezel, 6.0f);
 
         g.setColour (lampColour.withAlpha (0.10f + 0.08f * glow));

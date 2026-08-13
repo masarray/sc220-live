@@ -89,7 +89,7 @@ sc220_p6a_once(_ui "PC Audio status text vertical alignment"
 sc220_p6a_once(_ui "active MUTE pulse state"
 [=[
         const bool liveButton = button.getButtonText() == "GO LIVE" || button.getButtonText() == "LIVE";
-        auto fill = button.getToggleState() ? palette::ink : palette::surface;
+        auto fill = button.getToggleState() ? palette::cyanDeep : palette::surfaceAlt;
         if (liveButton)
             fill = button.getToggleState() ? palette::green : palette::orange;
 ]=]
@@ -102,7 +102,7 @@ sc220_p6a_once(_ui "active MUTE pulse state"
         const float mutePulse = 0.5f - 0.5f * std::cos (
             juce::MathConstants<float>::twoPi * mutePhase);
 
-        auto fill = button.getToggleState() ? palette::ink : palette::surface;
+        auto fill = button.getToggleState() ? palette::cyanDeep : palette::surfaceAlt;
         if (liveButton)
             fill = button.getToggleState() ? palette::green : palette::orange;
         if (muteActive)

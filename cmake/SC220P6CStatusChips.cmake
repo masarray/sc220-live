@@ -37,20 +37,38 @@ sc220_p6c_once(_ui "DSP ON/BYPASS illuminated chip"
         std::fmod (juce::Time::getMillisecondCounterHiRes(), 1800.0) / 1800.0);
     const float dspGlow = 0.5f - 0.5f * std::cos (
         juce::MathConstants<float>::twoPi * dspPhase);
+    const auto drawIlluminatedPad = [&g] (juce::Rectangle<float> bounds,
+                                         juce::Colour lampColour,
+                                         float glow)
+    {
+        const auto bezel = bounds.expanded (2.0f);
+        g.setColour (palette::ink.withAlpha (0.20f));
+        g.fillRoundedRectangle (bezel, 6.0f);
+
+        g.setColour (lampColour.withAlpha (0.10f + 0.08f * glow));
+        g.fillRoundedRectangle (bounds.expanded (4.0f), 8.0f);
+
+        g.setGradientFill (juce::ColourGradient (
+            lampColour.brighter (0.38f).withAlpha (0.98f),
+            bounds.getCentreX(), bounds.getY() + 1.0f,
+            lampColour.darker (0.24f).withAlpha (0.98f),
+            bounds.getCentreX(), bounds.getBottom(), false));
+        g.fillRoundedRectangle (bounds, 4.5f);
+
+        g.setColour (juce::Colours::white.withAlpha (0.30f + 0.10f * glow));
+        g.drawRoundedRectangle (bounds.reduced (0.75f), 4.0f, 1.0f);
+        g.setColour (juce::Colours::white.withAlpha (0.18f));
+        g.fillRoundedRectangle (bounds.reduced (4.0f, 3.0f).withHeight (3.0f), 1.5f);
+    };
+    const float dspPadHeight = static_cast<float> (enhancerPowerButton.getHeight());
     const auto dspChip = juce::Rectangle<float> (
-        static_cast<float> (enhancerPowerButton.getX() - 112),
-        static_cast<float> (enhancerPowerButton.getBounds().getCentreY() - 10),
-        96.0f, 20.0f);
-    g.setColour (dspChipColour.withAlpha (0.10f + 0.10f * dspGlow));
-    g.fillRoundedRectangle (dspChip.expanded (2.0f), 7.0f);
-    g.setColour (dspChipColour.darker (0.12f)
-                    .interpolatedWith (dspChipColour.brighter (0.18f), 0.30f * dspGlow));
-    g.fillRoundedRectangle (dspChip, 6.0f);
-    g.setColour (juce::Colours::white.withAlpha (0.16f + 0.18f * dspGlow));
-    g.drawRoundedRectangle (dspChip.reduced (0.7f), 5.4f, 1.0f);
+        static_cast<float> (enhancerPowerButton.getX() - 116),
+        static_cast<float> (enhancerPowerButton.getY()),
+        100.0f, dspPadHeight);
+    drawIlluminatedPad (dspChip, dspChipColour, dspGlow);
     g.setColour (juce::Colours::white);
-    g.setFont (interFont (9.0f, true));
-    g.drawFittedText (active ? "DSP ON" : "DSP BYPASS", dspChip.toNearestInt().reduced (8, 2),
+    g.setFont (interFont (9.2f, true));
+    g.drawFittedText (active ? "DSP ON" : "DSP BYPASS", dspChip.toNearestInt().reduced (9, 4),
                       juce::Justification::centred, 1);
 ]=])
 
@@ -70,30 +88,28 @@ sc220_p6c_once(_ui "Smart Protect illuminated chip"
         std::fmod (juce::Time::getMillisecondCounterHiRes() + 310.0, 2200.0) / 2200.0);
     const float protectGlow = 0.5f - 0.5f * std::cos (
         juce::MathConstants<float>::twoPi * protectPhase);
+    const float protectPadHeight = static_cast<float> (enhancerPowerButton.getHeight());
     const auto protectChip = juce::Rectangle<float> (
         static_cast<float> (signatureArea.getCentreX() - 82),
-        static_cast<float> (signatureArea.getBottom() - 49),
-        164.0f, 22.0f);
-    g.setColour (palette::green.withAlpha (0.08f + 0.10f * protectGlow));
-    g.fillRoundedRectangle (protectChip.expanded (2.0f), 7.0f);
-    g.setColour (palette::green.darker (0.10f)
-                    .interpolatedWith (palette::green.brighter (0.16f), 0.24f * protectGlow));
-    g.fillRoundedRectangle (protectChip, 6.0f);
-    g.setColour (juce::Colours::white.withAlpha (0.14f + 0.16f * protectGlow));
-    g.drawRoundedRectangle (protectChip.reduced (0.7f), 5.4f, 1.0f);
+        static_cast<float> (signatureArea.getBottom() - 54),
+        164.0f, protectPadHeight);
+    drawIlluminatedPad (protectChip, palette::green, protectGlow);
     g.setColour (juce::Colours::white);
-    g.setFont (interFont (9.2f, true));
-    g.drawFittedText ("SMART PROTECT   ON", protectChip.toNearestInt().reduced (10, 2),
+    g.setFont (interFont (9.4f, true));
+    g.drawFittedText ("SMART PROTECT   ON", protectChip.toNearestInt().reduced (12, 4),
                       juce::Justification::centred, 1);
 ]=])
 
 foreach(_required IN ITEMS
         "const auto dspChipColour = active ? palette::green : palette::amber"
+        "const auto drawIlluminatedPad"
+        "dspPadHeight = static_cast<float> (enhancerPowerButton.getHeight())"
         "active ? \"DSP ON\" : \"DSP BYPASS\""
-        "g.fillRoundedRectangle (dspChip"
+        "drawIlluminatedPad (dspChip"
         "const auto protectChip = juce::Rectangle<float>"
+        "protectPadHeight = static_cast<float> (enhancerPowerButton.getHeight())"
         "SMART PROTECT   ON"
-        "g.fillRoundedRectangle (protectChip")
+        "drawIlluminatedPad (protectChip")
     string(FIND "${_ui}" "${_required}" _position)
     if(_position EQUAL -1)
         message(FATAL_ERROR "SC220 P6C required status-chip authority missing: ${_required}")

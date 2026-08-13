@@ -31,12 +31,15 @@ for forbidden in [
 
 for needle, label in [
     ("const auto dspChipColour = active ? palette::green : palette::amber", "state-driven DSP colour"),
+    ("const auto drawIlluminatedPad", "shared hardware pad lens renderer"),
+    ("dspPadHeight = static_cast<float> (enhancerPowerButton.getHeight())", "DSP pad matches power height"),
     ("active ? \"DSP ON\" : \"DSP BYPASS\"", "explicit DSP state copy"),
-    ("g.fillRoundedRectangle (dspChip", "DSP rounded chip"),
-    ("dspChip.expanded (2.0f)", "subtle DSP glow"),
+    ("drawIlluminatedPad (dspChip", "DSP illuminated pad face"),
     ("const auto protectChip = juce::Rectangle<float>", "Smart Protect chip geometry"),
+    ("protectPadHeight = static_cast<float> (enhancerPowerButton.getHeight())", "Smart Protect pad matches power height"),
     ("SMART PROTECT   ON", "Smart Protect status copy"),
-    ("g.fillRoundedRectangle (protectChip", "Smart Protect rounded chip"),
+    ("drawIlluminatedPad (protectChip", "Smart Protect illuminated pad face"),
+    ("lampColour.brighter (0.38f)", "lit pad lens highlight"),
 ]:
     require(P6C, needle, label)
 

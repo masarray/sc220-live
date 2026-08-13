@@ -6,8 +6,8 @@ iss_path = ROOT / "installer" / "SC220Live.iss"
 probe_path = ROOT / "installer" / "SC220PrerequisiteProbe.ps1"
 notice_path = ROOT / "installer" / "VB_AUDIO_NOTICE.txt"
 package_path = ROOT / "scripts" / "package-sc220-installer.ps1"
-workflow_path = ROOT / ".github" / "workflows" / "installer-release-candidate.yml"
-inspect_path = ROOT / ".github" / "workflows" / "inspect-vbcable-pack45.yml"
+local_qa_path = ROOT / "scripts" / "run-sc220-local-qa.ps1"
+local_release_path = ROOT / "scripts" / "start-sc220-local-release.ps1"
 vc_lock_path = ROOT / "VC_REDIST_AUTHORITY.lock"
 vb_lock_path = ROOT / "VB_CABLE_AUTHORITY.lock"
 
@@ -16,8 +16,8 @@ required_paths = (
     probe_path,
     notice_path,
     package_path,
-    workflow_path,
-    inspect_path,
+    local_qa_path,
+    local_release_path,
     vc_lock_path,
     vb_lock_path,
 )
@@ -26,8 +26,8 @@ iss = iss_path.read_text(encoding="utf-8")
 probe = probe_path.read_text(encoding="utf-8")
 notice = notice_path.read_text(encoding="utf-8")
 package = package_path.read_text(encoding="utf-8")
-workflow = workflow_path.read_text(encoding="utf-8")
-inspect = inspect_path.read_text(encoding="utf-8")
+local_qa = local_qa_path.read_text(encoding="utf-8")
+local_release = local_release_path.read_text(encoding="utf-8")
 vc_lock = vc_lock_path.read_text(encoding="utf-8")
 vb_lock = vb_lock_path.read_text(encoding="utf-8")
 
@@ -307,32 +307,28 @@ check(
 )
 
 check(
-    "archived installer workflow retains its contract while remaining inert",
+    "local release validates and packages the installer contract",
     all(
-        token in workflow
+        token in local_qa + local_release
         for token in (
-            "on: []",
             "audit_sc220_installer_bundle.py",
             "package-sc220-installer.ps1",
-            "innosetup --version=6.7.1",
-            "actions/upload-artifact@v4",
-            "Setup-win-x64.exe",
-            "Setup-win-x64.manifest.json",
+            "run-sc220-local-qa.ps1",
+            "Configuration Release",
         )
     ),
 )
 
 check(
-    "archived Pack45 inspection remains inert but preserves review logic",
+    "local packager reviews Pack45 hash signatures and extra cable material",
     all(
-        token in inspect
+        token in package
         for token in (
-            "on: []",
             "VBCABLE_Driver_Pack45.zip",
-            "Get-FileHash -LiteralPath $zip -Algorithm SHA256",
-            "Get-AuthenticodeSignature -LiteralPath $setup.FullName",
-            "Invalid catalogue signature",
-            "A/B/C/D material",
+            "Get-FileHash -LiteralPath $downloadedVBCableZip -Algorithm SHA256",
+            "Get-AuthenticodeSignature -LiteralPath $vbSetup.FullName",
+            "catalogue signature is invalid",
+            "standard bundle unexpectedly contains A/B/C/D cable material",
         )
     ),
 )

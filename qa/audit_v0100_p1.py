@@ -15,7 +15,7 @@ theme = (ROOT / 'live/LiveTheme.cpp').read_text(encoding='utf-8')
 gitignore = (ROOT / '.gitignore').read_text(encoding='utf-8')
 bat = (ROOT / 'build-live-windows.bat').read_text(encoding='utf-8')
 package = (ROOT / 'scripts/package-live-windows.ps1').read_text(encoding='utf-8')
-workflow = (ROOT / '.github/workflows/source-audit.yml').read_text(encoding='utf-8')
+local_qa = (ROOT / 'scripts/run-sc220-local-qa.ps1').read_text(encoding='utf-8')
 live_target = cmake.split('target_sources(SonkupikLive PRIVATE', 1)[1].split('target_include_directories(SonkupikLive', 1)[0]
 
 check('CMake version 0.10.0', 'VERSION 0.10.0' in cmake)
@@ -25,7 +25,7 @@ check('BAT builds and packages Release', 'package-live-windows.ps1' in bat and '
 check('BAT supports clean rebuild', 'build-live-windows.bat clean' in bat and '-Clean' in bat)
 check('Package script default version updated', "[string]$Version = '0.10.0'" in package)
 check('Package script forwards clean build', '[switch]$Clean' in package and '$buildScriptArgs.Clean = $true' in package)
-check('CI runs current P1 audit', 'python qa/audit_v0100_p1.py' in workflow)
+check('Private repository has no GitHub workflow definitions', not list((ROOT / '.github/workflows').glob('*.yml')))
 check('Live target remains headless', 'ASKP_EDITOR_SOURCE' not in live_target and 'QrisLicensePanel' not in live_target)
 check('Git ignores build trees', '/build-*/' in gitignore and '/dist/' in gitignore)
 check('Git ignores fetched dependencies', '.deps/' in gitignore and 'third_party/JUCE/' in gitignore)

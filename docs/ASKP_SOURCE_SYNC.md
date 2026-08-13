@@ -64,4 +64,4 @@ The final command must print:
 - Live macro glide remains 12 ms, reference glide remains 80 ms;
 - Gain Match source/runtime logic is present for processor parity, but `EnhancerEngineBridge` keeps it disabled by default and the SC220 UI does not expose it.
 
-Future ASK-P upgrades must update together: submodule gitlink, `ASKP_AUTHORITY.lock`, CMake source contract, source-audit workflow, release workflows, bridge metadata/defaults, QA, and port documentation.
+Future ASK-P upgrades must update together: submodule gitlink, `ASKP_AUTHORITY.lock`, CMake source contract, local source/release QA, bridge metadata/defaults, QA, and port documentation. Private-repository GitHub workflows must not be reintroduced.

@@ -22,16 +22,8 @@ gitmodules = read(".gitmodules")
 gitattributes = read(".gitattributes")
 sync_script = read("scripts/sync-askp-v0523.ps1")
 build_script = read("scripts/build-live-windows.ps1")
-workflow = read(".github/workflows/source-audit.yml")
-release_workflow = read(".github/workflows/local-release.yml")
-candidate_workflows = {
-    path: read(path)
-    for path in (
-        ".github/workflows/installer-bundle.yml",
-        ".github/workflows/installer-release-candidate.yml",
-        ".github/workflows/release-candidate.yml",
-    )
-}
+local_qa = read("scripts/run-sc220-local-qa.ps1")
+local_release = read("scripts/start-sc220-local-release.ps1")
 historical_doc = read("docs/ASKP_V0523_ENGINE_PORT.md")
 
 # Latest approved ASK-P v0.5.24 release request names this immutable product
@@ -116,23 +108,13 @@ check("sync verifies both production audit and generator", all(x in sync_script 
 check("one-click Windows build self-syncs approved authority", all(x in build_script for x in [
     "sync-askp-v0523.ps1", "Synchronising approved ASK-P v0.5.24 production authority",
     "ArSonKuPik v0.5.24 (approved production source)"]))
-check("CI checks out approved source commit", source_commit in workflow)
-workflow_audit = workflow.find("Run upstream ASK-P v0.5.24 P0.3 production source audit")
-workflow_generate = workflow.find("Generate approved ASK-P v0.5.24 effective DSP")
-check("CI runs upstream source audit before generator", workflow_audit >= 0 and workflow_generate > workflow_audit)
-check("CI compiles generated effective DSP", "/tmp/arsonkupik_dsp_v0524.cpp" in workflow and "arsonkupik_presets.cpp" in workflow)
-check("public release workflow checks out approved source", source_commit in release_workflow)
-check("public release workflow verifies ASKP_AUTHORITY.lock", "ASKP_AUTHORITY.lock" in release_workflow and "ASK-P checkout mismatch" in release_workflow)
-check("public release reruns ASK-P port audit", "audit_v0150_askp_p03_port.py" in release_workflow)
-check(
-    "Windows release-candidate workflows use approved v0.5.24 source",
-    all(source_commit in workflow for workflow in candidate_workflows.values()),
-)
-check(
-    "Windows release-candidate workflows reject superseded v0.5.23 pin",
-    all("5757119cab7a1a75f09dcf0edea6e3be97975439" not in workflow
-        for workflow in candidate_workflows.values()),
-)
+check("local build synchronises approved source commit", source_commit in sync_script and "sync-askp-v0523.ps1" in build_script)
+check("local source audit runs before generated DSP compilation", cmake_audit_pos >= 0 and cmake_generator_pos > cmake_audit_pos)
+check("local QA compiles the effective DSP through the Release build", "build-live-windows.ps1" in local_qa and "Configuration = 'Release'" in local_qa)
+check("local release verifies ASKP authority through the full QA runner", "run-sc220-local-qa.ps1" in local_release and "audit_v0150_askp_p03_port.py" in local_qa)
+check("public handoff never checks out private ASK-P source", "publish-sc220-download.ps1" in local_release and "repository: masarray/askp-vst" not in local_release)
+check("private repository has no GitHub workflow definitions", not list((ROOT / ".github/workflows").glob("*.yml")))
+check("local release path rejects superseded v0.5.23 pin", "5757119cab7a1a75f09dcf0edea6e3be97975439" not in local_qa + local_release)
 check("historical v0.5.23 document cannot masquerade as current", "Historical record only" in historical_doc and "superseded" in historical_doc.lower())
 
 failed = [name for name, ok in checks if not ok]

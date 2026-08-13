@@ -16,10 +16,7 @@ def check(name: str, condition: bool) -> None:
     checks.append((name, bool(condition)))
 
 
-check("all private workflows are inert", bool(WORKFLOWS) and all(
-    re.search(r"(?m)^on: \[\]$", path.read_text(encoding="utf-8"))
-    for path in WORKFLOWS
-))
+check("private repository contains no GitHub workflow definitions", not WORKFLOWS)
 check("local QA owns source generation and Release build", all(token in local_qa for token in (
     "build-live-windows.ps1",
     "Configuration = 'Release'",

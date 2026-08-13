@@ -108,10 +108,9 @@ check(
     )),
 )
 check(
-    "private GitHub Actions are inert",
-    private_workflows.count("on: []") == len(list((ROOT / ".github" / "workflows").glob("*.yml")))
-    and "workflow_dispatch:" not in private_workflows
-    and "push:" not in private_workflows,
+    "private repository contains no GitHub workflow definitions",
+    not list((ROOT / ".github" / "workflows").glob("*.yml"))
+    and not private_workflows,
 )
 check(
     "local release builds audits and packages before public handoff",

@@ -2,24 +2,24 @@
 
 This document defines the release policy and records the currently published public release. A GitHub tag existing is not, by itself, proof that every listening or runtime qualification item passed; evidence must remain tied to the exact source commit and artifact hash.
 
-## Current published receipt — v0.1.1
+## Current published receipt - v0.1.2
 
-Published: **10 August 2026**
+Published: **14 August 2026**
 
 - Public repository: `masarray/sc220-download`
-- Public tag: `v0.1.1`
-- Private source commit recorded by the release: `994b983a7f02b6a2285c41781ecb77dc07e3b217`
+- Public tag: `v0.1.2`
+- Private source commit recorded by the release: `91c33377573b891b99c64aada9b63c4e10517fb3`
 - ASK-P authority: v0.5.24 @ `2c764f82b0fc99eaff04d918cef4f839db7509e5`
-- Installer: `SC220-Live-v0.1.1-Setup-win-x64.exe`
-- Installer size: `24,043,506` bytes
-- Installer SHA-256: `589b174357cb36c62611d7a0e89bfa6a7d25251fc27015b5dd5b25fb54c04686`
+- Installer: `SC220-Live-v0.1.2-Setup-win-x64.exe`
+- Installer size: `24,279,209` bytes
+- Installer SHA-256: `ba6c61617d8c796dd953234e50f6d2e179c5efbe5e281892da7e7ba977e55693`
 - VC++ Runtime SHA-256: `843068991daaa1f73ad9f6239bce4d0f6a07a51f18c37ea2a867e9beca71295c`
 - VB-CABLE Pack45 SHA-256: `b950e39f01af1d04ea623c8f6d8eb9b6ea5c477c637295fabf20631c85116bfb`
-- Public publish/verification workflow: `31346714396` — success
+- Public publish/verification workflow: `31773444418` - success
 
-The earlier private self-hosted `local-release.yml` run `31342102770` completed with failure and must **not** be cited as the successful v0.1.1 release-validation run. The published v0.1.1 release was subsequently verified and published by the public distribution workflow.
+The v0.1.2 installer was built and audited locally. Publication authority remained exclusively in the public `sc220-download` workflow; no private-repository GitHub Action was used.
 
-See `docs/RELEASE_V0.1.1_RECEIPT.md` for the immutable release-facing summary.
+See `docs/RELEASE_V0.1.2_RECEIPT.md` for the immutable release-facing summary.
 
 ## Automated requirements for future releases
 

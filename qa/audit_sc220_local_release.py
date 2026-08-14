@@ -57,6 +57,14 @@ check("publisher uploads an unpublished binary-only draft", all(token in publish
     "Binary handoff $tag is not an unpublished draft",
     "Draft release is missing assets",
 )) and "Set-RepositoryTextFile" not in publish)
+check("publisher handles a missing first draft and renders release metadata", all(
+    token in publish for token in (
+        "previousErrorPreference",
+        "nativeExitCode",
+        "1. Download $installerName.",
+        "- Installer SHA-256: $installerHash",
+    )
+) and "`$installerName" not in publish and "`$installerHash" not in publish)
 check("public sc220-download workflow is the publication authority", all(token in publish for token in (
     "workflow run 'publish-draft-release.yml'",
     "--repo $TargetRepository",

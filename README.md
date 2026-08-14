@@ -6,12 +6,12 @@ Native Windows audio console for Recording Tech SC220. SC220 Live combines an op
 
 ## Current public release
 
-**SC220 Live v0.1.1** was published on 10 August 2026.
+**SC220 Live v0.1.2** was published on 14 August 2026.
 
 - Public distribution: `masarray/sc220-download`
-- Release source commit: `994b983a7f02b6a2285c41781ecb77dc07e3b217`
-- Installer: `SC220-Live-v0.1.1-Setup-win-x64.exe`
-- Installer SHA-256: `589b174357cb36c62611d7a0e89bfa6a7d25251fc27015b5dd5b25fb54c04686`
+- Release source commit: `91c33377573b891b99c64aada9b63c4e10517fb3`
+- Installer: `SC220-Live-v0.1.2-Setup-win-x64.exe`
+- Installer SHA-256: `ba6c61617d8c796dd953234e50f6d2e179c5efbe5e281892da7e7ba977e55693`
 - Platform: Windows 10/11 x64
 
 The public repository contains compiled distribution assets and end-user documentation only. Application source, DSP source, build infrastructure, credentials, signing material, and private submodules remain private.

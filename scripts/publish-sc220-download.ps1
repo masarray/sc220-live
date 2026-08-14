@@ -47,8 +47,17 @@ function Invoke-Gh {
 
 function Get-GhJson {
     param([Parameter(ValueFromRemainingArguments = $true)][string[]]$Arguments)
-    $text = (& gh.exe @Arguments 2>$null | Out-String)
-    if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($text)) { return $null }
+    $previousErrorPreference = $ErrorActionPreference
+    $nativeExitCode = 0
+    try {
+        $ErrorActionPreference = 'SilentlyContinue'
+        $text = (& gh.exe @Arguments 2>$null | Out-String)
+        $nativeExitCode = $LASTEXITCODE
+    }
+    finally {
+        $ErrorActionPreference = $previousErrorPreference
+    }
+    if ($nativeExitCode -ne 0 -or [string]::IsNullOrWhiteSpace($text)) { return $null }
     return $text | ConvertFrom-Json
 }
 
@@ -129,7 +138,7 @@ $highlight
 
 ## Installation
 
-1. Download `$installerName`.
+1. Download $installerName.
 2. Run the installer as Administrator.
 3. Review the automatic system check.
 4. Restart Windows when requested after a runtime or driver operation.
@@ -137,10 +146,10 @@ $highlight
 
 ## Integrity
 
-- Installer SHA-256: `$installerHash`
-- Private source commit: `$SourceCommit`
-- Microsoft VC++ Runtime package SHA-256: `$($vcHash.ToLowerInvariant())`
-- VB-CABLE Pack45 SHA-256: `$($vbHash.ToLowerInvariant())`
+- Installer SHA-256: $installerHash
+- Private source commit: $SourceCommit
+- Microsoft VC++ Runtime package SHA-256: $($vcHash.ToLowerInvariant())
+- VB-CABLE Pack45 SHA-256: $($vbHash.ToLowerInvariant())
 - Platform: Windows 10/11 x64
 
 The installer was built and audited directly on the approved local Windows workstation. The public sc220-download workflow independently inspects the binary-only draft before publication.

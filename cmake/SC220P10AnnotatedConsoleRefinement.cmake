@@ -314,6 +314,8 @@ sc220_p10_once(_ui "centred header logo"
 foreach(_required IN ITEMS
         "sc220_mkii_device_alpha_png"
         "g.drawImageWithin (sc220Image"
+        "faderThumb->drawWithin"
+        "centreX - 16.0f, sliderPos - 34.0f"
         "inputContent.removeFromTop (14)"
         "const int sourceSelectorY = inputArea.getY() + 214"
         "inputButtonHeight = 26"

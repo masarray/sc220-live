@@ -200,11 +200,11 @@ file(READ "${_license_panel_source}" _license_panel)
 
 string(REPLACE
     "SC220 LIVE FULL VERSION"
-    "SC220 LIVE LICENSE"
+    "LICENSE & ACTIVATION"
     _license_panel "${_license_panel}")
 string(REPLACE
     "Full creative control is free for 365 days. Unlock permanently with one optional QRIS payment."
-    "SC220 hardware access is included. Software-only mode includes 90 days of full features, then requires one perpetual licence."
+    "Choose secure QRIS payment or enter a signed offline activation code."
     _license_panel "${_license_panel}")
 
 sc220_p6e_once(_license_panel "hardware-aware licence state"

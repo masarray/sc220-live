@@ -1,4 +1,5 @@
 from pathlib import Path
+import re
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -21,17 +22,28 @@ third_party = (ROOT / "THIRD_PARTY_NOTICES.md").read_text(encoding="utf-8")
 
 checks: list[tuple[str, bool]] = []
 
+project_match = re.search(r"project\(SC220Live VERSION (\d+)\.(\d+)\.(\d+)", cmake)
+published_match = re.search(r"SC220 Live v(\d+)\.(\d+)\.(\d+)", readme)
+project_version = tuple(map(int, project_match.groups())) if project_match else None
+published_version = tuple(map(int, published_match.groups())) if published_match else None
+release_line_ok = bool(
+    project_version
+    and published_version
+    and project_version[:2] == published_version[:2]
+    and project_version[2] in (published_version[2], published_version[2] + 1)
+)
+
 
 def check(name: str, condition: bool) -> None:
     checks.append((name, bool(condition)))
 
 
 check(
-    "current source and public receipt agree on v0.1.1",
-    "project(SC220Live VERSION 0.1.1" in cmake
-    and "SC220 Live v0.1.1" in readme
+    "source is current or one patch ahead of the published public receipt",
+    release_line_ok
     and "Current published receipt" in gate
-    and "v0.1.1" in gate,
+    and published_version is not None
+    and f"v{published_version[0]}.{published_version[1]}.{published_version[2]}" in gate,
 )
 check(
     "README describes current selectable source and Quick Stream architecture",

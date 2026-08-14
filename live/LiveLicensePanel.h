@@ -49,6 +49,7 @@ private:
     juce::Label title;
     juce::Label subtitle;
     juce::Label trialBadge;
+    juce::Label purchaseLabel;
     juce::Label price;
     juce::Label priceCaption;
     juce::Label nameLabel;

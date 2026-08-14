@@ -36,7 +36,7 @@
   </linearGradient>
  </defs>
  <g transform="translate(-845.71 -499.95)"><g transform="translate(-1.3202,15.152)">
-  <path transform="matrix(.53231 0 0 .99811 560.96 12.701)" d="m649.84 478.85v126.27l31.315-18.94s-35.355-47.982 0-83.338c-27.779-21.466-31.315-23.991-31.315-23.991z" fill="#a1a1a1" filter="url(#k)"/>
+  <path transform="matrix(.53231 0 0 .99811 560.96 12.701)" d="m649.84 478.85v126.27l31.315-18.94s-35.355-47.982 0-83.338c-27.779-21.466-31.315-23.991-31.315-23.991z" fill="#000"/>
   <path d="m890.45 497.09h34.461" fill="#e6e6e6" stroke="#b4b4b4" stroke-linecap="round" stroke-width="3.5"/>
   <rect x="847.03" y="488.03" width="62.143" height="129.29" rx="3" ry="3" fill="#4d4d4d"/>
   <rect x="847.97" y="552.42" width="60.419" height="3.5355" fill="#e6e6e6"/>

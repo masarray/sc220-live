@@ -25,25 +25,28 @@ LiveLicensePanel::LiveLicensePanel (EnhancerEngineBridge& engineToUse)
     auto setLabel = [] (juce::Label& label, float size, bool bold,
                         juce::Colour colour, juce::Justification justification)
     {
-        label.setFont (askp::AskpLookAndFeel::get().jakarta (size, bold));
+        auto font = juce::Font { juce::FontOptions { size } };
+        label.setFont (bold ? font.boldened() : font);
         label.setColour (juce::Label::textColourId, colour);
         label.setJustificationType (justification);
         label.setInterceptsMouseClicks (false, false);
     };
 
-    setLabel (title, 25.0f, true, colours::text, juce::Justification::centredLeft);
+    setLabel (title, 22.0f, true, colours::text, juce::Justification::centredLeft);
     title.setText ("SC220 LIVE FULL VERSION", juce::dontSendNotification);
-    setLabel (subtitle, 13.5f, false, colours::textMuted, juce::Justification::centredLeft);
+    setLabel (subtitle, 12.5f, false, colours::textMuted, juce::Justification::centredLeft);
     subtitle.setText ("Full creative control is free for 365 days. Unlock permanently with one optional QRIS payment.",
                       juce::dontSendNotification);
-    setLabel (trialBadge, 11.0f, true, colours::cyan, juce::Justification::centred);
-    setLabel (price, 31.0f, true, colours::text, juce::Justification::centredLeft);
+    setLabel (trialBadge, 10.5f, true, colours::cyan, juce::Justification::centredRight);
+    setLabel (purchaseLabel, 10.5f, true, colours::cyan, juce::Justification::centredLeft);
+    purchaseLabel.setText ("ONLINE PURCHASE", juce::dontSendNotification);
+    setLabel (price, 27.0f, true, colours::text, juce::Justification::centredLeft);
     price.setText (formatIdr (fullVersionPriceIdr), juce::dontSendNotification);
-    setLabel (priceCaption, 11.5f, false, colours::textMuted, juce::Justification::centredLeft);
+    setLabel (priceCaption, 10.5f, false, colours::textMuted, juce::Justification::centredLeft);
     priceCaption.setText ("ONE-TIME PERPETUAL LICENCE / 1 COMPUTER", juce::dontSendNotification);
 
-    setLabel (nameLabel, 10.0f, true, colours::textMuted, juce::Justification::centredLeft);
-    setLabel (emailLabel, 10.0f, true, colours::textMuted, juce::Justification::centredLeft);
+    setLabel (nameLabel, 10.5f, true, colours::textMuted, juce::Justification::centredLeft);
+    setLabel (emailLabel, 10.5f, true, colours::textMuted, juce::Justification::centredLeft);
     nameLabel.setText ("NAME FOR RECEIPT", juce::dontSendNotification);
     emailLabel.setText ("EMAIL FOR RECEIPT", juce::dontSendNotification);
     configureEditor (customerName, "Your name");
@@ -54,24 +57,25 @@ LiveLicensePanel::LiveLicensePanel (EnhancerEngineBridge& engineToUse)
     setLabel (paymentStatus, 11.5f, false, colours::textMuted, juce::Justification::topLeft);
     paymentStatus.setMinimumHorizontalScale (0.75f);
 
-    setLabel (requestLabel, 10.0f, true, colours::textMuted, juce::Justification::centredLeft);
-    requestLabel.setText ("OFFLINE ACTIVATION / COMPUTER REQUEST ID", juce::dontSendNotification);
+    setLabel (requestLabel, 10.5f, true, colours::cyan, juce::Justification::centredLeft);
+    requestLabel.setText ("OFFLINE ACTIVATION  /  COMPUTER REQUEST ID", juce::dontSendNotification);
     configureEditor (requestId, {});
     requestId.setReadOnly (true);
     requestId.setText (license.requestId(), false);
 
-    setLabel (activationLabel, 10.0f, true, colours::textMuted, juce::Justification::centredLeft);
-    activationLabel.setText ("ACTIVATION CODE", juce::dontSendNotification);
+    setLabel (activationLabel, 10.5f, true, colours::textMuted, juce::Justification::centredLeft);
+    activationLabel.setText ("SIGNED ACTIVATION CODE", juce::dontSendNotification);
     configureEditor (activationCode, "Paste signed activation code");
     activationCode.setMultiLine (true, true);
     activationCode.setReturnKeyStartsNewLine (true);
 
-    setLabel (privacyNote, 10.5f, false, colours::textMuted, juce::Justification::centredLeft);
-    privacyNote.setText ("Payment is hosted by Midtrans. SC220 Live sends only receipt details, the order capability and this computer request ID to the licence server. Audio is never uploaded.",
+    setLabel (privacyNote, 10.5f, false, colours::textMuted, juce::Justification::topLeft);
+    privacyNote.setMinimumHorizontalScale (0.82f);
+    privacyNote.setText ("MIDTRANS SECURE PAYMENT\nOnly receipt and licence details leave this computer. Audio is never uploaded.",
                          juce::dontSendNotification);
 
-    const std::array<juce::Component*, 21> components {{
-        &title, &subtitle, &trialBadge, &price, &priceCaption,
+    const std::array<juce::Component*, 22> components {{
+        &title, &subtitle, &trialBadge, &purchaseLabel, &price, &priceCaption,
         &nameLabel, &emailLabel, &customerName, &customerEmail,
         &buyButton, &checkButton, &cancelButton, &paymentStatus,
         &requestLabel, &requestId, &copyRequest, &activationLabel,
@@ -119,7 +123,7 @@ LiveLicensePanel::~LiveLicensePanel()
 void LiveLicensePanel::configureEditor (juce::TextEditor& editor,
                                         const juce::String& placeholder)
 {
-    editor.setFont (askp::AskpLookAndFeel::get().jakarta (12.5f, false));
+    editor.setFont (juce::Font { juce::FontOptions { 12.0f } });
     editor.setColour (juce::TextEditor::backgroundColourId, colours::panelLo);
     editor.setColour (juce::TextEditor::outlineColourId, colours::borderSoft);
     editor.setColour (juce::TextEditor::focusedOutlineColourId, colours::cyan.withAlpha (0.85f));
@@ -127,7 +131,7 @@ void LiveLicensePanel::configureEditor (juce::TextEditor& editor,
     editor.setColour (juce::TextEditor::highlightColourId, colours::cyan.withAlpha (0.22f));
     editor.setColour (juce::TextEditor::highlightedTextColourId, colours::text);
     editor.setTextToShowWhenEmpty (placeholder, colours::textMuted.withAlpha (0.66f));
-    editor.setBorder (juce::BorderSize<int> (8, 10, 8, 10));
+    editor.setBorder (juce::BorderSize<int> (7, 10, 7, 10));
 }
 
 juce::String LiveLicensePanel::formatIdr (int amount)
@@ -321,8 +325,8 @@ void LiveLicensePanel::refreshState()
 juce::Rectangle<int> LiveLicensePanel::cardBounds() const
 {
     auto area = getLocalBounds().reduced (24);
-    const int width = juce::jmin (760, area.getWidth());
-    const int height = juce::jmin (690, area.getHeight());
+    const int width = juce::jmin (900, area.getWidth());
+    const int height = juce::jmin (620, area.getHeight());
     return juce::Rectangle<int> (width, height).withCentre (area.getCentre());
 }
 
@@ -332,82 +336,99 @@ void LiveLicensePanel::paint (juce::Graphics& g)
     g.fillAll();
 
     const auto card = cardBounds().toFloat();
-    g.setColour (juce::Colours::black.withAlpha (0.34f));
-    g.fillRoundedRectangle (card.translated (0.0f, 7.0f), 16.0f);
+    g.setColour (juce::Colours::black.withAlpha (0.30f));
+    g.fillRoundedRectangle (card.translated (0.0f, 5.0f), 12.0f);
 
     juce::ColourGradient panel (colours::panelHi.brighter (0.025f), card.getX(), card.getY(),
                                 colours::panelLo, card.getRight(), card.getBottom(), false);
     panel.addColour (0.55, colours::panel);
     g.setGradientFill (panel);
-    g.fillRoundedRectangle (card, 16.0f);
+    g.fillRoundedRectangle (card, 12.0f);
     g.setColour (colours::border);
-    g.drawRoundedRectangle (card.reduced (0.5f), 16.0f, 1.0f);
+    g.drawRoundedRectangle (card.reduced (0.5f), 12.0f, 1.0f);
     g.setColour (colours::cyan.withAlpha (0.12f));
     g.fillRoundedRectangle ({ card.getX() + 20.0f, card.getY() + 1.0f,
                               card.getWidth() - 40.0f, 2.0f }, 1.0f);
 
-    const auto priceArea = juce::Rectangle<float> ((float) price.getX() - 12.0f,
-                                                    (float) price.getY() - 7.0f,
-                                                    (float) price.getWidth() + 24.0f,
-                                                    (float) price.getHeight() + 29.0f);
-    g.setColour (colours::cyan.withAlpha (0.045f));
-    g.fillRoundedRectangle (priceArea, 10.0f);
+    auto content = cardBounds().reduced (26);
+    content.removeFromTop (76);
+    content.removeFromBottom (46);
+    constexpr int columnGap = 22;
+    auto purchasePanel = content.removeFromLeft ((content.getWidth() - columnGap) / 2).toFloat();
+    content.removeFromLeft (columnGap);
+    const auto offlinePanel = content.toFloat();
+
+    for (const auto panelBounds : { purchasePanel, offlinePanel })
+    {
+        g.setColour (colours::panelLo.withAlpha (0.72f));
+        g.fillRoundedRectangle (panelBounds, 7.0f);
+        g.setColour (colours::borderSoft.withAlpha (0.78f));
+        g.drawRoundedRectangle (panelBounds.reduced (0.5f), 6.5f, 1.0f);
+    }
+
+    const auto priceArea = price.getBounds().getUnion (priceCaption.getBounds())
+                                .expanded (8, 5).toFloat();
+    g.setColour (colours::cyan.withAlpha (0.055f));
+    g.fillRoundedRectangle (priceArea, 6.0f);
     g.setColour (colours::borderSoft);
-    g.drawRoundedRectangle (priceArea, 10.0f, 1.0f);
+    g.drawRoundedRectangle (priceArea, 6.0f, 1.0f);
 }
 
 void LiveLicensePanel::resized()
 {
-    auto card = cardBounds().reduced (24);
-    auto header = card.removeFromTop (70);
-    title.setBounds (header.removeFromTop (34));
+    auto card = cardBounds().reduced (26);
+    auto header = card.removeFromTop (66);
+    auto titleRow = header.removeFromTop (31);
+    trialBadge.setBounds (titleRow.removeFromRight (250));
+    title.setBounds (titleRow);
     subtitle.setBounds (header.removeFromTop (25));
-
-    trialBadge.setBounds (card.removeFromTop (30).removeFromRight (240));
-    card.removeFromTop (8);
-
-    auto priceRow = card.removeFromTop (74);
-    price.setBounds (priceRow.removeFromLeft (270).reduced (8, 0));
-    priceCaption.setBounds (priceRow.reduced (8, 8));
-    card.removeFromTop (12);
-
-    auto customerRow = card.removeFromTop (72);
-    auto left = customerRow.removeFromLeft (customerRow.getWidth() / 2).reduced (0, 0);
-    customerRow.removeFromLeft (12);
-    auto right = customerRow;
-    nameLabel.setBounds (left.removeFromTop (18));
-    customerName.setBounds (left.removeFromTop (42));
-    emailLabel.setBounds (right.removeFromTop (18));
-    customerEmail.setBounds (right.removeFromTop (42));
     card.removeFromTop (10);
 
-    auto purchaseRow = card.removeFromTop (42);
-    buyButton.setBounds (purchaseRow.removeFromLeft (360));
-    purchaseRow.removeFromLeft (10);
-    checkButton.setBounds (purchaseRow.removeFromLeft (150));
-    purchaseRow.removeFromLeft (10);
-    cancelButton.setBounds (purchaseRow);
-    card.removeFromTop (10);
+    auto footer = card.removeFromBottom (36);
+    closeButton.setBounds (footer.removeFromRight (112));
+    card.removeFromBottom (10);
 
-    paymentStatus.setBounds (card.removeFromTop (64));
-    card.removeFromTop (8);
+    constexpr int columnGap = 22;
+    auto purchaseColumn = card.removeFromLeft ((card.getWidth() - columnGap) / 2).reduced (16, 14);
+    card.removeFromLeft (columnGap);
+    auto offlineColumn = card.reduced (16, 14);
 
-    requestLabel.setBounds (card.removeFromTop (18));
-    auto requestRow = card.removeFromTop (40);
-    copyRequest.setBounds (requestRow.removeFromRight (160));
-    requestRow.removeFromRight (10);
+    purchaseLabel.setBounds (purchaseColumn.removeFromTop (18));
+    purchaseColumn.removeFromTop (8);
+    auto priceRow = purchaseColumn.removeFromTop (66);
+    price.setBounds (priceRow.removeFromTop (37));
+    priceCaption.setBounds (priceRow);
+    purchaseColumn.removeFromTop (12);
+
+    nameLabel.setBounds (purchaseColumn.removeFromTop (17));
+    customerName.setBounds (purchaseColumn.removeFromTop (38));
+    purchaseColumn.removeFromTop (9);
+    emailLabel.setBounds (purchaseColumn.removeFromTop (17));
+    customerEmail.setBounds (purchaseColumn.removeFromTop (38));
+    purchaseColumn.removeFromTop (14);
+    buyButton.setBounds (purchaseColumn.removeFromTop (40));
+    purchaseColumn.removeFromTop (8);
+    auto secondaryActions = purchaseColumn.removeFromTop (34);
+    checkButton.setBounds (secondaryActions.removeFromLeft ((secondaryActions.getWidth() - 8) / 2));
+    secondaryActions.removeFromLeft (8);
+    cancelButton.setBounds (secondaryActions);
+    purchaseColumn.removeFromTop (8);
+    paymentStatus.setBounds (purchaseColumn);
+
+    requestLabel.setBounds (offlineColumn.removeFromTop (18));
+    offlineColumn.removeFromTop (8);
+    auto requestRow = offlineColumn.removeFromTop (40);
+    copyRequest.setBounds (requestRow.removeFromRight (144));
+    requestRow.removeFromRight (8);
     requestId.setBounds (requestRow);
-    card.removeFromTop (10);
-
-    activationLabel.setBounds (card.removeFromTop (18));
-    auto activationRow = card.removeFromTop (76);
-    activateButton.setBounds (activationRow.removeFromRight (190));
-    activationRow.removeFromRight (10);
-    activationCode.setBounds (activationRow);
-    card.removeFromTop (10);
-
-    privacyNote.setBounds (card.removeFromTop (43));
-    closeButton.setBounds (card.removeFromBottom (38).removeFromRight (120));
+    offlineColumn.removeFromTop (20);
+    activationLabel.setBounds (offlineColumn.removeFromTop (18));
+    offlineColumn.removeFromTop (8);
+    activationCode.setBounds (offlineColumn.removeFromTop (112));
+    offlineColumn.removeFromTop (10);
+    activateButton.setBounds (offlineColumn.removeFromTop (40));
+    offlineColumn.removeFromTop (14);
+    privacyNote.setBounds (offlineColumn);
 }
 
 void LiveLicensePanel::visibilityChanged()

@@ -142,9 +142,11 @@ public:
         return interFont (13.0f);
     }
 
-    juce::Font getLabelFont (juce::Label&) override
+    juce::Font getLabelFont (juce::Label& label) override
     {
-        return interFont (12.0f);
+        const auto requested = label.getFont();
+        const auto height = juce::jlimit (9.0f, 28.0f, requested.getHeight());
+        return interFont (height, requested.isBold());
     }
 
     juce::Typeface::Ptr getTypefaceForFont (const juce::Font& font) override
@@ -339,18 +341,9 @@ public:
                             track.getY() + 3.0f, track.getBottom() - 3.0f);
 
         const auto cap = juce::Rectangle<float> (centreX - 20.0f, sliderPos - 34.0f, 40.0f, 68.0f);
-        juce::Path capShadowPath;
-        capShadowPath.addRoundedRectangle (cap, 3.0f);
-        juce::DropShadow (juce::Colours::black.withAlpha (0.34f * alpha),
-                          10, { 0, 5 }).drawForPath (g, capShadowPath);
-        g.setColour (juce::Colours::black.withAlpha (0.20f * alpha));
-        g.fillRoundedRectangle (cap.translated (0.0f, 2.0f), 3.0f);
 
-        // Dark side cheeks give the cap the stepped depth of a physical mixer
-        // fader while keeping the aluminium face narrow and vertical.
-        g.setColour (juce::Colour (0xff313432).withAlpha (alpha));
-        g.fillRoundedRectangle (cap, 3.0f);
-        const auto capFace = cap.reduced (3.0f, 2.0f);
+        // A single metal face avoids any side strip reading as a fake shadow.
+        const auto capFace = cap.reduced (0.75f, 2.0f);
         juce::ColourGradient capGradient (palette::metalHi, cap.getCentreX(), cap.getY(),
                                           palette::metalLo, cap.getCentreX(), cap.getBottom(), false);
         capGradient.addColour (0.18, juce::Colour (0xffd8d9d5));

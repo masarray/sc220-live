@@ -14,6 +14,7 @@ CMAKE = (ROOT / "CMakeLists.txt").read_text(encoding="utf-8")
 GENERATED_PATH = ROOT / "build-sc220/generated/sc220-monitor/SC220MainComponent_Monitor.cpp"
 GENERATED = GENERATED_PATH.read_text(encoding="utf-8") if GENERATED_PATH.exists() else ""
 ALPHA_ASSET = ROOT / "assets/ui/sc220_mkii_device_alpha.png"
+FADER_SVG = (ROOT / "assets/ui/sc220_fader_thumb.svg").read_text(encoding="utf-8")
 
 checks: list[tuple[str, bool]] = []
 
@@ -169,11 +170,19 @@ check(
     and "const auto macroConsoleBay" in GENERATED,
 )
 check(
-    "14 fader cap uses soft ambient and contact shadows on the dark surface",
-    "juce::DropShadow (juce::Colours::black.withAlpha (0.34f * alpha)" in SOURCE
-    and "10, { 0, 5 }).drawForPath (g, capShadowPath)" in SOURCE
-    and "cap.translated (0.0f, 2.0f)" in SOURCE
-    and "cap.expanded (2.0f, 1.0f).translated" not in SOURCE,
+    "14 original detailed fader is retained with a clean black backing shape",
+    "capShadowPath" not in SOURCE
+    and "drawForPath (g, capShadowPath)" not in SOURCE
+    and "cap.translated (0.0f, 2.0f)" not in SOURCE
+    and "cap.expanded (2.0f, 1.0f).translated" not in SOURCE
+    and "0xff313432" not in SOURCE
+    and "cap.reduced (3.0f, 2.0f)" not in SOURCE
+    and "cap.reduced (0.75f, 2.0f)" in SOURCE
+    and "faderThumb->drawWithin" in GENERATED
+    and "centreX - 16.0f, sliderPos - 34.0f" in GENERATED
+    and 'fill="#a1a1a1"' not in FADER_SVG
+    and 'fill="#000"/>' in FADER_SVG
+    and 'fill="#000" filter="url(#k)"' not in FADER_SVG,
 )
 check(
     "P10 is final presentation authority and integrated label uses embedded Inter",

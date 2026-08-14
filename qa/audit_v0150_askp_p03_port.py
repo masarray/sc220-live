@@ -31,7 +31,7 @@ historical_doc = read("docs/ASKP_V0523_ENGINE_PORT.md")
 source_commit = "2c764f82b0fc99eaff04d918cef4f839db7509e5"
 latest_audited_head = "44b7d1657fbbd2c13cd490e251e8867734238623"
 release_helper_commit = "811b7376dd784ce9f64e03512c7baf7de5e77425"
-check("SC220 app version is v0.1.1", "project(SC220Live VERSION 0.1.1" in cmake)
+check("SC220 app version is v0.1.2", "project(SC220Live VERSION 0.1.2" in cmake)
 check("ASK-P v0.5.24 approved source pinned", source_commit in cmake and source_commit in lock and source_commit in sync_script)
 check("latest upstream audited head recorded", latest_audited_head in lock)
 check("current approved release helper recorded", release_helper_commit in lock)

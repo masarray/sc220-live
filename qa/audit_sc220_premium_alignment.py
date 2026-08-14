@@ -34,19 +34,20 @@ check(
     'font.setTypefaceName ("Segoe UI Variable")' not in source + generated,
 )
 check(
-    "P8 remains the final presentation authority",
-    "SC220P8PremiumAlignment.cmake" in state
-    and state.rfind("SC220P8PremiumAlignment.cmake")
-        > state.rfind("SC220P7CompactPleasant.cmake"),
+    "P8 alignment foundation precedes P9 and P10 authorities",
+    state.rfind("SC220P7CompactPleasant.cmake")
+    < state.rfind("SC220P8PremiumAlignment.cmake")
+    < state.rfind("SC220P9DigitalConsoleStyle.cmake")
+    < state.rfind("SC220P10AnnotatedConsoleRefinement.cmake"),
 )
 check(
     "input header grid has explicit non-overlapping rows",
     all(token in generated for token in (
-        "inputContent.removeFromTop (52)",
-        "juce::jlimit (228, 270",
-        "sourceSelectorY - 66, 64, 64",
-        "sourceSelectorY + 86",
-        "const int sc220StatusY = sc220StripArea.getY() + 68",
+        "inputContent.removeFromTop (14)",
+        "const int sourceSelectorY = inputArea.getY() + 214",
+        "sourceSelectorY - 84, 78, 78",
+        "sourceSelectorY + 76",
+        "const int sc220StatusY = sc220StripArea.getY() + 72",
         "const int pcStatusY = pcStripArea.getY() + 68",
     )),
 )
@@ -80,8 +81,9 @@ check(
         "masterColumnGap = 14",
         "outputBox.setBounds (streamColumn.getCentreX() - selectorWidth / 2",
         "monitorOutputBox.setBounds (monitorColumn.getCentreX() - selectorWidth / 2",
-        "monitorOutputBox.getBottom() + 12, 26, 26",
-        "monitorKnob.setBounds (monitorColumn.getCentreX() - 41",
+        "monitorOutputBox.getBottom() + 18, 26, 26",
+        "monitorKnob.setBounds (monitorColumn.getCentreX() - 50",
+        "monitorPowerButton.getBottom() + 26, 100, 124",
     )),
 )
 check(

@@ -163,6 +163,10 @@ include("${CMAKE_CURRENT_LIST_DIR}/SC220P7CompactPleasant.cmake")
 # collision-free top rows for Input, Loudness, Stream, and Monitor.
 include("${CMAKE_CURRENT_LIST_DIR}/SC220P8PremiumAlignment.cmake")
 
-# P9 is the final visual authority: one graphite/cyan digital-console chassis
-# across Input, Signature, Stream, Monitor, controls, meters, and readouts.
+# P9 establishes the graphite/cyan digital-console chassis across Input,
+# Signature, Stream, Monitor, controls, meters, and readouts.
 include("${CMAKE_CURRENT_LIST_DIR}/SC220P9DigitalConsoleStyle.cmake")
+
+# P10 consumes the annotated runtime audit: alpha product art, reclaimed input
+# space, aligned source rows, unified button heights, and one enhancer card.
+include("${CMAKE_CURRENT_LIST_DIR}/SC220P10AnnotatedConsoleRefinement.cmake")

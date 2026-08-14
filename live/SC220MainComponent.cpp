@@ -242,7 +242,7 @@ public:
             g.fillEllipse (dot.x - dotSize * 0.5f, dot.y - dotSize * 0.5f, dotSize, dotSize);
         }
 
-        g.setColour (juce::Colours::black.withAlpha (0.20f * alpha));
+        g.setColour (palette::header.withAlpha (0.68f * alpha));
         g.fillEllipse (knob.expanded (2.0f).translated (0.0f, 3.5f));
 
         juce::ColourGradient rim (palette::metalHi, knob.getCentreX(), knob.getY(),
@@ -339,8 +339,12 @@ public:
                             track.getY() + 3.0f, track.getBottom() - 3.0f);
 
         const auto cap = juce::Rectangle<float> (centreX - 20.0f, sliderPos - 34.0f, 40.0f, 68.0f);
-        g.setColour (juce::Colours::black.withAlpha (0.28f * alpha));
-        g.fillRoundedRectangle (cap.expanded (2.0f, 1.0f).translated (0.0f, 4.0f), 3.0f);
+        juce::Path capShadowPath;
+        capShadowPath.addRoundedRectangle (cap, 3.0f);
+        juce::DropShadow (juce::Colours::black.withAlpha (0.34f * alpha),
+                          10, { 0, 5 }).drawForPath (g, capShadowPath);
+        g.setColour (juce::Colours::black.withAlpha (0.20f * alpha));
+        g.fillRoundedRectangle (cap.translated (0.0f, 2.0f), 3.0f);
 
         // Dark side cheeks give the cap the stepped depth of a physical mixer
         // fader while keeping the aluminium face narrow and vertical.
@@ -698,7 +702,7 @@ SC220MainComponent::SC220MainComponent (LiveAudioEngine& engine, WindowActions a
     setOpaque (true);
     setLookAndFeel (lookAndFeel.get());
     recordingTechLogo = loadImage ("recording_tech_logo_png");
-    sc220Image = loadImage ("sc220_mkii_device_png");
+    sc220Image = loadImage ("sc220_mkii_device_alpha_png");
 
     audioEngine.getVoiceEnhancerBridge().setVisualTapEnabled (true);
     audioEngine.getMusicEnhancerBridge().setVisualTapEnabled (true);

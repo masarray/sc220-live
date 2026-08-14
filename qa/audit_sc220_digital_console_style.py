@@ -15,9 +15,10 @@ def check(name: str, condition: bool) -> None:
 
 
 check(
-    "P9 is the final presentation authority",
-    PIPELINE.rfind("SC220P9DigitalConsoleStyle.cmake")
-    > PIPELINE.rfind("SC220P8PremiumAlignment.cmake"),
+    "P9 console foundation follows P8 and precedes P10 refinement",
+    PIPELINE.rfind("SC220P8PremiumAlignment.cmake")
+    < PIPELINE.rfind("SC220P9DigitalConsoleStyle.cmake")
+    < PIPELINE.rfind("SC220P10AnnotatedConsoleRefinement.cmake"),
 )
 check(
     "graphite chassis replaces the mixed cream palette",
@@ -57,9 +58,9 @@ check(
     and "const auto monitorOutputBay" in P9,
 )
 check(
-    "illuminated pads remain part of the shared console language",
-    "drawIlluminatedPad" in GENERATED
-    and "dspPadHeight = static_cast<float> (enhancerPowerButton.getHeight())" in GENERATED,
+    "DSP state is integrated into one console-style power control",
+    'setEmbeddedLabels ("DSP ON", "DSP BYPASS"' in GENERATED
+    and "enhancerCardTop + 48, 128, 28" in GENERATED,
 )
 check(
     "post-master analyzer remains a dark cyan-edged screen",

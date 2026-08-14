@@ -105,6 +105,7 @@ $audits = @(
     'qa/audit_sc220_compact_pleasant.py',
     'qa/audit_sc220_premium_alignment.py',
     'qa/audit_sc220_digital_console_style.py',
+    'qa/audit_sc220_p10_annotated_refinement.py',
     'qa/audit_sc220_monitor_bus.py',
     'qa/audit_sc220_pc_endpoint_routing.py',
     'qa/audit_sc220_public_release.py',

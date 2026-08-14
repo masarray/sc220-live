@@ -95,7 +95,9 @@ check(
     and all(token in generated_ui + generated_app for token in (
         "centreWithSize (1280, 720)", "setResizeLimits (1080, 680, 1760, 1080)",
         "headerArea = area.removeFromTop (58)", "masterColumnGap = 14",
-        "spectrumDisplay->getBottom() + 42", "sharedFaderWidth = 60",
+        "const int enhancerCardTop = spectrumDisplay->getBottom() + 12",
+        "monitorPowerButton.getBottom() + 26, 100, 124",
+        "sharedFaderWidth = 60",
     )),
 )
 

@@ -17,6 +17,9 @@ public:
 
     void setIconColour (juce::Colour colour);
     void setOffColour (juce::Colour colour);
+    void setEmbeddedLabels (juce::String activeText,
+                            juce::String inactiveText,
+                            juce::Font labelFont);
     void paintButton (juce::Graphics&, bool highlighted, bool down) override;
     void mouseEnter (const juce::MouseEvent&) override;
     void mouseExit (const juce::MouseEvent&) override;
@@ -32,6 +35,9 @@ private:
     juce::String resource;
     juce::Colour iconColour;
     juce::Colour offColour { juce::Colour (0xff8494a7) };
+    juce::String activeEmbeddedLabel;
+    juce::String inactiveEmbeddedLabel;
+    juce::Font embeddedLabelFont { juce::FontOptions (9.0f) };
     std::unique_ptr<juce::Drawable> activeIcon;
     std::unique_ptr<juce::Drawable> inactiveIcon;
     float hoverMix = 0.0f;

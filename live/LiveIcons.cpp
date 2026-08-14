@@ -102,6 +102,16 @@ void LucideIconButton::setOffColour (juce::Colour colour)
     repaint();
 }
 
+void LucideIconButton::setEmbeddedLabels (juce::String activeText,
+                                          juce::String inactiveText,
+                                          juce::Font labelFont)
+{
+    activeEmbeddedLabel = std::move (activeText);
+    inactiveEmbeddedLabel = std::move (inactiveText);
+    embeddedLabelFont = std::move (labelFont);
+    repaint();
+}
+
 void LucideIconButton::drawFallbackIcon (juce::Graphics& g, juce::Rectangle<float> area,
                                           juce::Colour colour, float alpha) const
 {
@@ -158,10 +168,12 @@ void LucideIconButton::paintButton (juce::Graphics& g, bool highlighted, bool do
     auto bounds = getLocalBounds().toFloat();
     const bool toggleButton = getClickingTogglesState();
     const bool active = ! toggleButton || getToggleState();
+    const bool hasEmbeddedLabel = activeEmbeddedLabel.isNotEmpty();
 
     const float hover = juce::jlimit (0.0f, 1.0f, hoverMix + (highlighted ? 0.12f : 0.0f));
     const float press = juce::jlimit (0.0f, 1.0f, pressMix + (down ? 0.18f : 0.0f));
-    const bool showSurface = (toggleButton && active) || hover > 0.02f || press > 0.02f;
+    const bool showSurface = hasEmbeddedLabel || (toggleButton && active)
+                          || hover > 0.02f || press > 0.02f;
 
     if (showSurface)
     {
@@ -171,14 +183,15 @@ void LucideIconButton::paintButton (juce::Graphics& g, bool highlighted, bool do
                                       colours::panelLo, shell.getRight(), shell.getBottom(), false);
         surface.multiplyOpacity (0.90f);
         g.setGradientFill (surface);
-        g.fillRoundedRectangle (shell, 8.0f);
+        const float corner = hasEmbeddedLabel ? 5.0f : 8.0f;
+        g.fillRoundedRectangle (shell, corner);
 
         g.setColour (fillColour.withAlpha (0.05f + hover * 0.08f + press * 0.06f));
-        g.fillRoundedRectangle (shell.reduced (0.5f), 8.0f);
+        g.fillRoundedRectangle (shell.reduced (0.5f), corner);
         g.setColour (juce::Colours::black.withAlpha (0.12f + press * 0.04f));
-        g.drawRoundedRectangle (shell.reduced (1.0f), 7.0f, 1.0f);
+        g.drawRoundedRectangle (shell.reduced (1.0f), juce::jmax (3.0f, corner - 1.0f), 1.0f);
         g.setColour ((active ? colours::cyan : colours::border).withAlpha (0.16f + hover * 0.14f + press * 0.08f));
-        g.drawRoundedRectangle (shell.reduced (0.5f), 8.0f, 1.0f);
+        g.drawRoundedRectangle (shell.reduced (0.5f), corner, 1.0f);
 
         g.setColour (juce::Colours::white.withAlpha (0.018f + hover * 0.02f));
         g.fillRoundedRectangle (juce::Rectangle<float> (shell.getX() + 6.0f, shell.getY() + 1.5f,
@@ -188,14 +201,29 @@ void LucideIconButton::paintButton (juce::Graphics& g, bool highlighted, bool do
     const auto drawColour = active ? iconColour : offColour;
     const float alpha = isEnabled() ? (active ? (0.86f + hover * 0.12f) : (0.52f + hover * 0.08f)) : 0.28f;
     auto* drawable = active ? activeIcon.get() : inactiveIcon.get();
-    auto iconBounds = bounds.reduced (juce::jmax (5.0f, bounds.getWidth() * 0.25f));
+    auto iconArea = hasEmbeddedLabel
+        ? bounds.removeFromRight (bounds.getHeight()).reduced (3.0f)
+        : bounds;
+    if (hasEmbeddedLabel)
+    {
+        g.setColour (colours::border.withAlpha (0.62f));
+        g.drawVerticalLine (juce::roundToInt (iconArea.getX() - 3.0f),
+                            iconArea.getY() + 2.0f, iconArea.getBottom() - 2.0f);
+        g.setColour ((active ? colours::text : colours::textMuted)
+                         .withAlpha (isEnabled() ? 0.94f : 0.30f));
+        g.setFont (embeddedLabelFont);
+        g.drawFittedText (active ? activeEmbeddedLabel : inactiveEmbeddedLabel,
+                          bounds.toNearestInt().reduced (9, 2),
+                          juce::Justification::centred, 1);
+    }
+    auto iconBounds = iconArea.reduced (juce::jmax (5.0f, iconArea.getWidth() * 0.25f));
     const auto iconShift = juce::AffineTransform::translation (0.0f, press * 0.6f);
     if (drawable != nullptr)
         drawable->drawWithin (g, iconBounds, juce::RectanglePlacement::centred, alpha);
     else
         // Fallback glyphs perform their own padding. Passing the already
         // reduced iconBounds made minimise/maximise/tray glyphs tiny.
-        drawFallbackIcon (g, bounds.transformedBy (iconShift), drawColour, alpha);
+        drawFallbackIcon (g, iconArea.transformedBy (iconShift), drawColour, alpha);
 }
 
 } // namespace askp::live

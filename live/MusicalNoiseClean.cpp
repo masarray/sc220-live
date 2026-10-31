@@ -369,7 +369,6 @@ void MusicalNoiseClean::processFrame() noexcept
             const float magnitude = std::sqrt (power + kFloor);
             currentPower[static_cast<size_t> (channel)][static_cast<size_t> (bin)] = power;
 
-            const float previous = previousMagnitude[static_cast<size_t> (channel)][static_cast<size_t> (bin)];
             previousMagnitude[static_cast<size_t> (channel)][static_cast<size_t> (bin)] = magnitude;
 
             if (learningActive.load())

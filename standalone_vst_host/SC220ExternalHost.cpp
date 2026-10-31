@@ -87,27 +87,37 @@ public:
     {
         manager.removeAudioCallback(this);
         manager.closeAudioDevice();
-        voice.clear();
-        music.clear();
+        for (auto& channel : racks)
+            for (auto& effect : channel) effect.clear();
     }
     juce::AudioDeviceManager& devices() noexcept { return manager; }
-    juce::String pluginName(int lane) const
+    static constexpr int slotsPerChannel = 3;
+    static constexpr int channelCount = 2;
+    StereoPlugin& slotAt(int lane, int slot) noexcept
+    {
+        return racks[static_cast<size_t>(lane)][static_cast<size_t>(slot)];
+    }
+    const StereoPlugin& slotAt(int lane, int slot) const noexcept
+    {
+        return racks[static_cast<size_t>(lane)][static_cast<size_t>(slot)];
+    }
+    juce::String pluginName(int lane, int slot) const
     {
         const juce::ScopedLock lock(controlLock);
-        return lane == 0 ? voice.displayName : music.displayName;
+        return slotAt(lane, slot).displayName;
     }
-    bool hasPlugin(int lane) const
+    bool hasPlugin(int lane, int slot) const
     {
         const juce::ScopedLock lock(controlLock);
-        return lane == 0 ? voice.instance != nullptr : music.instance != nullptr;
+        return slotAt(lane, slot).instance != nullptr;
     }
-    void setBypass(int lane, bool enabled) noexcept
+    void setBypass(int lane, int slot, bool enabled) noexcept
     {
-        (lane == 0 ? voice : music).bypass.store(enabled, std::memory_order_relaxed);
+        slotAt(lane, slot).bypass.store(enabled, std::memory_order_relaxed);
     }
-    bool isBypassed(int lane) const noexcept
+    bool isBypassed(int lane, int slot) const noexcept
     {
-        return (lane == 0 ? voice : music).bypass.load(std::memory_order_relaxed);
+        return slotAt(lane, slot).bypass.load(std::memory_order_relaxed);
     }
     float meter(int lane) const noexcept
     {
@@ -120,7 +130,7 @@ public:
     void setStreamMuted(bool muted) noexcept { streamMuted.store(muted); }
     bool isStreamMuted() const noexcept { return streamMuted.load(); }
     int deadlineMisses() const noexcept { return misses.load(); }
-    juce::String loadPlugin(int lane, const juce::File& file)
+    juce::String loadPlugin(int lane, int slotIndex, const juce::File& file)
     {
         if (!file.exists() || !file.hasFileExtension(".vst3"))
             return "Please choose an installed .vst3 bundle.";
@@ -151,7 +161,7 @@ public:
         manager.removeAudioCallback(this);
         {
             const juce::ScopedLock lock(controlLock);
-            auto& slot = lane == 0 ? voice : music;
+            auto& slot = slotAt(lane, slotIndex);
             slot.clear();
             slot.instance = std::move(next);
             slot.displayName = name;
@@ -160,19 +170,19 @@ public:
         manager.addAudioCallback(this);
         return {};
     }
-    void removePlugin(int lane)
+    void removePlugin(int lane, int slotIndex)
     {
         manager.removeAudioCallback(this);
         {
             const juce::ScopedLock lock(controlLock);
-            (lane == 0 ? voice : music).clear();
+            slotAt(lane, slotIndex).clear();
         }
         manager.addAudioCallback(this);
     }
-    juce::AudioPluginInstance* processor(int lane)
+    juce::AudioPluginInstance* processor(int lane, int slotIndex)
     {
         const juce::ScopedLock lock(controlLock);
-        return (lane == 0 ? voice : music).instance.get();
+        return slotAt(lane, slotIndex).instance.get();
     }
     void audioDeviceAboutToStart(juce::AudioIODevice* device) override
     {
@@ -182,14 +192,14 @@ public:
         blockSize.store(block);
         voiceBuffer.setSize(2, block, false, true, false);
         musicBuffer.setSize(2, block, false, true, false);
-        voice.prepare(rate, block);
-        music.prepare(rate, block);
+        for (auto& channel : racks)
+            for (auto& effect : channel) effect.prepare(rate, block);
         misses.store(0);
     }
     void audioDeviceStopped() override
     {
-        voice.release();
-        music.release();
+        for (auto& channel : racks)
+            for (auto& effect : channel) effect.release();
         sampleRate.store(0.0);
     }
     void audioDeviceIOCallbackWithContext(const float* const* in, int inChannels,
@@ -213,8 +223,8 @@ public:
                 musicBuffer.copyFrom(ch, 0, in[ch + 2], n);
         }
         juce::MidiBuffer midi;
-        voice.process(voiceBuffer, midi);
-        music.process(musicBuffer, midi);
+        for (auto& effect : racks[0]) effect.process(voiceBuffer, midi);
+        for (auto& effect : racks[1]) effect.process(musicBuffer, midi);
         const auto vg = voiceGain.load(std::memory_order_relaxed);
         const auto mg = musicGain.load(std::memory_order_relaxed);
         voiceBuffer.applyGain(vg);
@@ -242,7 +252,7 @@ private:
     juce::AudioDeviceManager manager;
     juce::AudioPluginFormatManager formats;
     mutable juce::CriticalSection controlLock;
-    StereoPlugin voice, music;
+    std::array<std::array<StereoPlugin, slotsPerChannel>, channelCount> racks;
     juce::AudioBuffer<float> voiceBuffer, musicBuffer;
     std::atomic<double> sampleRate { 0.0 };
     std::atomic<int> blockSize { 0 };

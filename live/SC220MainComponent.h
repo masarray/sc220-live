@@ -49,6 +49,9 @@ private:
     void refreshMonitorDevices();
     void showSettingsMenu();
     void showAudioSettings();
+    void showVoiceFxMenu();
+    void chooseVoiceVst3();
+    void showVoiceVst3Editor();
     void drawHeader (juce::Graphics&);
     void drawInputSurface (juce::Graphics&);
     void drawSignatureSurface (juce::Graphics&);
@@ -72,6 +75,9 @@ private:
     LucideIconButton enhancerPowerButton { "Smart Enhancer", "power_svg", juce::Colours::white };
     LucideIconButton monitorPowerButton { "Monitor On / Off", "headphones_svg", juce::Colours::white };
     juce::TextButton goLiveButton { "GO LIVE" };
+    juce::TextButton voiceFxButton { "+ VST3 FX" };
+    std::unique_ptr<juce::FileChooser> voiceFxChooser;
+    std::unique_ptr<juce::DocumentWindow> voiceFxEditorWindow;
 
     juce::ComboBox presetBox;
     juce::ComboBox outputBox;

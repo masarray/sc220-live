@@ -4,27 +4,44 @@
 #include <memory>
 
 namespace askp::live {
-// One manually chosen trusted stereo VST3 on the SC220 voice lane.
-// Ownership is changed only while LiveAudioEngine's callback is detached.
+
+// A single user-selected, zero-added-host-latency stereo VST3 voice insert.
+// Creation/preparation and retirement run on the message thread; the caller
+// must quiesce audio callbacks before install()/clear() or device preparation.
+// process() uses only preallocated memory and never acquires a host lock.
 class InputVst3Rack final
 {
 public:
-    juce::String load (const juce::File& file, double sampleRate, int blockSize);
+    using PreparedInstance = std::unique_ptr<juce::AudioPluginInstance>;
+    static juce::String createPrepared (const juce::File& file, double sampleRate,
+                                        int blockSize, PreparedInstance& result);
+    void install (PreparedInstance prepared, double sampleRate, int maximumBlockSize);
     void clear();
-    void prepare (double sampleRate, int blockSize);
+    void prepare (double sampleRate, int maximumBlockSize);
     void release();
     void process (juce::AudioBuffer<float>&, juce::MidiBuffer&) noexcept;
-    void setBypassed (bool b) noexcept { bypassed.store (b, std::memory_order_relaxed); }
-    bool isBypassed() const noexcept { return bypassed.load (std::memory_order_relaxed); }
+    void setBypassed (bool value) noexcept { bypassed.store (value, std::memory_order_release); }
+    bool isBypassed() const noexcept { return bypassed.load (std::memory_order_acquire); }
     bool isLoaded() const noexcept { return instance != nullptr; }
     juce::String getName() const { return name; }
-    int getLatencySamples() const noexcept { return prepared && instance != nullptr ? instance->getLatencySamples() : 0; }
+    int getLatencySamples() const noexcept
+    {
+        return prepared && instance != nullptr ? juce::jmax (0, instance->getLatencySamples()) : 0;
+    }
     juce::AudioPluginInstance* getProcessor() const noexcept { return instance.get(); }
 private:
-    std::unique_ptr<juce::AudioPluginInstance> instance;
+    void allocateDryAlignment (double sampleRate, int maximumBlockSize);
+    PreparedInstance instance;
     juce::String name;
     std::atomic<bool> bypassed { false };
+    juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> bypassMix;
+    juce::AudioBuffer<float> originalDry;
+    juce::AudioBuffer<float> delayAlignedDry;
+    int dryDelayPosition = 0;
+    int dryDelaySamples = 0;
     bool prepared = false;
+
+    static constexpr int maximumAcceptedPluginLatency = 8192;
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (InputVst3Rack)
 };
 } // namespace askp::live

@@ -37,6 +37,16 @@ target_link_libraries(SC220PleasantPresenceAudit PRIVATE juce::juce_audio_utils 
 target_compile_definitions(SC220PleasantPresenceAudit PRIVATE JUCE_WEB_BROWSER=0 JUCE_USE_CURL=0)
 add_test(NAME SC220PleasantPresenceAudit COMMAND SC220PleasantPresenceAudit)
 
+# Validate the ACTUAL external binary on the Windows runner before a public
+# package is allowed, not merely the source-level presence of a VST3 host.
+juce_add_console_app(SC220BundledVstSmoke PRODUCT_NAME "SC220 VST3 Smoke")
+target_sources(SC220BundledVstSmoke PRIVATE qa/BundledVstSmoke.cpp live/InputVst3Rack.cpp)
+target_include_directories(SC220BundledVstSmoke PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/live")
+target_link_libraries(SC220BundledVstSmoke PRIVATE
+    juce::juce_audio_utils juce::juce_audio_processors juce::juce_dsp
+    PUBLIC juce::juce_recommended_config_flags juce::juce_recommended_warning_flags)
+target_compile_definitions(SC220BundledVstSmoke PRIVATE JUCE_WEB_BROWSER=0 JUCE_USE_CURL=0 JUCE_PLUGINHOST_VST3=1)
+
 # ---------------------------------------------------------------------------
 # Embedded UI assets
 # ---------------------------------------------------------------------------

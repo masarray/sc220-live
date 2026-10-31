@@ -14,7 +14,7 @@ Native Windows audio console for Recording Tech SC220. SC220 Live combines an op
 - Installer SHA-256: `ba6c61617d8c796dd953234e50f6d2e179c5efbe5e281892da7e7ba977e55693`
 - Platform: Windows 10/11 x64
 
-The public repository contains compiled distribution assets and end-user documentation only. Application source, DSP source, build infrastructure, credentials, signing material, and private submodules remain private.
+This repository is now public and contains application source and build scripts. The ASK-P DSP authority is still a separate private submodule; publishing this repository does not grant access to that dependency. Never commit signing keys or build credentials.
 
 ## Product signal path
 
@@ -45,6 +45,16 @@ SC220 Live pins the approved ASK-P v0.5.24 production authority:
 The approved processor includes the latest v0.5.24 Gain Match settle-controller fix for source parity, but **SC220 Live keeps Gain Match disabled by default and does not expose a Gain Match control in the public UI**.
 
 See [docs/ASKP_SOURCE_SYNC.md](docs/ASKP_SOURCE_SYNC.md) and [docs/ASKP_P03_DSP_PORT.md](docs/ASKP_P03_DSP_PORT.md).
+
+## ASIO and VST3 Voice FX — development branch
+
+Windows enables JUCE's bundled ASIO backend alongside WASAPI. Select an installed ASIO driver through **Settings → Audio Setup**. ASIO input/output must use the same driver's clock; ASIO input with a separate WASAPI output is not supported without drift correction.
+
+In the **SC220 INPUT** strip, press **+ VST3 FX → Load VST3 effect** and choose a trusted stereo VST3 bundle, such as ArSonVerb. The FX menu also provides the plugin editor, bypass and removal.
+
+Hardware voice flows through trim → noise cleanup → expander → VST3 → voice enhancer → voice fader → protected master. PC Music does not pass through the voice VST3 slot.
+
+**Limitations:** this first trusted-plugin stage has no out-of-process scanner, arbitrary-plugin crash isolation, saved plugin state or crossfaded bypass. Do not load untrusted plugins in a live show. A public repository is not a safe place for GitHub runner credentials. Public binary publication remains in `sc220-download`.
 
 ## Runtime capabilities
 
@@ -121,13 +131,13 @@ The release launcher is:
 .\RELEASE-SC220.cmd
 ```
 
-It is designed to fail closed: source must be clean and pushed, the ASK-P authority must match the lock, the release runner is brought online only for the release session, and publication is accepted only after the release path verifies the published tag/assets.
+It is designed to fail closed: source must be clean and pushed, the ASK-P authority must match the lock, and publication is accepted only after the release path verifies the published tag/assets.
 
 The release tooling can repair a clean submodule pointer mismatch, fast-forward a clean local branch, reuse an unfinished Actions run rather than dispatching a duplicate, and retain a verified JUCE 8.0.14 cache to reduce repeated clean-build setup time.
 
 ## Repository boundary
 
-- `masarray/sc220-live` — private canonical source, release automation, design authority, installer workflow, and private DSP submodule reference.
+- `masarray/sc220-live` — public application source with a private DSP submodule reference.
 - `masarray/sc220-download` — public landing pages, release metadata, checksums, manifests, end-user documentation, and compiled release assets.
 
 See [docs/RELEASE_BOUNDARY.md](docs/RELEASE_BOUNDARY.md), [docs/PUBLIC_RELEASE_GATE.md](docs/PUBLIC_RELEASE_GATE.md), and [docs/RELEASE_V0.1.1_RECEIPT.md](docs/RELEASE_V0.1.1_RECEIPT.md).

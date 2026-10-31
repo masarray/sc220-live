@@ -4,13 +4,16 @@
 
 Windows builds now compile JUCE ASIO support and provide one input-channel VST3 slot.
 The SC220 input FX menu offers manual selection, a plugin editor, bypass and removal.
-The plugin receives stereo voice after noise cleaning and expander, before voice enhancement.
-The engine removes the audio callback before plugin replacement and reprepares the loaded
-effect on device restart. Reported VST latency is included in the voice-path estimate.
+The plugin receives stereo voice before native voice enhancement, learned hiss
+cleanup and the expander. Noise Learn operates on a dry analysis tap and adds no delay
+to microphone audio. New VST3 instances are prepared on the UI thread while audio
+continues; a brief callback quiescence gate installs the prepared instance without
+restarting PC capture, the whole audio device or the native enhancer. Bypass uses a
+12 ms wet/latency-aligned-dry ramp. Reported VST latency contributes to voice telemetry.
 
 This is **not** a production-ready arbitrary plugin rack. The scanner subprocess,
-crash isolation/recovery, persistent plugin state, blacklisting and click-free bypass
-in the gate below are outstanding. Users should load only trusted plugins (e.g. their own
+crash isolation/recovery, persistent plugin state, blacklisting and click-free plugin
+**replacement** (not bypass) in the gate below remain outstanding. Users should load only trusted plugins (e.g. their own
 ArSonVerb). Input and output on ASIO must share one driver/clock; ASIO-to-WASAPI
 independent routing requires additional resampling/drift control.
 

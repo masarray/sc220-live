@@ -27,9 +27,13 @@ check(engine.index("voiceVst3.process (voiceBlock, voiceMidi);") <
       "Plugin routing accidentally reaches PC Music")
 check("masterLimiter.process (masterContext);" in engine,
       "Protected master output was removed")
-check(engine.count("deviceManager.removeAudioCallback (this);") >= 2
-      and engine.count("deviceManager.addAudioCallback (this);") >= 2,
-      "Plugin load/removal must detach callback before mutation")
+check("quiesceForPluginSwap()" in engine and "audioCallbacksInFlight" in engine
+      and "vstSwapSuspended" in engine,
+      "Prepared VST hot-swap must use a nonblocking audio-thread quiescence gate")
+check("InputVst3Rack::createPrepared" in engine and "voiceVst3.install" in engine,
+      "Plugin creation must finish before quiescing the audio callback")
+check(engine.count("deviceManager.removeAudioCallback (this);") == 1,
+      "Plugin swaps must not restart the entire device manager")
 check("voiceVst3.prepare (sampleRate, blockSize);" in engine
       and "voiceVst3.release();" in engine,
       "Plugin device lifecycle incomplete")
@@ -41,6 +45,21 @@ check("setBusesLayout (layout)" in rack
       and "getTotalNumOutputChannels() != 2" in rack,
       "Plugin stereo bus validation missing")
 check("std::isfinite" in rack, "Non-finite VST3 outputs must not poison the mixer")
+monitor = source("live/MonitorOutputClient.cpp")
+push = monitor.split("void MonitorOutputClient::push (", 1)[1].split(
+    "MonitorOutputClient::Status MonitorOutputClient::getStatus()", 1)[0]
+check("enqueueLocked" in push and "GetBuffer" not in push
+      and "AcquireSRWLock" not in push and "ensureComForCurrentThread" not in push,
+      "Monitor callback path must only publish SPSC samples")
+check("void run() override" in monitor and "renderAvailableLocked" in monitor,
+      "WASAPI rendering/reconnect needs a dedicated worker")
+check("const int discard = requested - freeSpace" not in monitor,
+      "FIFO producer must never move the consumer read cursor")
+noise = source("live/MusicalNoiseClean.cpp")
+capture = noise.split("void MusicalNoiseClean::process (", 1)[1].split(
+    "void SmoothDownwardExpander::prepare", 1)[0]
+check("buffer.setSample" not in capture and "buffer.copyFrom" not in capture,
+      "Learn Static Noise must not modify or delay live voice")
 check("voiceFxEditorWindow.reset();" in ui and "showVoiceVst3Editor()" in ui,
       "Voice FX editor teardown absent")
 check("&voiceFxButton" in ui_generator, "Generated UI omitted input FX button")

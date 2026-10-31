@@ -373,6 +373,23 @@ set(SC220_UI_GENERATED_SOURCE
     "${CMAKE_CURRENT_BINARY_DIR}/generated/sc220-ui/SC220MainComponent_Aligned.cpp")
 include("${CMAKE_CURRENT_SOURCE_DIR}/cmake/GenerateSC220AlignedUi.cmake")
 
+# One canonical production generator pipeline. The compiled translation units
+# must be the same monitor/route/latency/audio state that our QA validates.
+set(SC220_ENGINE_SOURCE "${CMAKE_CURRENT_SOURCE_DIR}/live/LiveAudioEngine.cpp")
+set(SC220_ENGINE_GENERATED_SOURCE
+    "${CMAKE_CURRENT_BINARY_DIR}/generated/sc220-runtime/LiveAudioEngine_Effective.cpp")
+include("${CMAKE_CURRENT_SOURCE_DIR}/cmake/GenerateSC220MonitorEngine.cmake")
+
+set(SC220_UI_MONITOR_SOURCE "${SC220_UI_GENERATED_SOURCE}")
+set(SC220_UI_MONITOR_GENERATED_SOURCE
+    "${CMAKE_CURRENT_BINARY_DIR}/generated/sc220-runtime/SC220MainComponent_Effective.cpp")
+include("${CMAKE_CURRENT_SOURCE_DIR}/cmake/GenerateSC220MonitorUi.cmake")
+
+set(SC220_APP_SOURCE "${CMAKE_CURRENT_SOURCE_DIR}/live/LiveApplication.cpp")
+set(SC220_APP_GENERATED_SOURCE
+    "${CMAKE_CURRENT_BINARY_DIR}/generated/sc220-runtime/LiveApplication_Effective.cpp")
+include("${CMAKE_CURRENT_SOURCE_DIR}/cmake/GenerateSC220BroadcastState.cmake")
+
 target_sources(SC220Live PRIVATE
     "${ASKP_DSP_SOURCE}"
     "${ASKP_PRESET_SOURCE}"
@@ -385,7 +402,8 @@ target_sources(SC220Live PRIVATE
     live/LiveLicensePanel.cpp
     live/MusicalNoiseClean.cpp
     live/PcAudioLoopbackCapture.cpp
-    live/LiveAudioEngine.cpp
+    "${SC220_ENGINE_GENERATED_SOURCE}"
+    live/MonitorOutputClient.cpp
     live/InputVst3Rack.cpp
     live/SmartPleasantPresence.cpp
     live/LiveTheme.cpp
@@ -393,8 +411,8 @@ target_sources(SC220Live PRIVATE
     live/LiveWidgets.cpp
     live/SonkupikSphereVisualizer.cpp
     live/LiveMainComponent.cpp
-    "${SC220_UI_GENERATED_SOURCE}"
-    live/LiveApplication.cpp
+    "${SC220_UI_MONITOR_GENERATED_SOURCE}"
+    "${SC220_APP_GENERATED_SOURCE}"
 )
 
 target_include_directories(SC220Live PRIVATE

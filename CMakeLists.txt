@@ -110,6 +110,7 @@ set(SC220_UI_GENERATED_SOURCE
 include("${CMAKE_CURRENT_SOURCE_DIR}/cmake/GenerateSC220AlignedUi.cmake")
 
 target_sources(SC220Live PRIVATE
+    third_party/sonkupik-sphere-v0.10.4/AskpLookAndFeel.cpp
     live/EnhancerEngineBridge.cpp
     live/LicenseManager.cpp
     live/LicenseCheckoutClient.cpp
@@ -126,7 +127,9 @@ target_sources(SC220Live PRIVATE
     live/LiveApplication.cpp
 )
 
-target_include_directories(SC220Live PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/live")
+target_include_directories(SC220Live PRIVATE
+    "${CMAKE_CURRENT_SOURCE_DIR}/live"
+    "${CMAKE_CURRENT_SOURCE_DIR}/third_party/sonkupik-sphere-v0.10.4")
 
 target_compile_definitions(SC220Live PRIVATE
     JUCE_WEB_BROWSER=0

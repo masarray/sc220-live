@@ -63,6 +63,27 @@ bool LiveAudioEngine::initialise (const juce::XmlElement* savedDeviceState)
         lastError = error;
     }
 
+    // Bundled, SHA-256 pinned official ArSonKuPik VST3 is shipped beside the EXE.
+    // Both instances are created on the message thread before the callback
+    // starts, without any source or compiler dependency on the ASK-P repository.
+    // Avoid automatic plugin discovery: the known bundle path is the authority.
+    const auto bundle = juce::File::getSpecialLocation (juce::File::currentExecutableFile)
+        .getParentDirectory().getChildFile ("Plugins").getChildFile ("ArSonKuPik.vst3");
+    if (auto* device = deviceManager.getCurrentAudioDevice())
+    {
+        const auto rate = device->getCurrentSampleRate();
+        const auto block = juce::jmax (64, device->getCurrentBufferSizeSamples());
+        const auto voiceError = voiceEnhancerBridge.loadBundled (bundle, rate, block);
+        const auto musicError = musicEnhancerBridge.loadBundled (bundle, rate, block);
+        if (voiceError.isNotEmpty() || musicError.isNotEmpty())
+        {
+            const juce::ScopedLock lock (statusLock);
+            lastError = "Bundled ArSonKuPik VST3 could not initialise. "
+                        "SC220 will run safe dry signal until the plugin is repaired. "
+                        "Voice: " + voiceError + "; Music: " + musicError;
+        }
+    }
+
     if (! callbackRegistered.exchange (true))
         deviceManager.addAudioCallback (this);
     refreshDeviceStatus();

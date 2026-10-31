@@ -94,8 +94,6 @@ public:
     bool hasVoiceVst3() const noexcept { return voiceVst3.isLoaded(); }
     juce::String getVoiceVst3Name() const { return voiceVst3.getName(); }
     juce::AudioPluginInstance* getVoiceVst3Processor() const noexcept { return voiceVst3.getProcessor(); }
-    askp::Processor& getAskpProcessor() noexcept { return voiceEnhancerBridge.processor(); }
-    const askp::Processor& getAskpProcessor() const noexcept { return voiceEnhancerBridge.processor(); }
     EnhancerEngineBridge& getEnhancerBridge() noexcept { return voiceEnhancerBridge; }
     EnhancerEngineBridge& getVoiceEnhancerBridge() noexcept { return voiceEnhancerBridge; }
     EnhancerEngineBridge& getMusicEnhancerBridge() noexcept { return musicEnhancerBridge; }

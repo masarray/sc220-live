@@ -159,6 +159,8 @@ jobs:
       - name: Validate immutable release identity and assets
         shell: bash
         env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
           TAG_NAME: ${{ inputs.version }}
         run: |
           [[ "$TAG_NAME" =~ ^v0\.1\.2-portable-preview\.[0-9]+$ ]] || {

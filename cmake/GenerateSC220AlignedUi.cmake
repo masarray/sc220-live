@@ -73,6 +73,16 @@ set(_input_layout_replacement [=[
 
 sc220_replace_once(_sc220_ui_source "input channel geometry"
     "${_input_layout_anchor}" "${_input_layout_replacement}")
+# Keep voice FX between SC220 status and INPUT TRIM in the production aligned grid.
+set(_voice_fx_position_anchor [=[
+    voiceFxButton.setBounds (sc220StripArea.getCentreX() - 74, sc220StripArea.getY() + 160, 148, 22);
+]=])
+set(_voice_fx_position_replacement [=[
+    voiceFxButton.setBounds (sc220StripArea.getCentreX() - 74, sourceSelectorY - 130, 148, 22);
+]=])
+sc220_replace_once(_sc220_ui_source "voice FX position"
+    "${_voice_fx_position_anchor}" "${_voice_fx_position_replacement}")
+
 
 set(_master_layout_anchor [=[
     loudnessDisplay->setBounds (masterArea.getCentreX() - 100, masterArea.getY() + 48, 200, 200);

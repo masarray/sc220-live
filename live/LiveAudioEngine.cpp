@@ -116,6 +116,34 @@ bool LiveAudioEngine::initialise (const juce::XmlElement* savedDeviceState)
     return error.isEmpty();
 }
 
+juce::String LiveAudioEngine::loadVoiceVst3 (const juce::File& pluginFile)
+{
+    const bool wasRegistered = callbackRegistered.exchange (false);
+    if (wasRegistered)
+        deviceManager.removeAudioCallback (this);
+    // The VST3 is loaded only on the message thread with no audio callback.
+    const auto error = voiceVst3.load (pluginFile, currentSampleRate.load(), currentBufferSize.load());
+    if (wasRegistered)
+    {
+        deviceManager.addAudioCallback (this);
+        callbackRegistered.store (true);
+    }
+    return error;
+}
+
+void LiveAudioEngine::removeVoiceVst3()
+{
+    const bool wasRegistered = callbackRegistered.exchange (false);
+    if (wasRegistered)
+        deviceManager.removeAudioCallback (this);
+    voiceVst3.clear();
+    if (wasRegistered)
+    {
+        deviceManager.addAudioCallback (this);
+        callbackRegistered.store (true);
+    }
+}
+
 void LiveAudioEngine::shutdown()
 {
     pcLoopback.stop();
@@ -529,6 +557,7 @@ void LiveAudioEngine::audioDeviceIOCallbackWithContext (
     expander.process (voiceBlock, detectorBlock);
 
     voiceMidi.clear();
+    voiceVst3.process (voiceBlock, voiceMidi); // Voice FX only; PC Music bypasses this insert.
     voiceEnhancerBridge.process (voiceBlock, voiceMidi);
     if (! voiceEnhancerBypassed.load (std::memory_order_relaxed))
     {
@@ -667,6 +696,8 @@ void LiveAudioEngine::audioDeviceAboutToStart (juce::AudioIODevice* device)
 
     const auto sampleRate = device->getCurrentSampleRate();
     const auto blockSize = juce::jmax (64, device->getCurrentBufferSizeSamples());
+    currentSampleRate.store (sampleRate);
+    currentBufferSize.store (blockSize);
     constexpr int channels = 2;
 
     processBuffer.setSize (channels, blockSize, false, true, false);
@@ -681,6 +712,7 @@ void LiveAudioEngine::audioDeviceAboutToStart (juce::AudioIODevice* device)
 
     voiceEnhancerBridge.prepare (sampleRate, blockSize);
     musicEnhancerBridge.prepare (sampleRate, blockSize);
+    voiceVst3.prepare (sampleRate, blockSize);
     pleasantPresence.prepare (sampleRate, blockSize, channels);
     updateInputTrimRouting();
     updateOutputTrimRouting();
@@ -736,7 +768,8 @@ void LiveAudioEngine::audioDeviceAboutToStart (juce::AudioIODevice* device)
     pcLoopback.prepare (sampleRate);
     pcLoopback.start();
 
-    const int voiceLatency = noiseClean.getLatencySamples() + voiceEnhancerBridge.latencySamples();
+    const int voiceLatency = noiseClean.getLatencySamples() + voiceVst3.getLatencySamples()
+                           + voiceEnhancerBridge.latencySamples();
     const int musicLatency = musicEnhancerBridge.latencySamples();
     voiceLatencySamples.store (voiceLatency);
     musicDspLatencySamples.store (musicLatency);
@@ -755,6 +788,7 @@ void LiveAudioEngine::audioDeviceStopped()
     pcLoopback.stop();
     voiceEnhancerBridge.release();
     musicEnhancerBridge.release();
+    voiceVst3.release();
     pleasantPresence.reset();
     masterLimiter.reset();
     running.store (false);

@@ -35,10 +35,12 @@ set(_voice_noise_anchor [=[
     expander.process (voiceBlock, detectorBlock);
 
     voiceMidi.clear();
+    voiceVst3.process (voiceBlock, voiceMidi); // Voice insert before native enhancer.
     voiceEnhancerBridge.process (voiceBlock, voiceMidi);
 ]=])
 set(_voice_noise_replacement [=[
     voiceMidi.clear();
+    voiceVst3.process (voiceBlock, voiceMidi); // Voice insert before native enhancer.
     voiceEnhancerBridge.process (voiceBlock, voiceMidi);
 
     expander.setNoiseFloorDb (noiseClean.hasProfile()
@@ -57,7 +59,7 @@ set(_settings_anchor [=[
 void SC220MainComponent::showSettingsMenu()
 {
     juce::PopupMenu menu;
-    menu.addItem (1, "Audio Setup");
+    menu.addItem (1, "Audio Setup (WASAPI / ASIO)");
     menu.addItem (2, "License & Activation");
     menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&settingsButton),
                         [this] (int result)
@@ -80,7 +82,7 @@ void SC220MainComponent::showSettingsMenu()
     const bool noiseEnabled = noise.isEnabled() && expander.isEnabled();
 
     juce::PopupMenu menu;
-    menu.addItem (1, "Audio Setup");
+    menu.addItem (1, "Audio Setup (WASAPI / ASIO)");
     menu.addSeparator();
     menu.addItem (2, "Noise Clean", true, noiseEnabled);
     menu.addItem (3, "Learn Static Noise (2 sec)", noiseEnabled && ! noise.isLearning());

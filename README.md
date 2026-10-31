@@ -46,19 +46,36 @@ The approved processor includes the latest v0.5.24 Gain Match settle-controller 
 
 See [docs/ASKP_SOURCE_SYNC.md](docs/ASKP_SOURCE_SYNC.md) and [docs/ASKP_P03_DSP_PORT.md](docs/ASKP_P03_DSP_PORT.md).
 
-## ASIO and VST3 Voice FX — development branch
+## Independent first-party VST3 host (GitHub Actions builds)
 
-Windows enables JUCE's bundled ASIO backend alongside WASAPI. Select an installed ASIO driver through **Settings → Audio Setup**. ASIO input/output must use the same driver's clock; ASIO input with a separate WASAPI output is not supported without drift correction.
+SC220 Live is an independent JUCE 8 ASIO/WASAPI live mixer. It does **not**
+compile or fetch private `askp-vst` DSP source. Two independent instances of
+the official **ArSonKuPik v0.5.26 VST3** process Voice and PC Music, while
+SC220 owns routing, live protection, ASIO device configuration, UI, license
+verification, meters and streamer/monitor outputs.
 
-In the **SC220 INPUT** strip, press **+ VST3 FX → Load VST3 effect** and choose a trusted stereo VST3 bundle, such as ArSonVerb. The FX menu also provides the plugin editor, bypass and removal.
+The official plugin bundle is obtained by the public Windows CI from:
+https://github.com/masarray/vst-enhancer/releases/tag/v0.5.26
 
-Hardware voice flows through trim → dry-only Noise Learn analysis (only during calibration) → VST3 → voice enhancer → learned hiss/expander stages → voice fader → protected master. PC Music never passes through the voice FX slot.
+The CI verifies the official VST3 ZIP using SHA-256
+`e53287c871166bcdc945b4962d7a38b5c93ad6cb0c0fa0bdd02fa42ff47cd5b6`
+and packages `Plugins/ArSonKuPik.vst3` next to `SC220 Live.exe`.
+The application auto-loads both instances before audio callback registration;
+the plugin is not downloaded dynamically at runtime. An absent/incompatible
+bundle produces a visible error and a dry fallback, not a silent crash.
+ArSonVerb can still be loaded independently in the voice FX rack.
 
-**Real-time hardening:** Native monitor WASAPI COM/render/reconnect runs on a dedicated worker; the audio callback writes to a bounded SPSC FIFO. VST3 loading prepares the candidate before briefly quiescing the audio callback, so plugin changes no longer restart the whole mixer. Bypass uses a 12 ms phase-aligned fade; the active effect keeps processing to preserve reverb tails. ASIO is made available, but switching drivers is **always explicit** to protect saved routing.
+**All builds are done through GitHub-hosted Windows CI. No local/self-hosted
+runner, private DSP submodule, ASK-P token or build secret is required.**
+See `.github/workflows/sc220-public-windows-ci.yml`. The independent SC220
+license verifier keeps the previously shipped SC220 request/activation format.
 
-**Windows hardware preview:** Checkout this development branch, authenticate Git Credential Manager for the private `masarray/askp-vst` submodule, then run `powershell -ExecutionPolicy Bypass -File .\\scripts\\build-asio-vst3-hardware-preview.ps1` from the repo root. This creates an unsigned local EXE without any hosted CI token. See `docs/REALTIME_SAFETY.md` for physical acceptance tests.
-
-**Limitations:** Generic VST3 plugins are not sandboxed. Plugin state recall, crash isolation and click-free plugin *replacement* are not production-complete. The ASK-P embedded processor contains a fixed lookahead, so do not claim 0 ms input-to-output latency. An actual Windows compile and physical device test are required before a stable release. Official binary publication remains in `sc220-download`.
+**Release gates:** a successful Windows compilation, source/CTest checks,
+pinned VST3 checksum, and user verification on actual ASIO hardware.
+Independent plugin license/evaluation restrictions still apply to the VST3
+binary; no bypass of those restrictions is implemented. A VST3 loaded in-process
+is not crash-isolated. The SC220 development preview is not guaranteed
+zero physical latency or crackle-free without hardware measurements.
 
 ## Runtime capabilities
 

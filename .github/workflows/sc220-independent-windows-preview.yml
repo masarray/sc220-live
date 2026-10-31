@@ -37,6 +37,21 @@ jobs:
         run: |
           cmake --build build --target SC220Live --config Release --parallel 2
           if ($LASTEXITCODE -ne 0) { throw 'MSVC compile failed.' }
+      - name: Download official v0.5.26 ArSonKuPik VST3 binary (no private source)
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $asset = 'ArSonKuPik-v0.5.26-Windows-x64-VST3.zip'
+          $url = 'https://github.com/masarray/vst-enhancer/releases/download/v0.5.26/' + $asset
+          Invoke-WebRequest -Uri $url -OutFile $asset -MaximumRedirection 10
+          $actual = (Get-FileHash $asset -Algorithm SHA256).Hash.ToLowerInvariant()
+          $expected = 'e53287c871166bcdc945b4962d7a38b5c93ad6cb0c0fa0bdd02fa42ff47cd5b6'
+          if ($actual -cne $expected) { throw "ArSonKuPik release SHA256 verification failed: $actual" }
+          New-Item -ItemType Directory -Path unpacked-enhancer -Force | Out-Null
+          Expand-Archive -LiteralPath $asset -DestinationPath unpacked-enhancer -Force
+          $plugins = Get-ChildItem -Path unpacked-enhancer -Recurse -Directory -Filter '*.vst3'
+          if (-not $plugins) { throw 'Official VST3 archive does not contain a VST3 bundle.' }
+          Write-Host "Verified public ArSonKuPik VST3, SHA256 $actual"
       - name: Package unsigned Windows preview
         shell: pwsh
         run: |
@@ -47,12 +62,18 @@ jobs:
           if (-not $exe) { throw 'SC220 Release EXE not found.' }
           New-Item -ItemType Directory preview -Force | Out-Null
           Copy-Item $exe.FullName preview/
+          New-Item -ItemType Directory preview/plugins -Force | Out-Null
+          $bundles = Get-ChildItem unpacked-enhancer -Directory -Recurse -Filter '*.vst3'
+          foreach ($bundle in $bundles) {
+            Copy-Item $bundle.FullName -Destination preview/plugins -Recurse -Force
+          }
+          "Bundled VST3: ArSonKuPik v0.5.26 (official binary SHA256 e53287c871166bcdc945b4962d7a38b5c93ad6cb0c0fa0bdd02fa42ff47cd5b6)" | Set-Content preview/VST3-PROVENANCE.txt
           "Build SHA: $env:GITHUB_SHA" | Set-Content preview/BUILD-INFO.txt
           "SHA256: $((Get-FileHash $exe.FullName -Algorithm SHA256).Hash)" | Add-Content preview/BUILD-INFO.txt
           @'
           SC220 independent VST3 host - DEVELOPMENT PREVIEW
-          No embedded ASK-P DSP. Install ArSonKuPik.vst3 and ArSonVerb.vst3
-          separately. Windows Setup -> select ASIO or WASAPI.
+          No embedded ASK-P DSP. ArSonKuPik v0.5.26 VST3 is bundled
+          from a verified official public GitHub Release. ArSonVerb optional. Windows Setup -> select ASIO or WASAPI.
           Input 1/2 = Voice; Input 3/4 = Music (when supported by device).
           GO LIVE is muted by default. Test routing with monitors off first.
           Audio hardware, editor, streaming and DSP parity remain unverified.

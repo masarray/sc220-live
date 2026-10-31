@@ -1345,7 +1345,6 @@ void SC220MainComponent::resized()
                             sc220StripArea.getWidth() / 2 - 10, 31);
     dualMonoButton.setBounds (stereoButton.getRight(), stereoButton.getY(),
                               sc220StripArea.getWidth() / 2 - 10, 31);
-    voiceFxButton.setBounds (sc220StripArea.getCentreX() - 74, sc220StripArea.getY() + 160, 148, 22);
     inputTrim.setBounds (sc220StripArea.getCentreX() - 46, sc220StripArea.getY() + 186, 92, 92);
     sc220Meter->setBounds (sc220StripArea.getX() + 18, sc220StripArea.getY() + 306,
                            30, sc220StripArea.getHeight() - 392);
@@ -1361,6 +1360,8 @@ void SC220MainComponent::resized()
                        68, pcStripArea.getHeight() - 300);
     duckAmount.setBounds (pcStripArea.getX() + 24, pcStripArea.getBottom() - 82, 70, 70);
 
+    // Outside the console-grid replacement anchor; retained in the generated production UI.
+    voiceFxButton.setBounds (sc220StripArea.getCentreX() - 74, sc220StripArea.getY() + 160, 148, 22);
     presetBox.setBounds (signatureArea.getCentreX() - 102, signatureArea.getY() + 72, 204, 36);
     enhancerPowerButton.setBounds (signatureArea.getRight() - 54, signatureArea.getY() + 20, 36, 36);
     spectrumDisplay->setBounds (signatureArea.reduced (34, 0).withTop (signatureArea.getY() + 128)

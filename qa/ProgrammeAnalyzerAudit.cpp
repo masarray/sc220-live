@@ -1,4 +1,4 @@
-#include "PluginProcessor.h"
+#include "ScopeTap.h"
 
 #include <juce_dsp/juce_dsp.h>
 

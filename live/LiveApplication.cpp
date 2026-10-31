@@ -235,7 +235,7 @@ class SC220LiveApplication final : public juce::JUCEApplication
 {
 public:
     const juce::String getApplicationName() override { return "SC220 Live"; }
-    const juce::String getApplicationVersion() override { return "0.1.0"; }
+    const juce::String getApplicationVersion() override { return "0.1.2"; }
     bool moreThanOneInstanceAllowed() override { return false; }
 
     void initialise (const juce::String&) override
@@ -290,6 +290,11 @@ public:
             audioEngine->setEngineEnabled (file->getBoolValue ("engineEnabled", true));
         }
         audioEngine->initialise (deviceState.get());
+#if ! JUCE_WINDOWS
+        // Only Windows has a WASAPI PC Music capture backend. A saved Windows
+        // preference must never imply that capture is active on macOS/Linux.
+        audioEngine->setPcAudioEnabled (false);
+#endif
 
         mainWindow = std::make_unique<LiveMainWindow> (
             *audioEngine,

@@ -246,15 +246,15 @@ struct MonitorOutputClient::Impl : public juce::Thread
     // Gating protects FIFO resets without ever waiting in the audio callback.
     void pausePublishing() noexcept
     {
-        publishing.store (false, std::memory_order_release);
-        while (writersInFlight.load (std::memory_order_acquire) != 0)
+        publishing.store (false, std::memory_order_seq_cst);
+        while (writersInFlight.load (std::memory_order_seq_cst) != 0)
             juce::Thread::sleep (1); // Worker/control only.
     }
 
     void resumePublishing() noexcept
     {
 #if JUCE_WINDOWS
-        publishing.store (audioClient != nullptr, std::memory_order_release);
+        publishing.store (audioClient != nullptr, std::memory_order_seq_cst);
 #endif
     }
 
@@ -337,7 +337,7 @@ struct MonitorOutputClient::Impl : public juce::Thread
 #endif
     }
 
-    void enqueueLocked (const juce::AudioBuffer<float>& source,
+    void enqueueFromAudioThread (const juce::AudioBuffer<float>& source,
                         int numSamples) noexcept
     {
         const int requested = juce::jmin (numSamples, source.getNumSamples());
@@ -579,7 +579,7 @@ struct MonitorOutputClient::Impl : public juce::Thread
         endpointPaddingFrames.store (0, std::memory_order_relaxed);
         reconnectPending = true;
         // FIFO reset is deferred to the worker's gated reconnection.
-        publishing.store (false, std::memory_order_release);
+        publishing.store (false, std::memory_order_seq_cst);
         setError (operation + " failed; monitor will reconnect automatically ("
                   + hresultText (result) + ").");
     }
@@ -992,12 +992,12 @@ void MonitorOutputClient::push (const juce::AudioBuffer<float>& source,
 {
 #if JUCE_WINDOWS
     if (numSamples <= 0 || source.getNumChannels() <= 0
-        || ! impl->publishing.load (std::memory_order_acquire))
+        || ! impl->publishing.load (std::memory_order_seq_cst))
         return;
-    impl->writersInFlight.fetch_add (1, std::memory_order_acq_rel);
-    if (impl->publishing.load (std::memory_order_acquire))
-        impl->enqueueLocked (source, numSamples); // Fixed-capacity SPSC only.
-    impl->writersInFlight.fetch_sub (1, std::memory_order_release);
+    impl->writersInFlight.fetch_add (1, std::memory_order_seq_cst);
+    if (impl->publishing.load (std::memory_order_seq_cst))
+        impl->enqueueFromAudioThread (source, numSamples); // Fixed-capacity SPSC only.
+    impl->writersInFlight.fetch_sub (1, std::memory_order_seq_cst);
 #else
     juce::ignoreUnused (source, numSamples);
 #endif

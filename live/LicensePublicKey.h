@@ -1,0 +1,10 @@
+#pragma once
+
+namespace askp::licensing {
+
+// Public verification key for ArSonKuPik offline activation.
+// The matching private key must never be committed or shipped with the plugin.
+inline constexpr const char* kRsaPublicKey =
+    "10001,bd5c787be321fdbaa0796ae2148244d82db8bc415a5df633ac42acad3787e8f41751b9165bcda4178baeccd7cbe732074b78515e0d907e1956fe34f5ace1bd2dcd7e3df62667aedb010922bdf0b8cb69400036bc8c1457bbc1dcd650e62586e1e423e2b6b1046a6c22418e6bec01da1288c6701bef1fbfe9421f5e1620b9aa78b2130f90da4db30bc63fbecb9399e76a8f3d9ce655ce93ea2d475245fe1e78813a0c17b636363a14c6cb8637d0f10cb52687aea93394e5c0ddab247f92f575069f35fb2ad9043507b907aeafb9391d714400f52693410547b68b93944b8e2284714003349081c717b4312973e9a55ac1ffed1e2eeceb4636bb747600b13cc879";
+
+} // namespace askp::licensing

@@ -1,5 +1,19 @@
 # External VST3 Hosting Roadmap
 
+## Current stage: trusted manual voice VST3 insert
+
+Windows builds now compile JUCE ASIO support and provide one input-channel VST3 slot.
+The SC220 input FX menu offers manual selection, a plugin editor, bypass and removal.
+The plugin receives stereo voice after noise cleaning and expander, before voice enhancement.
+The engine removes the audio callback before plugin replacement and reprepares the loaded
+effect on device restart. Reported VST latency is included in the voice-path estimate.
+
+This is **not** a production-ready arbitrary plugin rack. The scanner subprocess,
+crash isolation/recovery, persistent plugin state, blacklisting and click-free bypass
+in the gate below are outstanding. Users should load only trusted plugins (e.g. their own
+ArSonVerb). Input and output on ASIO must share one driver/clock; ASIO-to-WASAPI
+independent routing requires additional resampling/drift control.
+
 ## Product intent
 
 External plugins extend Sonkupik Live into a compact live rack, but the app must not become a

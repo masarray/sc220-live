@@ -69,19 +69,21 @@ bool LiveAudioEngine::initialise (const juce::XmlElement* savedDeviceState)
     // Avoid automatic plugin discovery: the known bundle path is the authority.
     const auto bundle = juce::File::getSpecialLocation (juce::File::currentExecutableFile)
         .getParentDirectory().getChildFile ("Plugins").getChildFile ("ArSonKuPik.vst3");
-    if (auto* device = deviceManager.getCurrentAudioDevice())
+    // Prepare on startup even if no default Windows endpoint is open yet:
+    // user may select a native ASIO device for the first time AFTER launch.
+    auto* startupDevice = deviceManager.getCurrentAudioDevice();
+    const double pluginRate = startupDevice != nullptr
+        ? startupDevice->getCurrentSampleRate() : 48000.0;
+    const int pluginBlock = startupDevice != nullptr
+        ? juce::jmax (64, startupDevice->getCurrentBufferSizeSamples()) : 256;
+    const auto voiceError = voiceEnhancerBridge.loadBundled (bundle, pluginRate, pluginBlock);
+    const auto musicError = musicEnhancerBridge.loadBundled (bundle, pluginRate, pluginBlock);
+    if (voiceError.isNotEmpty() || musicError.isNotEmpty())
     {
-        const auto rate = device->getCurrentSampleRate();
-        const auto block = juce::jmax (64, device->getCurrentBufferSizeSamples());
-        const auto voiceError = voiceEnhancerBridge.loadBundled (bundle, rate, block);
-        const auto musicError = musicEnhancerBridge.loadBundled (bundle, rate, block);
-        if (voiceError.isNotEmpty() || musicError.isNotEmpty())
-        {
-            const juce::ScopedLock lock (statusLock);
-            lastError = "Bundled ArSonKuPik VST3 could not initialise. "
-                        "SC220 will run safe dry signal until the plugin is repaired. "
-                        "Voice: " + voiceError + "; Music: " + musicError;
-        }
+        const juce::ScopedLock lock (statusLock);
+        lastError = "Bundled ArSonKuPik VST3 could not initialise. "
+                    "SC220 will run safe dry signal until the plugin is repaired. "
+                    "Voice: " + voiceError + "; Music: " + musicError;
     }
 
     if (! callbackRegistered.exchange (true))

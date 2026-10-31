@@ -139,3 +139,17 @@ See [docs/RELEASE_BOUNDARY.md](docs/RELEASE_BOUNDARY.md), [docs/PUBLIC_RELEASE_G
 - Never select the same endpoint or virtual-cable family as both PC Audio Source and Stream/Monitor destination.
 - Restart Windows after installing or repairing an audio driver when requested.
 - Avoid clipping and verify the complete signal path before a production broadcast.
+
+## Linux and macOS build candidates (not public Windows release replacements)
+
+Linux x64 and macOS universal (Intel + Apple Silicon) use
+[the existing public distribution authority in sc220-download](https://github.com/masarray/sc220-download/blob/main/.github/workflows/build-portable-release.yml),
+[platform limitations and acceptance criteria](docs/PORTABLE_RELEASE.md),
+and native CMake presets. The pinned proprietary ASK-P engine stays private.
+Only compiled assets may be published to **public sc220-download Releases**
+after both platform CI checks pass and an explicit manual release request.
+
+**Not yet feature-equivalent:** Windows-only WASAPI playback capture and
+independent physical Monitor Bus are unavailable on Linux/macOS. Do not
+market the portable builds as tested production stream mixers until native
+capture, monitor routing, real SC220 tests and platform signing are complete.

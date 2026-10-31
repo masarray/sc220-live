@@ -320,7 +320,7 @@ set(_destructor_block_anchor [=[
 SC220MainComponent::~SC220MainComponent()
 {
     stopTimer();
-    voiceFxEditorWindow.reset();
+    voiceFxEditorWindow.reset(); // Editor must die before its VST3 AudioProcessor.
     voiceFxChooser.reset();
     audioEngine.getVoiceEnhancerBridge().setVisualTapEnabled (false);
     audioEngine.getMusicEnhancerBridge().setVisualTapEnabled (false);
@@ -331,7 +331,7 @@ set(_destructor_block_replacement [=[
 SC220MainComponent::~SC220MainComponent()
 {
     stopTimer();
-    voiceFxEditorWindow.reset();
+    voiceFxEditorWindow.reset(); // Editor must die before its VST3 AudioProcessor.
     voiceFxChooser.reset();
     audioEngine.setProgrammeAnalyzerEnabled (false);
     audioEngine.getVoiceEnhancerBridge().setVisualTapEnabled (false);

@@ -320,6 +320,8 @@ set(_destructor_block_anchor [=[
 SC220MainComponent::~SC220MainComponent()
 {
     stopTimer();
+    voiceFxEditorWindow.reset();
+    voiceFxChooser.reset();
     audioEngine.getVoiceEnhancerBridge().setVisualTapEnabled (false);
     audioEngine.getMusicEnhancerBridge().setVisualTapEnabled (false);
     setLookAndFeel (nullptr);
@@ -329,6 +331,8 @@ set(_destructor_block_replacement [=[
 SC220MainComponent::~SC220MainComponent()
 {
     stopTimer();
+    voiceFxEditorWindow.reset();
+    voiceFxChooser.reset();
     audioEngine.setProgrammeAnalyzerEnabled (false);
     audioEngine.getVoiceEnhancerBridge().setVisualTapEnabled (false);
     audioEngine.getMusicEnhancerBridge().setVisualTapEnabled (false);

@@ -142,11 +142,11 @@ See [docs/RELEASE_BOUNDARY.md](docs/RELEASE_BOUNDARY.md), [docs/PUBLIC_RELEASE_G
 
 ## Linux and macOS build candidates (not public Windows release replacements)
 
-Linux x64 and macOS universal (Intel + Apple Silicon) are covered by
-[the portable preview workflow](.github/workflows/portable-release.yml),
+Linux x64 and macOS universal (Intel + Apple Silicon) use
+[the existing public distribution authority in sc220-download](https://github.com/masarray/sc220-download/blob/main/.github/workflows/build-portable-release.yml),
 [platform limitations and acceptance criteria](docs/PORTABLE_RELEASE.md),
-and native CMake presets. Those builds retain the pinned proprietary ASK-P
-engine and only publish compiled assets to **private** GitHub Releases
+and native CMake presets. The pinned proprietary ASK-P engine stays private.
+Only compiled assets may be published to **public sc220-download Releases**
 after both platform CI checks pass and an explicit manual release request.
 
 **Not yet feature-equivalent:** Windows-only WASAPI playback capture and

@@ -44,7 +44,7 @@ jobs:
       - name: Compile SC220 Live and independent QA
         shell: pwsh
         run: |
-          cmake --build build --config Release --target SC220Live SC220LoudnessAudit SC220ProgrammeAnalyzerAudit SC220PleasantPresenceAudit --parallel 3
+          cmake --build build --config Release --target SC220Live SC220LoudnessAudit SC220ProgrammeAnalyzerAudit SC220PleasantPresenceAudit SC220BundledVstSmoke --parallel 3
           if ($LASTEXITCODE -ne 0) { throw "Windows Release compilation failed" }
       - name: Run CTest
         shell: pwsh
@@ -64,6 +64,13 @@ jobs:
           $bundle=Get-ChildItem -Path "vst-archive" -Filter "*.vst3" -Recurse |
             Where-Object { $_.PSIsContainer -or $_.Extension -eq ".vst3" } | Select-Object -First 1
           if (-not $bundle) { throw "Expected ArSonKuPik.vst3 binary bundle missing from official release" }
+          # End-to-end host proof: two actual plugin instances, mandatory macros,
+          # startup plus bypass, finite DSP output. Fail package on any mismatch.
+          $smoke=Get-ChildItem -Path "build/SC220BundledVstSmoke_artefacts" -Filter "*.exe" -File -Recurse |
+            Where-Object { $_.FullName -match "\\\\Release\\\\" } | Select-Object -First 1
+          if (-not $smoke) { throw "VST3 executable smoke test missing" }
+          & $smoke.FullName $bundle.FullName
+          if ($LASTEXITCODE -ne 0) { throw "Bundled ArSonKuPik VST3 binary failed host smoke test" }
           $exe=Get-ChildItem -Path "build/SC220Live_artefacts" -Recurse -Filter "*.exe" -File |
             Where-Object { $_.FullName -match "\\Release\\" } | Select-Object -First 1
           if (-not $exe) { throw "SC220 Windows Release EXE missing" }

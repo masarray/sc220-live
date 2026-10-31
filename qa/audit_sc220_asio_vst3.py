@@ -48,7 +48,7 @@ check("std::isfinite" in rack, "Non-finite VST3 outputs must not poison the mixe
 monitor = source("live/MonitorOutputClient.cpp")
 push = monitor.split("void MonitorOutputClient::push (", 1)[1].split(
     "MonitorOutputClient::Status MonitorOutputClient::getStatus()", 1)[0]
-check("enqueueLocked" in push and "GetBuffer" not in push
+check("enqueueFromAudioThread" in push and "GetBuffer" not in push
       and "AcquireSRWLock" not in push and "ensureComForCurrentThread" not in push,
       "Monitor callback path must only publish SPSC samples")
 check("void run() override" in monitor and "renderAvailableLocked" in monitor,

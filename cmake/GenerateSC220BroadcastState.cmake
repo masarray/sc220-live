@@ -51,8 +51,6 @@ sc220_state_replace_once(_app "load monitor and music settings"
 
 set(_initialise_anchor [=[
         audioEngine->initialise (deviceState.get());
-
-        mainWindow = std::make_unique<LiveMainWindow> (
 ]=])
 set(_initialise_replacement [=[
         audioEngine->initialise (deviceState.get());
@@ -62,8 +60,6 @@ set(_initialise_replacement [=[
             if (monitorDevice.isNotEmpty())
                 audioEngine->selectMonitorOutputDevice (monitorDevice);
         }
-
-        mainWindow = std::make_unique<LiveMainWindow> (
 ]=])
 sc220_state_replace_once(_app "restore physical monitor device"
     "${_initialise_anchor}" "${_initialise_replacement}")

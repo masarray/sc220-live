@@ -116,32 +116,68 @@ bool LiveAudioEngine::initialise (const juce::XmlElement* savedDeviceState)
     return error.isEmpty();
 }
 
+bool LiveAudioEngine::quiesceForPluginSwap() noexcept
+{
+    // This gate is checked before any mutable plugin or DSP member is touched.
+    // Unlike removeAudioCallback(), it does NOT release/prepare the entire graph.
+    vstSwapSuspended.store (true, std::memory_order_release);
+    for (int attempt = 0; attempt < 500; ++attempt)
+    {
+        if (audioCallbacksInFlight.load (std::memory_order_acquire) == 0)
+            return true;
+        juce::Thread::sleep (1); // Message thread only, never the audio callback.
+    }
+    vstSwapSuspended.store (false, std::memory_order_release);
+    return false; // Refuse to destroy a processor while its callback may be stuck.
+}
+
+void LiveAudioEngine::publishLatencyEstimate() noexcept
+{
+    const int voiceLatency = noiseClean.getLatencySamples() + voiceVst3.getLatencySamples()
+                           + voiceEnhancerBridge.latencySamples();
+    const int musicLatency = musicEnhancerBridge.latencySamples();
+    voiceLatencySamples.store (voiceLatency, std::memory_order_relaxed);
+    musicDspLatencySamples.store (musicLatency, std::memory_order_relaxed);
+    if (auto* device = deviceManager.getCurrentAudioDevice())
+        totalLatencySamples.store (juce::jmax (voiceLatency, musicLatency)
+                                   + device->getInputLatencyInSamples()
+                                   + device->getOutputLatencyInSamples(),
+                                   std::memory_order_relaxed);
+}
+
 juce::String LiveAudioEngine::loadVoiceVst3 (const juce::File& pluginFile)
 {
-    const bool wasRegistered = callbackRegistered.exchange (false);
-    if (wasRegistered)
-        deviceManager.removeAudioCallback (this);
-    // The VST3 is loaded only on the message thread with no audio callback.
-    const auto error = voiceVst3.load (pluginFile, currentSampleRate.load(), currentBufferSize.load());
-    if (wasRegistered)
+    const double sampleRate = currentSampleRate.load (std::memory_order_acquire);
+    const int blockSize = currentBufferSize.load (std::memory_order_acquire);
+    InputVst3Rack::PreparedInstance candidate;
+    const auto error = InputVst3Rack::createPrepared (pluginFile, sampleRate, blockSize, candidate);
+    if (error.isNotEmpty())
+        return error;
+
+    if (sampleRate != currentSampleRate.load() || blockSize != currentBufferSize.load())
     {
-        deviceManager.addAudioCallback (this);
-        callbackRegistered.store (true);
+        candidate->releaseResources();
+        return "The audio device changed while preparing the VST3. Try loading again.";
     }
-    return error;
+
+    if (! quiesceForPluginSwap())
+    {
+        candidate->releaseResources();
+        return "The audio callback did not become idle; VST3 was not replaced.";
+    }
+    voiceVst3.install (std::move (candidate), sampleRate, blockSize);
+    publishLatencyEstimate();
+    vstSwapSuspended.store (false, std::memory_order_release);
+    return {};
 }
 
 void LiveAudioEngine::removeVoiceVst3()
 {
-    const bool wasRegistered = callbackRegistered.exchange (false);
-    if (wasRegistered)
-        deviceManager.removeAudioCallback (this);
+    if (! quiesceForPluginSwap())
+        return; // Never destroy a processor still in use.
     voiceVst3.clear();
-    if (wasRegistered)
-    {
-        deviceManager.addAudioCallback (this);
-        callbackRegistered.store (true);
-    }
+    publishLatencyEstimate();
+    vstSwapSuspended.store (false, std::memory_order_release);
 }
 
 void LiveAudioEngine::shutdown()
@@ -480,8 +516,18 @@ void LiveAudioEngine::audioDeviceIOCallbackWithContext (
     float* const* outputChannelData, int numOutputChannels,
     int numSamples, const juce::AudioIODeviceCallbackContext&)
 {
+    struct CallbackLifetime final
+    {
+        explicit CallbackLifetime (std::atomic<int>& count) noexcept : inFlight (count)
+        { inFlight.fetch_add (1, std::memory_order_acq_rel); }
+        ~CallbackLifetime() { inFlight.fetch_sub (1, std::memory_order_release); }
+        std::atomic<int>& inFlight;
+    } guard (audioCallbacksInFlight);
+
     const auto start = std::chrono::high_resolution_clock::now();
     clearOutputs (outputChannelData, numOutputChannels, numSamples);
+    if (vstSwapSuspended.load (std::memory_order_acquire))
+        return;
 
     if (! running.load() || ! engineEnabled.load() || numOutputChannels <= 0)
         return;
@@ -768,14 +814,7 @@ void LiveAudioEngine::audioDeviceAboutToStart (juce::AudioIODevice* device)
     pcLoopback.prepare (sampleRate);
     pcLoopback.start();
 
-    const int voiceLatency = noiseClean.getLatencySamples() + voiceVst3.getLatencySamples()
-                           + voiceEnhancerBridge.latencySamples();
-    const int musicLatency = musicEnhancerBridge.latencySamples();
-    voiceLatencySamples.store (voiceLatency);
-    musicDspLatencySamples.store (musicLatency);
-    totalLatencySamples.store (juce::jmax (voiceLatency, musicLatency)
-                               + device->getInputLatencyInSamples()
-                               + device->getOutputLatencyInSamples());
+    publishLatencyEstimate();
     running.store (true);
     deviceOpen.store (true);
     dropoutCount.store (0);

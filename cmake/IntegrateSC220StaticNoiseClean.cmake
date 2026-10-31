@@ -35,12 +35,12 @@ set(_voice_noise_anchor [=[
     expander.process (voiceBlock, detectorBlock);
 
     voiceMidi.clear();
-    voiceVst3.process (voiceBlock, voiceMidi); // Voice insert before native enhancer.
+    voiceVst3.process (voiceBlock, voiceMidi); // Voice FX only; PC Music bypasses this insert.
     voiceEnhancerBridge.process (voiceBlock, voiceMidi);
 ]=])
 set(_voice_noise_replacement [=[
     voiceMidi.clear();
-    voiceVst3.process (voiceBlock, voiceMidi); // Voice insert before native enhancer.
+    voiceVst3.process (voiceBlock, voiceMidi); // Voice FX only; PC Music bypasses this insert.
     voiceEnhancerBridge.process (voiceBlock, voiceMidi);
 
     expander.setNoiseFloorDb (noiseClean.hasProfile()

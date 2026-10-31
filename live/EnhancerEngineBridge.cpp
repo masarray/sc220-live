@@ -28,6 +28,16 @@ juce::String EnhancerEngineBridge::loadBundled (const juce::File& file, double r
     if (error.isNotEmpty()) return error;
     rack.install (std::move (candidate), rate, block);
     bindParameters();
+    for (auto* parameter : parameters)
+    {
+        if (parameter == nullptr)
+        {
+            rack.clear();
+            parameters.fill (nullptr);
+            return "The bundled ArSonKuPik VST3 parameter contract changed. "
+                   "Keep the pinned v0.5.26 plugin installed alongside SC220 Live.";
+        }
+    }
     setGainMatchEnabled (false);
     return {};
 }

@@ -39,7 +39,7 @@ public:
 
     ActivationResult activate(const juce::String& activationCode);
 
-    static constexpr int betaDurationDays = 365;
+    static constexpr int betaDurationDays = 90;
 
     // Shared by the private Key Activator. The plugin itself never receives a
     // private signing key.

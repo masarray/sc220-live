@@ -67,7 +67,7 @@ jobs:
           # End-to-end host proof: two actual plugin instances, mandatory macros,
           # startup plus bypass, finite DSP output. Fail package on any mismatch.
           $smoke=Get-ChildItem -Path "build/SC220BundledVstSmoke_artefacts" -Filter "*.exe" -File -Recurse |
-            Where-Object { $_.FullName -match "\\\\Release\\\\" } | Select-Object -First 1
+            Where-Object { $_.FullName -match "\\Release\\" } | Select-Object -First 1
           if (-not $smoke) { throw "VST3 executable smoke test missing" }
           & $smoke.FullName $bundle.FullName
           if ($LASTEXITCODE -ne 0) { throw "Bundled ArSonKuPik VST3 binary failed host smoke test" }

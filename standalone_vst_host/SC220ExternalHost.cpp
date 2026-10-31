@@ -37,6 +37,22 @@ struct StereoPlugin
         wetMix.setCurrentAndTargetValue(bypass.load() ? 0.0f : 1.0f);
         ready = true;
     }
+    void swapPrepared(StereoPlugin& other)
+    {
+        // Called on UI thread with audio callbacks quiesced. No DSP scratch
+        // is allocated, and old instance retirement happens after the gate.
+        using std::swap;
+        instance.swap(other.instance);
+        displayName.swapWith(other.displayName);
+        dry.swapWith(other.dry);
+        delayedDry.swapWith(other.delayedDry);
+        swap(writeIndex, other.writeIndex);
+        swap(latency, other.latency);
+        swap(ready, other.ready);
+        swap(wetMix, other.wetMix);
+        const bool oldBypass = bypass.exchange(other.bypass.load(std::memory_order_relaxed));
+        other.bypass.store(oldBypass, std::memory_order_relaxed);
+    }
     void release()
     {
         if (instance && ready) instance->releaseResources();
@@ -61,7 +77,8 @@ struct StereoPlugin
         for (int i = 0; i < n; ++i)
         {
             const float wet = wetMix.getNextValue();
-            const int read = (writeIndex + len - latency) % len;
+            int read = writeIndex - latency;
+            if (read < 0) read += len; // Bounded ring read; avoid per-sample division.
             for (int ch = 0; ch < 2; ++ch)
             {
                 delayedDry.setSample(ch, writeIndex, dry.getSample(ch, i));
@@ -130,12 +147,38 @@ public:
     void setStreamMuted(bool muted) noexcept { streamMuted.store(muted); }
     bool isStreamMuted() const noexcept { return streamMuted.load(); }
     int deadlineMisses() const noexcept { return misses.load(); }
+    juce::String currentBackend() const { return manager.getCurrentAudioDeviceType(); }
+    double bufferPeriodMs() const noexcept
+    {
+        const auto rate = sampleRate.load(std::memory_order_relaxed);
+        return rate > 0.0 ? 1000.0 * blockSize.load(std::memory_order_relaxed) / rate : 0.0;
+    }
+    int pluginLatencySamples(int lane) const
+    {
+        const juce::ScopedLock lock(controlLock);
+        int total = 0;
+        for (const auto& slot : racks[static_cast<size_t>(lane)])
+            total += slot.latency;
+        return total;
+    }
+    bool quiesceCallbacks() noexcept
+    {
+        rackSwapPause.store(true, std::memory_order_seq_cst);
+        for (int attempt = 0; attempt < 150; ++attempt)
+        {
+            if (activeCallbacks.load(std::memory_order_seq_cst) == 0)
+                return true;
+            juce::Thread::sleep(1); // Only GUI thread; never realtime.
+        }
+        rackSwapPause.store(false, std::memory_order_seq_cst);
+        return false;
+    }
     juce::String loadPlugin(int lane, int slotIndex, const juce::File& file)
     {
         if (!file.exists() || !file.hasFileExtension(".vst3"))
             return "Please choose an installed .vst3 bundle.";
-        const double rate = sampleRate.load();
-        const int block = blockSize.load();
+        const double rate = sampleRate.load(std::memory_order_acquire);
+        const int block = blockSize.load(std::memory_order_acquire);
         if (rate < 8000.0 || block < 1) return "Open an audio device first.";
         juce::VST3PluginFormat vst;
         juce::OwnedArray<juce::PluginDescription> descriptions;
@@ -155,29 +198,36 @@ public:
         if (!next->setBusesLayout(layout) || next->getTotalNumInputChannels() != 2
             || next->getTotalNumOutputChannels() != 2)
             return "This VST3 must support stereo input and output.";
-        const auto name = next->getName();
-        // JUCE's removeAudioCallback waits for in-flight callbacks. No VST3
-        // scan or destruction takes place in the realtime callback.
-        manager.removeAudioCallback(this);
+
+        StereoPlugin candidate;
+        candidate.displayName = next->getName();
+        candidate.instance = std::move(next);
+        candidate.prepare(rate, block); // Host preparation outside audio callback.
+        if (candidate.latency > 8192)
+            return "The VST3 declares more than 8192 samples of plugin latency.";
+        if (rate != sampleRate.load(std::memory_order_acquire)
+            || block != blockSize.load(std::memory_order_acquire))
+            return "Audio device changed while loading VST3; try again.";
+        if (!quiesceCallbacks())
+            return "Audio callback would not quiesce; active FX slot was preserved.";
         {
             const juce::ScopedLock lock(controlLock);
-            auto& slot = slotAt(lane, slotIndex);
-            slot.clear();
-            slot.instance = std::move(next);
-            slot.displayName = name;
-            slot.bypass.store(false);
+            slotAt(lane, slotIndex).swapPrepared(candidate);
         }
-        manager.addAudioCallback(this);
+        rackSwapPause.store(false, std::memory_order_seq_cst);
+        candidate.clear(); // Old plugin retired on UI thread after resuming audio.
         return {};
     }
     void removePlugin(int lane, int slotIndex)
     {
-        manager.removeAudioCallback(this);
+        if (!quiesceCallbacks()) return;
+        StereoPlugin retired;
         {
             const juce::ScopedLock lock(controlLock);
-            slotAt(lane, slotIndex).clear();
+            slotAt(lane, slotIndex).swapPrepared(retired);
         }
-        manager.addAudioCallback(this);
+        rackSwapPause.store(false, std::memory_order_seq_cst);
+        retired.clear();
     }
     juce::AudioPluginInstance* processor(int lane, int slotIndex)
     {
@@ -206,10 +256,18 @@ public:
         float* const* out, int outChannels, int n,
         const juce::AudioIODeviceCallbackContext&) override
     {
+        struct ScopedCallback
+        {
+            explicit ScopedCallback(std::atomic<int>& count) : callbacks(count)
+            { callbacks.fetch_add(1, std::memory_order_seq_cst); }
+            ~ScopedCallback() { callbacks.fetch_sub(1, std::memory_order_seq_cst); }
+            std::atomic<int>& callbacks;
+        } callbackGuard(activeCallbacks);
         const auto begin = juce::Time::getHighResolutionTicks();
         for (int ch = 0; ch < outChannels; ++ch)
             if (out[ch]) juce::FloatVectorOperations::clear(out[ch], n);
-        if (n > voiceBuffer.getNumSamples() || n <= 0) return;
+        if (rackSwapPause.load(std::memory_order_seq_cst)
+            || n > voiceBuffer.getNumSamples() || n <= 0) return;
         voiceBuffer.clear();
         musicBuffer.clear();
         // Default routing: hardware mic = input 1/2, music = input 3/4 if
@@ -260,6 +318,8 @@ private:
     std::atomic<float> voicePeak { 0.0f }, musicPeak { 0.0f };
     std::atomic<bool> streamMuted { true };
     std::atomic<int> misses { 0 };
+    std::atomic<bool> rackSwapPause { false };
+    std::atomic<int> activeCallbacks { 0 };
 };
 
 class Console final : public juce::Component, private juce::Timer

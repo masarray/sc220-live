@@ -44,8 +44,8 @@ struct StereoPlugin
         using std::swap;
         instance.swap(other.instance);
         displayName.swapWith(other.displayName);
-        dry.swapWith(other.dry);
-        delayedDry.swapWith(other.delayedDry);
+        swap(dry, other.dry); // juce::AudioBuffer has noexcept move, not swapWith.
+        swap(delayedDry, other.delayedDry);
         swap(writeIndex, other.writeIndex);
         swap(latency, other.latency);
         swap(ready, other.ready);

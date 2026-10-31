@@ -8,20 +8,42 @@
   "configurePresets": [
     {
       "name": "windows-live-vs2026",
-      "displayName": "Sonkupik Live v0.13.3 - Visual Studio 2026",
-      "description": "Deterministic embedded Signature Engine v0.5.19. Requires CMake 4.2+ and Visual Studio 2026 Desktop development with C++.",
+      "displayName": "SC220 Live v0.1.2 - Visual Studio",
+      "description": "Visual Studio 2026 Desktop development with C++.",
       "generator": "Visual Studio 18 2026",
       "architecture": "x64",
       "binaryDir": "${sourceDir}/build-live-vs2026"
     },
     {
       "name": "windows-live-ninja",
-      "displayName": "Sonkupik Live v0.13.3 - Ninja + MSVC",
-      "description": "Run from a Visual Studio x64 Developer PowerShell/Command Prompt.",
+      "displayName": "SC220 Live v0.1.2 - Ninja + MSVC",
+      "description": "Run from the Visual Studio x64 developer command prompt.",
       "generator": "Ninja",
       "binaryDir": "${sourceDir}/build-live-ninja",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Release"
+      }
+    },
+    {
+      "name": "linux-release",
+      "displayName": "SC220 Live portable - Linux x64",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/portable-linux",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "SONKUPIK_BUILD_PARITY_QA": "OFF"
+      }
+    },
+    {
+      "name": "macos-universal-release",
+      "displayName": "SC220 Live portable - macOS Intel + Apple Silicon",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/portable-macos",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "CMAKE_OSX_ARCHITECTURES": "arm64;x86_64",
+        "CMAKE_OSX_DEPLOYMENT_TARGET": "11.0",
+        "SONKUPIK_BUILD_PARITY_QA": "OFF"
       }
     }
   ],
@@ -30,14 +52,58 @@
       "name": "windows-live-vs2026-release",
       "configurePreset": "windows-live-vs2026",
       "configuration": "Release",
-      "targets": ["SonkupikLive"],
+      "targets": [
+        "SC220Live"
+      ],
       "jobs": 0
     },
     {
       "name": "windows-live-ninja-release",
       "configurePreset": "windows-live-ninja",
-      "targets": ["SonkupikLive"],
+      "targets": [
+        "SC220Live"
+      ],
       "jobs": 0
+    },
+    {
+      "name": "linux-release",
+      "configurePreset": "linux-release",
+      "configuration": "Release",
+      "targets": [
+        "SC220Live",
+        "SC220LoudnessAudit",
+        "SC220ProgrammeAnalyzerAudit",
+        "SC220PleasantPresenceAudit"
+      ]
+    },
+    {
+      "name": "macos-universal-release",
+      "configurePreset": "macos-universal-release",
+      "configuration": "Release",
+      "targets": [
+        "SC220Live",
+        "SC220LoudnessAudit",
+        "SC220ProgrammeAnalyzerAudit",
+        "SC220PleasantPresenceAudit"
+      ]
+    }
+  ],
+  "testPresets": [
+    {
+      "name": "linux-tests",
+      "configurePreset": "linux-release",
+      "configuration": "Release",
+      "output": {
+        "outputOnFailure": true
+      }
+    },
+    {
+      "name": "macos-tests",
+      "configurePreset": "macos-universal-release",
+      "configuration": "Release",
+      "output": {
+        "outputOnFailure": true
+      }
     }
   ]
 }

@@ -854,9 +854,14 @@ void LiveAudioEngine::updateOutputTrimRouting() noexcept
 
 bool LiveAudioEngine::looksLikeVirtualCable (const juce::String& name)
 {
+    // Identify explicit virtual routing outputs without assuming that every
+    // JACK, CoreAudio or PipeWire endpoint is a safe stream destination.
     return name.containsIgnoreCase ("VB-Audio")
         || name.containsIgnoreCase ("VB-CABLE")
-        || name.containsIgnoreCase ("CABLE Input");
+        || name.containsIgnoreCase ("CABLE Input")
+        || name.containsIgnoreCase ("BlackHole")
+        || name.containsIgnoreCase ("Soundflower")
+        || name.containsIgnoreCase ("Loopback Audio");
 }
 
 } // namespace askp::live

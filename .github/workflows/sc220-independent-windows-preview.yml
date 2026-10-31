@@ -37,21 +37,44 @@ jobs:
         run: |
           cmake --build build --target SC220Live --config Release --parallel 2
           if ($LASTEXITCODE -ne 0) { throw 'MSVC compile failed.' }
-      - name: Download official v0.5.26 ArSonKuPik VST3 binary (no private source)
+      - name: Fetch and verify official ArSonKuPik + ArSonVerb VST3 assets
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          $asset = 'ArSonKuPik-v0.5.26-Windows-x64-VST3.zip'
-          $url = 'https://github.com/masarray/vst-enhancer/releases/download/v0.5.26/' + $asset
-          Invoke-WebRequest -Uri $url -OutFile $asset -MaximumRedirection 10
-          $actual = (Get-FileHash $asset -Algorithm SHA256).Hash.ToLowerInvariant()
-          $expected = 'e53287c871166bcdc945b4962d7a38b5c93ad6cb0c0fa0bdd02fa42ff47cd5b6'
-          if ($actual -cne $expected) { throw "ArSonKuPik release SHA256 verification failed: $actual" }
-          New-Item -ItemType Directory -Path unpacked-enhancer -Force | Out-Null
-          Expand-Archive -LiteralPath $asset -DestinationPath unpacked-enhancer -Force
-          $plugins = Get-ChildItem -Path unpacked-enhancer -Recurse -Directory -Filter '*.vst3'
-          if (-not $plugins) { throw 'Official VST3 archive does not contain a VST3 bundle.' }
-          Write-Host "Verified public ArSonKuPik VST3, SHA256 $actual"
+          $assets = @(
+            @{
+              Label = 'ArSonKuPik'
+              Name = 'ArSonKuPik-v0.5.26-Windows-x64-VST3.zip'
+              URL = 'https://github.com/masarray/vst-enhancer/releases/download/v0.5.26/'
+              SHA = 'e53287c871166bcdc945b4962d7a38b5c93ad6cb0c0fa0bdd02fa42ff47cd5b6'
+            },
+            @{
+              Label = 'ArSonVerb'
+              Name = 'ArSonVerb-Windows-x64-VST3-v1.0.1.zip'
+              URL = 'https://github.com/masarray/arsonverb/releases/download/v1.0.1/'
+              SHA = '41fdf9132f26e55a1671fe6f00409a5219199b245be4dbccb7615fc4dd7c3e7b'
+            }
+          )
+          foreach ($asset in $assets) {
+            $name = $asset.Name
+            Invoke-WebRequest -Uri ($asset.URL + $name) -OutFile $name -MaximumRedirection 10
+            $actual = (Get-FileHash -LiteralPath $name -Algorithm SHA256).Hash.ToLowerInvariant()
+            if ($actual -cne $asset.SHA) {
+              throw "$($asset.Label) SHA256 mismatch. Expected $($asset.SHA), got $actual"
+            }
+            $dest = Join-Path 'unpacked-vst' $asset.Label
+            New-Item -ItemType Directory -Path $dest -Force | Out-Null
+            Expand-Archive -LiteralPath $name -DestinationPath $dest -Force
+            Write-Host "Verified $($asset.Label) archive: $actual"
+            # Accept both Windows single-file .vst3 and directory .vst3 bundles.
+            $bundles = @(Get-ChildItem -Path $dest -Recurse -Force |
+              Where-Object { $_.Name.EndsWith('.vst3', [StringComparison]::OrdinalIgnoreCase) })
+            if ($bundles.Count -eq 0) {
+              Get-ChildItem -Path $dest -Recurse -Force |
+                Select-Object -First 45 FullName, Length | Format-Table | Out-String | Write-Host
+              throw "$($asset.Label) archive has no .vst3 bundle or file"
+            }
+          }
       - name: Package unsigned Windows preview
         shell: pwsh
         run: |
@@ -63,17 +86,30 @@ jobs:
           New-Item -ItemType Directory preview -Force | Out-Null
           Copy-Item $exe.FullName preview/
           New-Item -ItemType Directory preview/plugins -Force | Out-Null
-          $bundles = Get-ChildItem unpacked-enhancer -Directory -Recurse -Filter '*.vst3'
-          foreach ($bundle in $bundles) {
-            Copy-Item $bundle.FullName -Destination preview/plugins -Recurse -Force
+          foreach ($product in @('ArSonKuPik', 'ArSonVerb')) {
+            $src = Join-Path 'unpacked-vst' $product
+            $bundles = @(Get-ChildItem -Path $src -Recurse -Force |
+              Where-Object { $_.Name.EndsWith('.vst3', [StringComparison]::OrdinalIgnoreCase) })
+            # Copy the outermost VST3 package only, not nested binaries.
+            foreach ($bundle in $bundles) {
+              Copy-Item -LiteralPath $bundle.FullName -Destination preview/plugins -Recurse -Force
+            }
           }
-          "Bundled VST3: ArSonKuPik v0.5.26 (official binary SHA256 e53287c871166bcdc945b4962d7a38b5c93ad6cb0c0fa0bdd02fa42ff47cd5b6)" | Set-Content preview/VST3-PROVENANCE.txt
+          @'
+          ArSonKuPik v0.5.26
+          https://github.com/masarray/vst-enhancer/releases/tag/v0.5.26
+          SHA256 ZIP e53287c871166bcdc945b4962d7a38b5c93ad6cb0c0fa0bdd02fa42ff47cd5b6
+          ArSonVerb v1.0.1
+          https://github.com/masarray/arsonverb/releases/tag/v1.0.1
+          SHA256 ZIP 41fdf9132f26e55a1671fe6f00409a5219199b245be4dbccb7615fc4dd7c3e7b
+          '@ | Set-Content preview/VST3-PROVENANCE.txt
           "Build SHA: $env:GITHUB_SHA" | Set-Content preview/BUILD-INFO.txt
           "SHA256: $((Get-FileHash $exe.FullName -Algorithm SHA256).Hash)" | Add-Content preview/BUILD-INFO.txt
           @'
           SC220 independent VST3 host - DEVELOPMENT PREVIEW
-          No embedded ASK-P DSP. ArSonKuPik v0.5.26 VST3 is bundled
-          from a verified official public GitHub Release. ArSonVerb optional. Windows Setup -> select ASIO or WASAPI.
+          Bundled: ArSonKuPik v0.5.26 on FX 1 (both channels),
+          ArSonVerb v1.0.1 on FX 2 (Voice). FX 3 free per channel.
+          All archives verified against pinned SHA256; no ASK-P source. Windows Setup -> select ASIO or WASAPI.
           Input 1/2 = Voice; Input 3/4 = Music (when supported by device).
           GO LIVE is muted by default. Test routing with monitors off first.
           Audio hardware, editor, streaming and DSP parity remain unverified.

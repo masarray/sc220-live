@@ -322,6 +322,28 @@ private:
     std::atomic<int> activeCallbacks { 0 };
 };
 
+// Non-modal DAW-style plugin editor. Own the editor window explicitly, so
+// CLEAR/REPLACE destroys the UI before the corresponding VST3 processor.
+class FxEditorWindow final : public juce::DocumentWindow
+{
+public:
+    explicit FxEditorWindow(juce::AudioProcessor& processor)
+        : juce::DocumentWindow(processor.getName(), juce::Colour(0xff202833),
+                               juce::DocumentWindow::closeButton, true)
+    {
+        auto* editor = processor.createEditorIfNeeded();
+        if (editor == nullptr)
+            editor = new juce::GenericAudioProcessorEditor(processor);
+        setUsingNativeTitleBar(true);
+        setContentOwned(editor, true);
+        setResizable(true, true);
+        centreWithSize(juce::jmax(360, editor->getWidth()),
+                       juce::jmax(300, editor->getHeight() + 32));
+        setVisible(true);
+    }
+    void closeButtonPressed() override { setVisible(false); }
+};
+
 class Console final : public juce::Component, private juce::Timer
 {
 public:
@@ -429,28 +451,18 @@ private:
     };
     void closeEditor(int lane, int slot)
     {
-        if (auto* window = editors[lane][slot].getComponent())
-            delete window; // The editor must die before its AudioPluginInstance.
-        editors[lane][slot] = nullptr;
+        editors[lane][slot].reset(); // Owner destroys editor before processor.
     }
     void openEditor(int lane, int slot)
     {
-        if (auto* existing = editors[lane][slot].getComponent())
+        if (auto* existing = editors[lane][slot].get())
         {
+            existing->setVisible(true);
             existing->toFront(true);
             return;
         }
-        auto* processor = engine.processor(lane, slot);
-        if (processor == nullptr) return;
-        auto* editor = processor->createEditorIfNeeded();
-        if (editor == nullptr)
-            editor = new juce::GenericAudioProcessorEditor(*processor);
-        juce::DialogWindow::LaunchOptions options;
-        options.dialogTitle = engine.pluginName(lane, slot);
-        options.dialogBackgroundColour = juce::Colour(0xff202833);
-        options.content.setOwned(editor);
-        options.resizable = true;
-        editors[lane][slot] = options.launchAsync();
+        if (auto* processor = engine.processor(lane, slot))
+            editors[lane][slot] = std::make_unique<FxEditorWindow>(*processor);
     }
     void initialiseLane(int lane, const juce::String& heading)
     {
@@ -552,6 +564,12 @@ private:
         juce::File enhancer, reverb;
         for (const auto& file : bundles)
         {
+            // Some .vst3 directories contain an identically named .vst3
+            // binary; choose the outer bundle and never the nested DLL.
+            const auto fullPath = file.getFullPathName();
+            if (fullPath.containsIgnoreCase(".vst3\\")
+                || fullPath.containsIgnoreCase(".vst3/"))
+                continue;
             if (file.getFileName().containsIgnoreCase("arsonkupik"))
                 enhancer = file;
             if (file.getFileName().containsIgnoreCase("arsonverb"))
@@ -578,8 +596,11 @@ private:
     {
         for (int lane = 0; lane < 2; ++lane)
             meters[lane].setValue(engine.meter(lane), juce::dontSendNotification);
-        health.setText("DSP callback deadline misses: " + juce::String(engine.deadlineMisses())
-            + "     ·     Output: "
+        health.setText(engine.currentBackend() + "  /  "
+            + juce::String(engine.bufferPeriodMs(), 2) + " ms nominal buffer"
+            + "  ·  Voice FX latency " + juce::String(engine.pluginLatencySamples(0))
+            + " samples  ·  Missed DSP budgets " + juce::String(engine.deadlineMisses())
+            + "\nOutput: "
             + juce::String(engine.isStreamMuted() ? "MUTED (safe)" : "LIVE")
             + (startupError.isEmpty() ? juce::String()
                 : juce::String("\nBundled plugin error: ") + startupError),
@@ -591,7 +612,7 @@ private:
     std::array<juce::Label, 2> laneTitles, rackTitles;
     std::array<std::array<FxControls, Engine::slotsPerChannel>, 2> controls;
     std::array<juce::Slider, 2> gains, meters;
-    std::array<std::array<juce::Component::SafePointer<juce::DialogWindow>,
+    std::array<std::array<std::unique_ptr<FxEditorWindow>,
                           Engine::slotsPerChannel>, 2> editors;
     std::unique_ptr<juce::FileChooser> chooser;
     juce::String startupError;

@@ -52,9 +52,13 @@ Windows enables JUCE's bundled ASIO backend alongside WASAPI. Select an installe
 
 In the **SC220 INPUT** strip, press **+ VST3 FX → Load VST3 effect** and choose a trusted stereo VST3 bundle, such as ArSonVerb. The FX menu also provides the plugin editor, bypass and removal.
 
-Hardware voice flows through trim → noise cleanup → expander → VST3 → voice enhancer → voice fader → protected master. PC Music does not pass through the voice VST3 slot.
+Hardware voice flows through trim → dry-only Noise Learn analysis (only during calibration) → VST3 → voice enhancer → learned hiss/expander stages → voice fader → protected master. PC Music never passes through the voice FX slot.
 
-**Limitations:** this first trusted-plugin stage has no out-of-process scanner, arbitrary-plugin crash isolation, saved plugin state or crossfaded bypass. Do not load untrusted plugins in a live show. A public repository is not a safe place for GitHub runner credentials. Public binary publication remains in `sc220-download`.
+**Real-time hardening:** Native monitor WASAPI COM/render/reconnect runs on a dedicated worker; the audio callback writes to a bounded SPSC FIFO. VST3 loading prepares the candidate before briefly quiescing the audio callback, so plugin changes no longer restart the whole mixer. Bypass uses a 12 ms phase-aligned fade; the active effect keeps processing to preserve reverb tails. ASIO is made available, but switching drivers is **always explicit** to protect saved routing.
+
+**Windows hardware preview:** Checkout this development branch, authenticate Git Credential Manager for the private `masarray/askp-vst` submodule, then run `powershell -ExecutionPolicy Bypass -File .\\scripts\\build-asio-vst3-hardware-preview.ps1` from the repo root. This creates an unsigned local EXE without any hosted CI token. See `docs/REALTIME_SAFETY.md` for physical acceptance tests.
+
+**Limitations:** Generic VST3 plugins are not sandboxed. Plugin state recall, crash isolation and click-free plugin *replacement* are not production-complete. The ASK-P embedded processor contains a fixed lookahead, so do not claim 0 ms input-to-output latency. An actual Windows compile and physical device test are required before a stable release. Official binary publication remains in `sc220-download`.
 
 ## Runtime capabilities
 

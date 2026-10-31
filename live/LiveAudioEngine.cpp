@@ -753,6 +753,10 @@ void LiveAudioEngine::audioDeviceAboutToStart (juce::AudioIODevice* device)
     detectorBuffer.clear();
     pcAudioBuffer.clear();
 
+    // Clear the per-engine P6B filter state on every real device start.
+    p6bLow1L = p6bLow2L = p6bLow1R = p6bLow2R = 0.0f;
+    p6bHighEnvelope = p6bBodyEnvelope = 0.0f;
+    p6bHissGain = 1.0f;
     noiseClean.prepare (sampleRate, blockSize, channels);
     expander.prepare (sampleRate);
 

@@ -386,6 +386,7 @@ target_sources(SC220Live PRIVATE
     live/MusicalNoiseClean.cpp
     live/PcAudioLoopbackCapture.cpp
     live/LiveAudioEngine.cpp
+    live/InputVst3Rack.cpp
     live/SmartPleasantPresence.cpp
     live/LiveTheme.cpp
     live/LiveIcons.cpp
@@ -408,6 +409,7 @@ target_compile_definitions(SC220Live PRIVATE
     JUCE_WEB_BROWSER=0
     JUCE_USE_CURL=0
     JUCE_MODAL_LOOPS_PERMITTED=1
+    JUCE_PLUGINHOST_VST3=1
     JUCE_STANDALONE_APPLICATION=0
     JucePlugin_Build_Standalone=0
     JucePlugin_Name="ArSonKuPik"
@@ -442,6 +444,9 @@ target_link_libraries(SC220Live PRIVATE
 )
 
 if(WIN32)
+    # JUCE 8.0.14 uses bundled Steinberg ASIO headers. Review the SDK's
+    # redistribution/licensing requirements before publishing Windows builds.
+    target_compile_definitions(SC220Live PRIVATE JUCE_ASIO=1)
     target_link_libraries(SC220Live PRIVATE ole32 avrt)
 endif()
 

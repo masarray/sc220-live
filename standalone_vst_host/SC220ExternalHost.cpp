@@ -280,6 +280,27 @@ public:
         };
         initialiseLane(0, "VOICE  /  INPUT 1–2");
         initialiseLane(1, "MUSIC  /  INPUT 3–4");
+        // Official ArSonKuPik binary is distributed with the standalone host,
+        // rather than built from private ASK-P source. Loading is on the UI
+        // thread, before the first physical output can be unmuted.
+        const auto exeDir = juce::File::getSpecialLocation(
+            juce::File::currentExecutableFile).getParentDirectory();
+        const auto bundleDir = exeDir.getChildFile("plugins");
+        juce::Array<juce::File> bundled;
+        bundleDir.findChildFiles(bundled, juce::File::findFilesAndDirectories,
+                                 true, "*.vst3");
+        if (bundled.isEmpty())
+            bundleDir.findChildFiles(bundled, juce::File::findFilesAndDirectories,
+                                     true, "*ArSonKuPik*");
+        if (!bundled.isEmpty())
+        {
+            const auto voiceResult = engine.loadPlugin(0, bundled.getFirst());
+            if (voiceResult.isEmpty())
+                engine.loadPlugin(1, bundled.getFirst());
+            else
+                health.setText("BUNDLED ENHANCER: " + voiceResult, juce::dontSendNotification);
+            updatePluginNames();
+        }
         addAndMakeVisible(stream);
         stream.setButtonText("GO LIVE");
         stream.setClickingTogglesState(true);

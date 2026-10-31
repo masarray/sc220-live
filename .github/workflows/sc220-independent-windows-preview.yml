@@ -88,12 +88,19 @@ jobs:
           New-Item -ItemType Directory preview/plugins -Force | Out-Null
           foreach ($product in @('ArSonKuPik', 'ArSonVerb')) {
             $src = Join-Path 'unpacked-vst' $product
-            $bundles = @(Get-ChildItem -Path $src -Recurse -Force |
-              Where-Object { $_.Name.EndsWith('.vst3', [StringComparison]::OrdinalIgnoreCase) })
-            # Copy the outermost VST3 package only, not nested binaries.
-            foreach ($bundle in $bundles) {
-              Copy-Item -LiteralPath $bundle.FullName -Destination preview/plugins -Recurse -Force
+            # A bundle directory commonly contains a second .vst3 DLL.
+            # Always copy the OUTERMOST .vst3, not both parent and child.
+            $package = Get-ChildItem -Path $src -Recurse -Directory -Force |
+              Where-Object { $_.Name.EndsWith('.vst3', [StringComparison]::OrdinalIgnoreCase) } |
+              Sort-Object { $_.FullName.Length } | Select-Object -First 1
+            if (-not $package) {
+              $package = Get-ChildItem -Path $src -Recurse -File -Force |
+                Where-Object { $_.Name.EndsWith('.vst3', [StringComparison]::OrdinalIgnoreCase) } |
+                Select-Object -First 1
             }
+            if (-not $package) { throw "No .vst3 payload found for $product" }
+            Copy-Item -LiteralPath $package.FullName -Destination preview/plugins -Recurse -Force
+            Write-Host "Staged outer VST3: $($package.FullName)"
           }
           @'
           ArSonKuPik v0.5.26

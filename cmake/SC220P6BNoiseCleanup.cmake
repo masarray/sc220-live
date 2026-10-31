@@ -28,21 +28,16 @@ endfunction()
 # therefore adds zero samples of latency.
 set(_hiss_anchor [=[
     voiceMidi.clear();
+    voiceVst3.process (voiceBlock, voiceMidi); // Voice FX only; PC Music bypasses this insert.
     voiceEnhancerBridge.process (voiceBlock, voiceMidi);
 
     if (noiseClean.hasProfile() && noiseClean.isEnabled() && expander.isEnabled())
 ]=])
 set(_hiss_replacement [=[
     voiceMidi.clear();
+    voiceVst3.process (voiceBlock, voiceMidi); // Voice FX only; PC Music bypasses this insert.
     voiceEnhancerBridge.process (voiceBlock, voiceMidi);
 
-    static float p6bLow1L = 0.0f;
-    static float p6bLow2L = 0.0f;
-    static float p6bLow1R = 0.0f;
-    static float p6bLow2R = 0.0f;
-    static float p6bHighEnvelope = 0.0f;
-    static float p6bBodyEnvelope = 0.0f;
-    static float p6bHissGain = 1.0f;
 
     if (noiseClean.hasProfile() && noiseClean.isEnabled())
     {

@@ -1,0 +1,66 @@
+name: SC220 independent Windows VST3 host — CI preview
+on:
+  push:
+    branches: [feature/asio-input-vst3-and-public-runner-cleanup]
+    paths:
+      - 'CMakeLists.txt'
+      - 'standalone_vst_host/**'
+      - '.github/workflows/sc220-independent-windows-preview.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: sc220-independent-windows-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  windows:
+    runs-on: windows-2022
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: false
+          persist-credentials: false
+      - name: Enforce public source independence
+        shell: pwsh
+        run: |
+          if (-not (Select-String -Path CMakeLists.txt -SimpleMatch 'option(SC220_EXTERNAL_VST_ONLY "Build independent first-party/external VST3 live host" ON)')) { throw 'External VST host not default.' }
+          if (-not (Test-Path standalone_vst_host/SC220ExternalHost.cpp)) { throw 'Host missing.' }
+          if (-not (Test-Path standalone_vst_host/SC220ExternalVstHost.cmake)) { throw 'Independent CMake missing.' }
+      - name: Configure Windows x64 independent ASIO/VST3 host
+        shell: pwsh
+        run: |
+          cmake -S . -B build -G 'Visual Studio 17 2022' -A x64 -DSC220_EXTERNAL_VST_ONLY=ON
+          if ($LASTEXITCODE -ne 0) { throw 'Configure failed.' }
+      - name: Compile Release EXE
+        shell: pwsh
+        run: |
+          cmake --build build --target SC220Live --config Release --parallel 2
+          if ($LASTEXITCODE -ne 0) { throw 'MSVC compile failed.' }
+      - name: Package unsigned Windows preview
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $exe = Get-ChildItem -Path build -Recurse -File -Filter '*.exe' |
+            Where-Object { $_.Name -match '^SC220.?Live.exe$' -and $_.FullName -match '\\Release\\' } |
+            Select-Object -First 1
+          if (-not $exe) { throw 'SC220 Release EXE not found.' }
+          New-Item -ItemType Directory preview -Force | Out-Null
+          Copy-Item $exe.FullName preview/
+          "Build SHA: $env:GITHUB_SHA" | Set-Content preview/BUILD-INFO.txt
+          "SHA256: $((Get-FileHash $exe.FullName -Algorithm SHA256).Hash)" | Add-Content preview/BUILD-INFO.txt
+          @'
+          SC220 independent VST3 host - DEVELOPMENT PREVIEW
+          No embedded ASK-P DSP. Install ArSonKuPik.vst3 and ArSonVerb.vst3
+          separately. Windows Setup -> select ASIO or WASAPI.
+          Input 1/2 = Voice; Input 3/4 = Music (when supported by device).
+          GO LIVE is muted by default. Test routing with monitors off first.
+          Audio hardware, editor, streaming and DSP parity remain unverified.
+          This is NOT the former full SC220 console or stable public release.
+          '@ | Set-Content preview/README.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sc220-independent-windows-vst3-preview
+          path: preview/
+          retention-days: 7
+          if-no-files-found: error

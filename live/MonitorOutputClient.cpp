@@ -199,7 +199,7 @@ bool resolveEndpoint (const juce::String& requested, EndpointInfo& endpoint,
 
 } // namespace
 
-struct MonitorOutputClient::Impl
+struct MonitorOutputClient::Impl : public juce::Thread
 {
     static constexpr int fifoCapacitySamples = 384000;
     static constexpr int resampleScratchCapacity = 65536;
@@ -214,7 +214,7 @@ struct MonitorOutputClient::Impl
         pcm32
     };
 
-    Impl()
+    explicit Impl (MonitorOutputClient& parent) : juce::Thread ("SC220 Monitor WASAPI Worker"), owner (parent)
     {
         ringBuffer.setSize (2, fifoCapacitySamples, false, true, false);
         resampleInput.setSize (2, resampleScratchCapacity, false, true, false);
@@ -242,6 +242,84 @@ struct MonitorOutputClient::Impl
         return errorMessage;
     }
 
+    // Only the worker reads the FIFO; only the audio callback writes to it.
+    // Gating protects FIFO resets without ever waiting in the audio callback.
+    void pausePublishing() noexcept
+    {
+        publishing.store (false, std::memory_order_release);
+        while (writersInFlight.load (std::memory_order_acquire) != 0)
+            juce::Thread::sleep (1); // Worker/control only.
+    }
+
+    void resumePublishing() noexcept
+    {
+#if JUCE_WINDOWS
+        publishing.store (audioClient != nullptr, std::memory_order_release);
+#endif
+    }
+
+    void run() override
+    {
+#if JUCE_WINDOWS
+        if (! ensureComForCurrentThread())
+        {
+            setError ("WASAPI monitor render worker could not initialise COM.");
+            return;
+        }
+        while (! threadShouldExit())
+        {
+            AcquireSRWLockExclusive (&playbackLock);
+            const bool selectionChanged = selectionPending.exchange (false, std::memory_order_acq_rel);
+            const bool flush = flushPending.exchange (false, std::memory_order_acq_rel);
+            if (selectionChanged || flush)
+            {
+                pausePublishing();
+                if (selectionChanged)
+                {
+                    closeEndpointLocked (false);
+                    if (selectedDisplayName.isNotEmpty())
+                        openSelectedEndpointLocked (owner.getGainDb(), false);
+                }
+                else
+                {
+                    if (audioClient != nullptr && endpointStarted)
+                    {
+                        audioClient->Stop();
+                        audioClient->Reset();
+                    }
+                    resetTransportLocked();
+                }
+                resumePublishing();
+            }
+            if (audioClient == nullptr && selectedDisplayName.isNotEmpty())
+            {
+                const auto now = juce::Time::getMillisecondCounterHiRes();
+                if (lastReconnectAttemptMs <= 0.0 || now - lastReconnectAttemptMs >= 1000.0)
+                {
+                    lastReconnectAttemptMs = now;
+                    pausePublishing();
+                    openSelectedEndpointLocked (owner.getGainDb(), true);
+                    resumePublishing();
+                }
+            }
+            if (audioClient != nullptr)
+                renderAvailableLocked (owner.getGainDb(), owner.isMuted());
+            ReleaseSRWLockExclusive (&playbackLock);
+            juce::Thread::sleep (selectedOutputEnabled.load (std::memory_order_relaxed) ? 2 : 8);
+        }
+#else
+        while (! threadShouldExit())
+            juce::Thread::sleep (50);
+#endif
+    }
+
+    MonitorOutputClient& owner;
+    std::atomic<bool> publishing { false };
+    std::atomic<int> writersInFlight { 0 };
+    std::atomic<bool> selectionPending { false };
+    std::atomic<bool> flushPending { false };
+    std::atomic<bool> selectedOutputEnabled { false };
+
     void resetTransportLocked() noexcept
     {
         fifo.reset();
@@ -266,14 +344,11 @@ struct MonitorOutputClient::Impl
         if (requested <= 0 || source.getNumChannels() <= 0)
             return;
 
-        const int freeSpace = fifo.getFreeSpace();
-        if (freeSpace < requested)
+        // Producer never alters the reader index (JUCE AbstractFifo SPSC invariant).
+        if (fifo.getFreeSpace() < requested)
         {
-            const int discard = requested - freeSpace;
-            int start1 = 0, size1 = 0, start2 = 0, size2 = 0;
-            fifo.prepareToRead (discard, start1, size1, start2, size2);
-            fifo.finishedRead (size1 + size2);
             overflowCount.fetch_add (1, std::memory_order_relaxed);
+            return;
         }
 
         int start1 = 0, size1 = 0, start2 = 0, size2 = 0;
@@ -503,7 +578,8 @@ struct MonitorOutputClient::Impl
         running.store (false, std::memory_order_release);
         endpointPaddingFrames.store (0, std::memory_order_relaxed);
         reconnectPending = true;
-        resetTransportLocked();
+        // FIFO reset is deferred to the worker's gated reconnection.
+        publishing.store (false, std::memory_order_release);
         setError (operation + " failed; monitor will reconnect automatically ("
                   + hresultText (result) + ").");
     }
@@ -779,7 +855,7 @@ struct MonitorOutputClient::Impl
 };
 
 MonitorOutputClient::MonitorOutputClient()
-    : impl (std::make_unique<Impl>())
+    : impl (std::make_unique<Impl> (*this))
 {
 }
 
@@ -791,14 +867,8 @@ MonitorOutputClient::~MonitorOutputClient()
 bool MonitorOutputClient::initialise()
 {
 #if JUCE_WINDOWS
-    if (! ensureComForCurrentThread())
-    {
-        impl->setError ("Windows COM is unavailable; WASAPI monitor cannot start.");
-        return false;
-    }
-
     impl->clearError();
-    return true;
+    return impl->isThreadRunning() || impl->startThread (juce::Thread::Priority::high);
 #else
     impl->setError ("Physical monitoring currently requires the Windows WASAPI backend.");
     return false;
@@ -808,7 +878,10 @@ bool MonitorOutputClient::initialise()
 void MonitorOutputClient::shutdown()
 {
 #if JUCE_WINDOWS
+    impl->signalThreadShouldExit();
+    impl->stopThread (5000);
     AcquireSRWLockExclusive (&impl->playbackLock);
+    impl->pausePublishing();
     impl->closeEndpointLocked (true);
     ReleaseSRWLockExclusive (&impl->playbackLock);
 #else
@@ -834,14 +907,8 @@ void MonitorOutputClient::prepareSource (double sourceSampleRate,
 void MonitorOutputClient::flush() noexcept
 {
 #if JUCE_WINDOWS
-    AcquireSRWLockExclusive (&impl->playbackLock);
-    if (impl->audioClient != nullptr && impl->endpointStarted)
-    {
-        impl->audioClient->Stop();
-        impl->audioClient->Reset();
-    }
-    impl->resetTransportLocked();
-    ReleaseSRWLockExclusive (&impl->playbackLock);
+    // Device callbacks never wait for WASAPI or alter FIFO reader ownership.
+    impl->flushPending.store (true, std::memory_order_release);
 #else
     impl->resetTransportLocked();
 #endif
@@ -875,10 +942,13 @@ juce::String MonitorOutputClient::selectOutputDevice (const juce::String& name,
     if (! ensureComForCurrentThread())
         return "Windows COM is unavailable; WASAPI monitor cannot start.";
 
-    AcquireSRWLockExclusive (&impl->playbackLock);
     if (requested.isEmpty())
     {
-        impl->closeEndpointLocked (true);
+        AcquireSRWLockExclusive (&impl->playbackLock);
+        impl->selectedDisplayName.clear();
+        impl->selectedDeviceId.clear();
+        impl->selectedOutputEnabled.store (false, std::memory_order_release);
+        impl->selectionPending.store (true, std::memory_order_release);
         ReleaseSRWLockExclusive (&impl->playbackLock);
         return {};
     }
@@ -890,7 +960,6 @@ juce::String MonitorOutputClient::selectOutputDevice (const juce::String& name,
         const juce::String error =
             "The selected Windows playback endpoint is no longer available.";
         impl->setError (error);
-        ReleaseSRWLockExclusive (&impl->playbackLock);
         return error;
     }
 
@@ -899,18 +968,19 @@ juce::String MonitorOutputClient::selectOutputDevice (const juce::String& name,
         const juce::String error =
             "Monitor output must be a physical speaker or headphone endpoint, not VB-CABLE.";
         impl->setError (error);
-        ReleaseSRWLockExclusive (&impl->playbackLock);
         return error;
     }
 
+    AcquireSRWLockExclusive (&impl->playbackLock);
     impl->selectedDefault = useDefault;
     impl->selectedDeviceId = endpoint.id;
     impl->selectedDisplayName = useDefault ? juce::String (systemDefaultMonitorName)
                                            : endpoint.label;
-    const bool opened = impl->openSelectedEndpointLocked (getGainDb(), false);
-    const auto error = opened ? juce::String() : impl->getError();
+    impl->selectedOutputEnabled.store (true, std::memory_order_release);
+    impl->selectionPending.store (true, std::memory_order_release);
     ReleaseSRWLockExclusive (&impl->playbackLock);
-    return error;
+    // COM activation and recovery belong to the worker, never to UI/audio callback.
+    return {};
 #else
     juce::ignoreUnused (requested);
     return "Physical monitoring currently requires the Windows WASAPI backend.";
@@ -921,39 +991,13 @@ void MonitorOutputClient::push (const juce::AudioBuffer<float>& source,
                                 int numSamples) noexcept
 {
 #if JUCE_WINDOWS
-    if (source.getNumChannels() <= 0 || numSamples <= 0)
+    if (numSamples <= 0 || source.getNumChannels() <= 0
+        || ! impl->publishing.load (std::memory_order_acquire))
         return;
-
-    if (! TryAcquireSRWLockExclusive (&impl->playbackLock))
-    {
-        impl->overflowCount.fetch_add (1, std::memory_order_relaxed);
-        return;
-    }
-
-    if (! ensureComForCurrentThread())
-    {
-        ReleaseSRWLockExclusive (&impl->playbackLock);
-        return;
-    }
-
-    if (impl->audioClient == nullptr && impl->selectedDisplayName.isNotEmpty())
-    {
-        const double now = juce::Time::getMillisecondCounterHiRes();
-        if (impl->lastReconnectAttemptMs <= 0.0
-            || now - impl->lastReconnectAttemptMs >= 1000.0)
-        {
-            impl->lastReconnectAttemptMs = now;
-            impl->openSelectedEndpointLocked (getGainDb(), true);
-        }
-    }
-
-    if (impl->audioClient != nullptr)
-    {
-        impl->enqueueLocked (source, numSamples);
-        impl->renderAvailableLocked (getGainDb(), isMuted());
-    }
-
-    ReleaseSRWLockExclusive (&impl->playbackLock);
+    impl->writersInFlight.fetch_add (1, std::memory_order_acq_rel);
+    if (impl->publishing.load (std::memory_order_acquire))
+        impl->enqueueLocked (source, numSamples); // Fixed-capacity SPSC only.
+    impl->writersInFlight.fetch_sub (1, std::memory_order_release);
 #else
     juce::ignoreUnused (source, numSamples);
 #endif

@@ -1,0 +1,27 @@
+name: SC220 source safety guards
+
+on:
+  pull_request:
+    paths:
+      - 'CMakeLists.txt'
+      - 'live/**'
+      - 'cmake/**'
+      - 'qa/audit_sc220_asio_vst3.py'
+      - '.github/workflows/sc220-source-guard.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  source-guard:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          submodules: false
+      - name: Verify VST3 voice routing and public runner hygiene
+        run: python3 qa/audit_sc220_asio_vst3.py
+      - name: Verify canonical production-generated runtime and UI anchors
+        run: cmake -P qa/verify_effective_cmake_pipeline.cmake

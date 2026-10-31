@@ -1,4 +1,5 @@
 #include "SC220MainComponent.h"
+#include <juce_audio_utils/juce_audio_utils.h>
 
 #include "BinaryData.h"
 
@@ -708,6 +709,8 @@ SC220MainComponent::SC220MainComponent (LiveAudioEngine& engine, WindowActions a
 SC220MainComponent::~SC220MainComponent()
 {
     stopTimer();
+    voiceFxEditorWindow.reset(); // Editor must die before its VST3 AudioProcessor.
+    voiceFxChooser.reset();
     audioEngine.getVoiceEnhancerBridge().setVisualTapEnabled (false);
     audioEngine.getMusicEnhancerBridge().setVisualTapEnabled (false);
     setLookAndFeel (nullptr);
@@ -717,7 +720,7 @@ void SC220MainComponent::configureControls()
 {
     for (auto* component : std::initializer_list<juce::Component*> {
              &minimiseButton, &maximiseButton, &closeButton, &settingsButton,
-             &enhancerPowerButton, &goLiveButton, &presetBox, &outputBox,
+             &enhancerPowerButton, &goLiveButton, &voiceFxButton, &presetBox, &outputBox,
              &stereoButton, &dualMonoButton, &pcSourceBox, &inputTrim,
              &sc220Fader, &pcFader, &duckAmount, &streamFader, &monitorKnob,
              &sc220Mute, &streamMute })
@@ -738,7 +741,9 @@ void SC220MainComponent::configureControls()
     minimiseButton.setTooltip ("Minimise");
     maximiseButton.setTooltip ("Maximise / Restore");
     closeButton.setTooltip ("Close to tray");
-    settingsButton.setTooltip ("Settings");
+    settingsButton.setTooltip ("Audio Setup (WASAPI / ASIO) and License");
+    voiceFxButton.setTooltip ("Voice VST3 insert: choose ArSonVerb or another trusted stereo effect");
+    voiceFxButton.onClick = [this] { showVoiceFxMenu(); };
     enhancerPowerButton.setTooltip ("Smart Enhancer On / Bypass");
     enhancerPowerButton.setIconColour (palette::orange);
     enhancerPowerButton.setOffColour (palette::muted);
@@ -881,6 +886,12 @@ void SC220MainComponent::refreshAllControls()
     goLiveButton.setToggleState (! audioEngine.isOutputMuted(), juce::dontSendNotification);
     goLiveButton.setButtonText (audioEngine.isOutputMuted() ? "GO LIVE" : "LIVE");
 
+    const auto fxLabel = audioEngine.hasVoiceVst3()
+        ? (audioEngine.isVoiceVst3Bypassed() ? juce::String ("FX BYPASS")
+            : juce::String ("FX ") + audioEngine.getVoiceVst3Name())
+        : juce::String ("+ VST3 FX");
+    if (voiceFxButton.getButtonText() != fxLabel)
+        voiceFxButton.setButtonText (fxLabel);
     const auto status = audioEngine.getStatus();
     const auto outputIndex = audioEngine.getOutputDeviceNames().indexOf (status.outputDevice);
     if (outputIndex >= 0)
@@ -917,7 +928,7 @@ void SC220MainComponent::timerCallback()
 void SC220MainComponent::showSettingsMenu()
 {
     juce::PopupMenu menu;
-    menu.addItem (1, "Audio Setup");
+    menu.addItem (1, "Audio Setup (WASAPI / ASIO)");
     menu.addItem (2, "License & Activation");
     menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&settingsButton),
                         [this] (int result)
@@ -930,6 +941,88 @@ void SC220MainComponent::showSettingsMenu()
                                 licensePanel->toFront (true);
                             }
                         });
+}
+
+class VoiceFxEditorWindow final : public juce::DocumentWindow
+{
+public:
+    VoiceFxEditorWindow (const juce::String& title, juce::AudioProcessorEditor* editor)
+        : juce::DocumentWindow (title, juce::Colours::darkgrey,
+                                juce::DocumentWindow::closeButton, true)
+    {
+        setUsingNativeTitleBar (true);
+        setContentOwned (editor, true);
+        setResizable (false, false);
+        centreWithSize (juce::jmax (350, editor->getWidth()),
+                        juce::jmax (250, editor->getHeight()));
+    }
+
+    void closeButtonPressed() override { setVisible (false); }
+};
+
+void SC220MainComponent::showVoiceFxMenu()
+{
+    juce::PopupMenu menu;
+    menu.addItem (1, "Load VST3 effect...");
+    const bool loaded = audioEngine.hasVoiceVst3();
+    menu.addItem (2, "Open plugin editor", loaded);
+    menu.addItem (3, audioEngine.isVoiceVst3Bypassed() ? "Enable effect" : "Bypass effect", loaded);
+    menu.addItem (4, "Remove effect", loaded);
+    juce::Component::SafePointer<SC220MainComponent> safe (this);
+    menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&voiceFxButton),
+                        [safe] (int result)
+                        {
+                            if (safe == nullptr) return;
+                            if (result == 1) safe->chooseVoiceVst3();
+                            if (result == 2) safe->showVoiceVst3Editor();
+                            if (result == 3)
+                                safe->audioEngine.setVoiceVst3Bypassed (! safe->audioEngine.isVoiceVst3Bypassed());
+                            if (result == 4)
+                            {
+                                safe->voiceFxEditorWindow.reset();
+                                safe->audioEngine.removeVoiceVst3();
+                            }
+                            if (result == 3 || result == 4) safe->refreshAllControls();
+                        });
+}
+
+void SC220MainComponent::chooseVoiceVst3()
+{
+    voiceFxChooser = std::make_unique<juce::FileChooser> (
+        "Choose a trusted VST3 effect (ArSonVerb)", juce::File(), "*.vst3");
+    juce::Component::SafePointer<SC220MainComponent> safe (this);
+    voiceFxChooser->launchAsync (juce::FileBrowserComponent::openMode
+                                    | juce::FileBrowserComponent::canSelectFiles
+                                    | juce::FileBrowserComponent::canSelectDirectories,
+                                [safe] (const juce::FileChooser& chooser)
+                                {
+                                    if (safe == nullptr) return;
+                                    const auto file = chooser.getResult();
+                                    if (file == juce::File()) return;
+                                    safe->voiceFxEditorWindow.reset();
+                                    const auto error = safe->audioEngine.loadVoiceVst3 (file);
+                                    if (error.isNotEmpty())
+                                        juce::AlertWindow::showMessageBoxAsync (
+                                            juce::MessageBoxIconType::WarningIcon, "VST3 unavailable", error);
+                                    safe->refreshAllControls();
+                                });
+}
+
+void SC220MainComponent::showVoiceVst3Editor()
+{
+    if (auto* processor = audioEngine.getVoiceVst3Processor())
+    {
+        if (voiceFxEditorWindow == nullptr)
+        {
+            auto* editor = processor->createEditorIfNeeded();
+            if (editor == nullptr)
+                editor = new juce::GenericAudioProcessorEditor (*processor);
+            voiceFxEditorWindow = std::make_unique<VoiceFxEditorWindow> (
+                audioEngine.getVoiceVst3Name(), editor);
+        }
+        voiceFxEditorWindow->setVisible (true);
+        voiceFxEditorWindow->toFront (true);
+    }
 }
 
 void SC220MainComponent::showAudioSettings()
@@ -1268,6 +1361,8 @@ void SC220MainComponent::resized()
                        68, pcStripArea.getHeight() - 300);
     duckAmount.setBounds (pcStripArea.getX() + 24, pcStripArea.getBottom() - 82, 70, 70);
 
+    // Outside the console-grid replacement anchor; retained in the generated production UI.
+    voiceFxButton.setBounds (sc220StripArea.getCentreX() - 74, sc220StripArea.getY() + 160, 148, 22);
     presetBox.setBounds (signatureArea.getCentreX() - 102, signatureArea.getY() + 72, 204, 36);
     enhancerPowerButton.setBounds (signatureArea.getRight() - 54, signatureArea.getY() + 20, 36, 36);
     spectrumDisplay->setBounds (signatureArea.reduced (34, 0).withTop (signatureArea.getY() + 128)

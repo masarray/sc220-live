@@ -28,6 +28,8 @@ endfunction()
 set(_start_anchor [=[
     const auto sampleRate = device->getCurrentSampleRate();
     const auto blockSize = juce::jmax (64, device->getCurrentBufferSizeSamples());
+    currentSampleRate.store (sampleRate);
+    currentBufferSize.store (blockSize);
     constexpr int channels = 2;
 ]=])
 set(_start_replacement [=[

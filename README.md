@@ -14,7 +14,7 @@ Native Windows audio console for Recording Tech SC220. SC220 Live combines an op
 - Installer SHA-256: `ba6c61617d8c796dd953234e50f6d2e179c5efbe5e281892da7e7ba977e55693`
 - Platform: Windows 10/11 x64
 
-The public repository contains compiled distribution assets and end-user documentation only. Application source, DSP source, build infrastructure, credentials, signing material, and private submodules remain private.
+This repository is now public and contains application source and build scripts. The ASK-P DSP authority is still a separate private submodule; publishing this repository does not grant access to that dependency. Never commit signing keys or build credentials.
 
 ## Product signal path
 
@@ -45,6 +45,37 @@ SC220 Live pins the approved ASK-P v0.5.24 production authority:
 The approved processor includes the latest v0.5.24 Gain Match settle-controller fix for source parity, but **SC220 Live keeps Gain Match disabled by default and does not expose a Gain Match control in the public UI**.
 
 See [docs/ASKP_SOURCE_SYNC.md](docs/ASKP_SOURCE_SYNC.md) and [docs/ASKP_P03_DSP_PORT.md](docs/ASKP_P03_DSP_PORT.md).
+
+## Independent first-party VST3 host (GitHub Actions builds)
+
+SC220 Live is an independent JUCE 8 ASIO/WASAPI live mixer. It does **not**
+compile or fetch private `askp-vst` DSP source. Two independent instances of
+the official **ArSonKuPik v0.5.26 VST3** process Voice and PC Music, while
+SC220 owns routing, live protection, ASIO device configuration, UI, license
+verification, meters and streamer/monitor outputs.
+
+The official plugin bundle is obtained by the public Windows CI from:
+https://github.com/masarray/vst-enhancer/releases/tag/v0.5.26
+
+The CI verifies the official VST3 ZIP using SHA-256
+`e53287c871166bcdc945b4962d7a38b5c93ad6cb0c0fa0bdd02fa42ff47cd5b6`
+and packages `Plugins/ArSonKuPik.vst3` next to `SC220 Live.exe`.
+The application auto-loads both instances before audio callback registration;
+the plugin is not downloaded dynamically at runtime. An absent/incompatible
+bundle produces a visible error and a dry fallback, not a silent crash.
+ArSonVerb can still be loaded independently in the voice FX rack.
+
+**All builds are done through GitHub-hosted Windows CI. No local/self-hosted
+runner, private DSP submodule, ASK-P token or build secret is required.**
+See `.github/workflows/sc220-public-windows-ci.yml`. The independent SC220
+license verifier keeps the previously shipped SC220 request/activation format.
+
+**Release gates:** a successful Windows compilation, source/CTest checks,
+pinned VST3 checksum, and user verification on actual ASIO hardware.
+Independent plugin license/evaluation restrictions still apply to the VST3
+binary; no bypass of those restrictions is implemented. A VST3 loaded in-process
+is not crash-isolated. The SC220 development preview is not guaranteed
+zero physical latency or crackle-free without hardware measurements.
 
 ## Runtime capabilities
 
@@ -121,13 +152,13 @@ The release launcher is:
 .\RELEASE-SC220.cmd
 ```
 
-It is designed to fail closed: source must be clean and pushed, the ASK-P authority must match the lock, the release runner is brought online only for the release session, and publication is accepted only after the release path verifies the published tag/assets.
+It is designed to fail closed: source must be clean and pushed, the ASK-P authority must match the lock, and publication is accepted only after the release path verifies the published tag/assets.
 
 The release tooling can repair a clean submodule pointer mismatch, fast-forward a clean local branch, reuse an unfinished Actions run rather than dispatching a duplicate, and retain a verified JUCE 8.0.14 cache to reduce repeated clean-build setup time.
 
 ## Repository boundary
 
-- `masarray/sc220-live` — private canonical source, release automation, design authority, installer workflow, and private DSP submodule reference.
+- `masarray/sc220-live` — public application source with a private DSP submodule reference.
 - `masarray/sc220-download` — public landing pages, release metadata, checksums, manifests, end-user documentation, and compiled release assets.
 
 See [docs/RELEASE_BOUNDARY.md](docs/RELEASE_BOUNDARY.md), [docs/PUBLIC_RELEASE_GATE.md](docs/PUBLIC_RELEASE_GATE.md), and [docs/RELEASE_V0.1.1_RECEIPT.md](docs/RELEASE_V0.1.1_RECEIPT.md).

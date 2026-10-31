@@ -1,126 +1,88 @@
 #pragma once
-
-#include "PluginProcessor.h"
-
-#include <juce_audio_basics/juce_audio_basics.h>
-
+#include "InputVst3Rack.h"
+#include "LicenseManager.h"
+#include "ScopeTap.h"
+#include <juce_audio_processors/juce_audio_processors.h>
+#include <array>
 #include <atomic>
 
 namespace askp::live {
-
-// Stable boundary between the standalone live rack and the embedded
-// ArSonKuPik Signature Engine. LiveAudioEngine never reaches into APVTS or
-// hard-codes engine internals directly; future engine ports are confined here.
+// One SC220-owned control facade around the version-pinned public ArSonKuPik
+// VST3 binary. No private DSP headers, compile-time processor or source patches.
 class EnhancerEngineBridge final
 {
 public:
     struct MeterSnapshot
     {
-        float inputPeakDbL = -120.0f;
-        float inputPeakDbR = -120.0f;
-        float outputPeakDbL = -120.0f;
-        float outputPeakDbR = -120.0f;
-        float gainReductionDb = 0.0f;
-        float safetyGainReductionDb = 0.0f;
-        float preSafetyPeakDbL = -120.0f;
-        float preSafetyPeakDbR = -120.0f;
-        bool inputOver = false;
-        bool preSafetyOver = false;
-        bool outputOver = false;
-        float gainMatchDb = 0.0f;
-        bool gainMatchReady = false;
-        float correlation = 1.0f;
-        bool clipping = false;
+        float inputPeakDbL=-120.0f,inputPeakDbR=-120.0f;
+        float outputPeakDbL=-120.0f,outputPeakDbR=-120.0f;
+        float gainReductionDb=0.0f,safetyGainReductionDb=0.0f;
+        float preSafetyPeakDbL=-120.0f,preSafetyPeakDbR=-120.0f;
+        bool inputOver=false,preSafetyOver=false,outputOver=false;
+        float gainMatchDb=0.0f,correlation=1.0f;
+        bool gainMatchReady=false,clipping=false;
     };
+    static constexpr const char* engineVersion="0.5.26";
+    static constexpr int factoryProfileCount=13;
 
-    static constexpr const char* engineVersion = "0.5.24";
-    static constexpr int engineRevision = ASKP_DSP_HEADER_REVISION;
-    static constexpr int factoryProfileCount = 13;
-
-    EnhancerEngineBridge();
-
+    EnhancerEngineBridge() = default;
+    juce::String loadBundled (const juce::File& bundle, double sampleRate, int blockSize);
+    bool isLoaded() const noexcept { return rack.isLoaded(); }
     void prepare (double sampleRate, int maximumBlockSize);
     void release();
-    void process (juce::AudioBuffer<float>& audio, juce::MidiBuffer& midi);
-
-    int latencySamples() const noexcept { return processor_.getLatencySamples(); }
+    void process (juce::AudioBuffer<float>& audio, juce::MidiBuffer& midi) noexcept;
+    int latencySamples() const noexcept { return rack.getLatencySamples(); }
 
     void setInputGainDb (float valueDb) noexcept;
     void setFinalOutputGainDb (float valueDb) noexcept;
-    void setBypassed (bool bypassed) noexcept;
-    bool isBypassed() const noexcept;
-    void setGainMatchEnabled (bool enabled) noexcept;
+    void setBypassed (bool value) noexcept { rack.setBypassed (value); }
+    bool isBypassed() const noexcept { return rack.isBypassed(); }
+    void setGainMatchEnabled (bool value) noexcept;
     bool isGainMatchEnabled() const noexcept;
-
-    askp::LicenseManager& licenseManager() noexcept { return processor_.licenseManager; }
-    const askp::LicenseManager& licenseManager() const noexcept { return processor_.licenseManager; }
-
-    // Physical SC220 ownership is its own entitlement. The software-only
-    // licence timer may expire, but a currently enumerated SC220 must keep the
-    // creative controls available without asking the hardware owner to pay for
-    // a second software entitlement.
-    void setHardwareEntitled (bool entitled) noexcept
-    {
-        hardwareEntitled_.store (entitled, std::memory_order_release);
-    }
+    askp::LicenseManager& licenseManager() noexcept { return license; }
+    const askp::LicenseManager& licenseManager() const noexcept { return license; }
+    void setHardwareEntitled (bool value) noexcept
+    { hardwareEntitled.store (value, std::memory_order_release); }
     bool isHardwareEntitled() const noexcept
-    {
-        return hardwareEntitled_.load (std::memory_order_acquire);
-    }
+    { return hardwareEntitled.load (std::memory_order_acquire); }
     bool editingAllowed() const noexcept
-    {
-        return isHardwareEntitled() || processor_.licenseManager.editingAllowed();
-    }
-    bool isLicensed() const noexcept { return processor_.licenseManager.isLicensed(); }
+    { return isHardwareEntitled() || license.editingAllowed(); }
+    bool isLicensed() const noexcept { return license.isLicensed(); }
 
     void setPresetIndex (int index);
     int presetIndex() const noexcept;
     juce::StringArray presetNames() const;
     juce::String presetCategory (int index) const;
     juce::String presetDescription (int index) const;
-
     void setEnhance (float value) noexcept;
     void setSmartBass (float value) noexcept;
     void setSmartTreble (float value) noexcept;
     void setVocalBody (float value) noexcept;
     void setStereoMagic (float value) noexcept;
-
     float enhance() const noexcept;
     float smartBass() const noexcept;
     float smartTreble() const noexcept;
     float vocalBody() const noexcept;
     float stereoMagic() const noexcept;
-
     MeterSnapshot meters() const noexcept;
-
-    // SC220 Live owns a dedicated lock-free analyzer tap. The embedded ASK-P
-    // editor tap stays disabled permanently, so no per-block enable/disable
-    // race can starve the message-thread spectrum reader.
-    void setVisualTapEnabled (bool enabled) noexcept
+    void setVisualTapEnabled (bool enable) noexcept
     {
-        visualTapEnabled_.store (enabled, std::memory_order_release);
-        analyzerTap_.setEnabled (enabled);
-        processor_.scopeTap.setEnabled (false);
+        visualTapEnabled.store (enable, std::memory_order_release);
+        analyzerTap.setEnabled (enable);
     }
-
-    askp::ScopeTap& analysisTap() noexcept { return analyzerTap_; }
-    const askp::ScopeTap& analysisTap() const noexcept { return analyzerTap_; }
-
-    askp::Processor& processor() noexcept { return processor_; }
-    const askp::Processor& processor() const noexcept { return processor_; }
+    askp::ScopeTap& analysisTap() noexcept { return analyzerTap; }
+    const askp::ScopeTap& analysisTap() const noexcept { return analyzerTap; }
 
 private:
-    void setParameter (const char* parameterId, float plainValue) noexcept;
-    float getParameter (const char* parameterId, float fallback = 0.0f) const noexcept;
-
-    askp::Processor processor_;
-    askp::ScopeTap analyzerTap_;
-    std::atomic<bool> visualTapEnabled_ { false };
-    // Start permissive so persisted creative settings can be restored before
-    // the Windows endpoint watcher performs its first authoritative hardware
-    // scan. SC220DeviceWatcher replaces this value immediately when the main UI
-    // is constructed.
-    std::atomic<bool> hardwareEntitled_ { true };
+    enum Parameter { preset, inputGain, finalGain, enhanceParam, bass, treble, vocal, stereo, gainMatch, count };
+    void bindParameters() noexcept;
+    void setPlain (Parameter, float value, float minimum, float maximum) noexcept;
+    float readPlain (Parameter, float minimum, float maximum, float fallback) const noexcept;
+    InputVst3Rack rack;
+    askp::LicenseManager license;
+    askp::ScopeTap analyzerTap;
+    std::array<juce::AudioProcessorParameter*, count> parameters{};
+    std::atomic<bool> visualTapEnabled{false},hardwareEntitled{true};
+    std::atomic<float> inputL{-120},inputR{-120},outputL{-120},outputR{-120};
 };
-
 } // namespace askp::live

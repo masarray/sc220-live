@@ -283,24 +283,13 @@ sc220_p6e_once(_license_panel "required panel cannot close after expiry"
 ]=])
 
 if(NOT CMAKE_SCRIPT_MODE_FILE)
-    # The pinned ASK-P licence implementation keeps its hardened local state,
-    # clock checks and signed activation format; SC220 changes only the generated
-    # product-specific free-period constant from 365 to 90 days.
-    if(NOT DEFINED ASKP_GENERATED_DIR)
-        message(FATAL_ERROR "SC220 P6E requires ASKP_GENERATED_DIR in normal configure")
+    # Independent SC220 licence source: preserve 90-day software trial
+    # without importing or rewriting private ASK-P-generated headers.
+    set(_sc220_license_header "${CMAKE_CURRENT_SOURCE_DIR}/live/LicenseManager.h")
+    file(READ "${_sc220_license_header}" _license_header)
+    if(NOT _license_header MATCHES "betaDurationDays = 90")
+        message(FATAL_ERROR "SC220 software-only trial must remain exactly 90 days")
     endif()
-    set(_generated_license_header "${ASKP_GENERATED_DIR}/LicenseManager.h")
-    if(NOT EXISTS "${_generated_license_header}")
-        message(FATAL_ERROR "SC220 P6E generated licence header is missing")
-    endif()
-    file(READ "${_generated_license_header}" _license_header)
-    string(FIND "${_license_header}" "betaDurationDays = 365" _old_trial)
-    if(_old_trial EQUAL -1)
-        message(FATAL_ERROR "SC220 P6E ASK-P trial-duration anchor changed")
-    endif()
-    string(REPLACE "betaDurationDays = 365" "betaDurationDays = 90"
-                   _license_header "${_license_header}")
-    file(WRITE "${_generated_license_header}" "${_license_header}")
 
     set(_generated_panel "${CMAKE_CURRENT_BINARY_DIR}/generated/sc220-p6e/LiveLicensePanel_P6E.cpp")
     get_filename_component(_generated_panel_dir "${_generated_panel}" DIRECTORY)

@@ -18,7 +18,7 @@ endfunction()
 
 set(_component_list_anchor [=[
              &minimiseButton, &maximiseButton, &closeButton, &settingsButton,
-             &enhancerPowerButton, &goLiveButton, &presetBox, &outputBox,
+             &enhancerPowerButton, &goLiveButton, &voiceFxButton, &presetBox, &outputBox,
              &stereoButton, &dualMonoButton, &pcSourceBox, &inputTrim,
              &sc220Fader, &pcFader, &duckAmount, &streamFader, &monitorKnob,
              &sc220Mute, &streamMute })
@@ -26,7 +26,7 @@ set(_component_list_anchor [=[
 set(_component_list_replacement [=[
              &minimiseButton, &maximiseButton, &closeButton, &settingsButton,
              &enhancerPowerButton, &monitorPowerButton, &goLiveButton,
-             &presetBox, &outputBox, &monitorOutputBox,
+             &voiceFxButton, &presetBox, &outputBox, &monitorOutputBox,
              &stereoButton, &dualMonoButton, &pcSourceBox,
              &programMonitorButton, &musicCueButton, &inputTrim,
              &sc220Fader, &pcFader, &duckAmount, &streamFader, &monitorKnob,

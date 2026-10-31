@@ -345,8 +345,6 @@ void MusicalNoiseClean::processFrame() noexcept
 {
     const int bins = fftSize / 2 + 1;
 
-    float totalFlux = 0.0f;
-    float totalMagnitude = 0.0f;
 
     for (int channel = 0; channel < channelCount; ++channel)
     {
@@ -371,18 +369,12 @@ void MusicalNoiseClean::processFrame() noexcept
             const float magnitude = std::sqrt (power + kFloor);
             currentPower[static_cast<size_t> (channel)][static_cast<size_t> (bin)] = power;
 
-            const float previous = previousMagnitude[static_cast<size_t> (channel)][static_cast<size_t> (bin)];
-            totalFlux += juce::jmax (0.0f, magnitude - previous);
-            totalMagnitude += magnitude;
             previousMagnitude[static_cast<size_t> (channel)][static_cast<size_t> (bin)] = magnitude;
 
             if (learningActive.load())
                 profileAccumulator[static_cast<size_t> (channel)][static_cast<size_t> (bin)] += power;
         }
     }
-
-    const float transientScore = juce::jlimit (0.0f, 1.0f,
-        (totalFlux / (totalMagnitude + 1.0e-9f) - 0.018f) * 11.0f);
 
     if (learningActive.load())
     {
@@ -410,129 +402,42 @@ void MusicalNoiseClean::processFrame() noexcept
         }
     }
 
-    std::array<float, maxBins> rawGains {};
-    rawGains.fill (1.0f);
-
-    for (int bin = 1; bin < bins - 1; ++bin)
-    {
-        const float linkedPower = 0.5f * (currentPower[0][static_cast<size_t> (bin)]
-                                        + currentPower[juce::jmin (1, channelCount - 1)][static_cast<size_t> (bin)]);
-        const float linkedMagnitude = std::sqrt (linkedPower + kFloor);
-        const float neighbour = 0.25f * (std::sqrt (currentPower[0][static_cast<size_t> (bin - 1)] + kFloor)
-                                       + std::sqrt (currentPower[0][static_cast<size_t> (bin + 1)] + kFloor)
-                                       + std::sqrt (currentPower[juce::jmin (1, channelCount - 1)][static_cast<size_t> (bin - 1)] + kFloor)
-                                       + std::sqrt (currentPower[juce::jmin (1, channelCount - 1)][static_cast<size_t> (bin + 1)] + kFloor));
-        const float tonality = smoothStep ((linkedMagnitude / (neighbour + 1.0e-9f) - 1.15f) / 1.8f);
-        rawGains[static_cast<size_t> (bin)] = calculateLinkedGain (bin, linkedPower, tonality, transientScore);
-    }
-
-    for (int bin = 2; bin < bins - 2; ++bin)
-    {
-        rawGains[static_cast<size_t> (bin)] = (rawGains[static_cast<size_t> (bin - 2)]
-                                              + 2.0f * rawGains[static_cast<size_t> (bin - 1)]
-                                              + 3.0f * rawGains[static_cast<size_t> (bin)]
-                                              + 2.0f * rawGains[static_cast<size_t> (bin + 1)]
-                                              + rawGains[static_cast<size_t> (bin + 2)]) / 9.0f;
-    }
-
-    for (int channel = 0; channel < channelCount; ++channel)
-    {
-        auto& work = fftWork[static_cast<size_t> (channel)];
-        for (int bin = 0; bin < bins; ++bin)
-        {
-            const float gain = rawGains[static_cast<size_t> (bin)];
-            work[static_cast<size_t> (bin * 2)] *= gain;
-            work[static_cast<size_t> (bin * 2 + 1)] *= gain;
-        }
-
-        fixedFft.inverse (work.data());
-
-        for (int i = 0; i < fftSize; ++i)
-        {
-            // The frame is completed immediately before the current output
-            // sample is consumed. Schedule its oldest sample one position ahead,
-            // producing exactly fftSize samples of latency and matching the dry
-            // delay ring used by bypass / Hear Removed.
-            int destination = outputReadPos + 1 + i;
-            if (destination >= outputFifoSize) destination -= outputFifoSize;
-            const float sample = work[static_cast<size_t> (i)] * window[static_cast<size_t> (i)];
-            outputRing[static_cast<size_t> (channel)][static_cast<size_t> (destination)] += sample;
-            if (channelCount == 1)
-                outputRing[1][static_cast<size_t> (destination)] += sample;
-        }
-    }
-
-    // The main workspace uses the time-domain liquid visualizer. The denoiser
-    // therefore performs no GUI publication work after a spectral frame.
 }
 
 void MusicalNoiseClean::process (juce::AudioBuffer<float>& buffer) noexcept
 {
-    // Quality changes are committed only by prepare(), normally through the
-    // explicit audio-engine restart. This keeps FFT/window reconfiguration out
-    // of the real-time callback.
-    if (learnRequested.exchange (false))
+    // Static-noise LEARN is analysis-only. Never put a delayed FFT wet/dry
+    // signal into the live microphone path, including during the two-second
+    // calibration. No allocation or blocking; FFT state is preallocated.
+    if (learnRequested.exchange (false, std::memory_order_acq_rel))
         beginLearningOnAudioThread();
+    if (! learningActive.load (std::memory_order_acquire))
+        return;
 
-    const int samples = buffer.getNumSamples();
     const int channels = juce::jmin (channelCount, buffer.getNumChannels());
-    const bool shouldProcess = enabled.load();
-    const bool removedOnly = listenRemoved.load();
-
+    const int samples = buffer.getNumSamples();
     for (int sample = 0; sample < samples; ++sample)
     {
-        float dry[maxChannels] {};
-        int dryWritePosition = outputReadPos + fftSize;
-        if (dryWritePosition >= outputFifoSize) dryWritePosition -= outputFifoSize;
         for (int channel = 0; channel < channels; ++channel)
         {
-            dry[channel] = buffer.getSample (channel, sample);
-            dryDelayRing[static_cast<size_t> (channel)][static_cast<size_t> (dryWritePosition)] = dry[channel];
-
-            const float spectralInput = shouldProcess
-                                      ? subsonicFilters[static_cast<size_t> (channel)].process (dry[channel])
-                                      : dry[channel];
-            inputRing[static_cast<size_t> (channel)][static_cast<size_t> (inputWritePos)] = spectralInput;
-
-            if (learningActive.load())
-            {
-                learningTimeDomainEnergy += static_cast<double> (spectralInput) * spectralInput;
-                ++learningTimeDomainSamples;
-            }
+            const float input = buffer.getSample (channel, sample);
+            const float analysed = subsonicFilters[static_cast<size_t> (channel)].process (input);
+            inputRing[static_cast<size_t> (channel)][static_cast<size_t> (inputWritePos)] = analysed;
+            learningTimeDomainEnergy += static_cast<double> (analysed) * analysed;
+            ++learningTimeDomainSamples;
         }
-
         if (channels == 1)
-        {
-            inputRing[1][static_cast<size_t> (inputWritePos)] = inputRing[0][static_cast<size_t> (inputWritePos)];
-            dryDelayRing[1][static_cast<size_t> (dryWritePosition)] = dry[0];
-        }
-
+            inputRing[1][static_cast<size_t> (inputWritePos)]
+                = inputRing[0][static_cast<size_t> (inputWritePos)];
         if (++inputWritePos >= fftSize) inputWritePos = 0;
         ++samplesSeen;
-        ++hopCounter;
-
-        if (samplesSeen >= fftSize && hopCounter >= hopSize)
+        if (++hopCounter >= hopSize && samplesSeen >= fftSize)
         {
             hopCounter = 0;
             processFrame();
+            if (! learningActive.load (std::memory_order_relaxed))
+                break;
         }
-
-        for (int channel = 0; channel < channels; ++channel)
-        {
-            float wet = outputRing[static_cast<size_t> (channel)][static_cast<size_t> (outputReadPos)];
-            const float delayedDry = dryDelayRing[static_cast<size_t> (channel)][static_cast<size_t> (outputReadPos)];
-            outputRing[static_cast<size_t> (channel)][static_cast<size_t> (outputReadPos)] = 0.0f;
-            dryDelayRing[static_cast<size_t> (channel)][static_cast<size_t> (outputReadPos)] = 0.0f;
-
-            if (! shouldProcess)
-                wet = delayedDry;
-            else if (removedOnly)
-                wet = delayedDry - wet;
-
-            buffer.setSample (channel, sample, std::isfinite (wet) ? wet : 0.0f);
-        }
-
-        if (++outputReadPos >= outputFifoSize) outputReadPos = 0;
     }
 }
 

@@ -63,6 +63,29 @@ bool LiveAudioEngine::initialise (const juce::XmlElement* savedDeviceState)
         lastError = error;
     }
 
+    // Bundled, SHA-256 pinned official ArSonKuPik VST3 is shipped beside the EXE.
+    // Both instances are created on the message thread before the callback
+    // starts, without any source or compiler dependency on the ASK-P repository.
+    // Avoid automatic plugin discovery: the known bundle path is the authority.
+    const auto bundle = juce::File::getSpecialLocation (juce::File::currentExecutableFile)
+        .getParentDirectory().getChildFile ("Plugins").getChildFile ("ArSonKuPik.vst3");
+    // Prepare on startup even if no default Windows endpoint is open yet:
+    // user may select a native ASIO device for the first time AFTER launch.
+    auto* startupDevice = deviceManager.getCurrentAudioDevice();
+    const double pluginRate = startupDevice != nullptr
+        ? startupDevice->getCurrentSampleRate() : 48000.0;
+    const int pluginBlock = startupDevice != nullptr
+        ? juce::jmax (64, startupDevice->getCurrentBufferSizeSamples()) : 256;
+    const auto voiceError = voiceEnhancerBridge.loadBundled (bundle, pluginRate, pluginBlock);
+    const auto musicError = musicEnhancerBridge.loadBundled (bundle, pluginRate, pluginBlock);
+    if (voiceError.isNotEmpty() || musicError.isNotEmpty())
+    {
+        const juce::ScopedLock lock (statusLock);
+        lastError = "Bundled ArSonKuPik VST3 could not initialise. "
+                    "SC220 will run safe dry signal until the plugin is repaired. "
+                    "Voice: " + voiceError + "; Music: " + musicError;
+    }
+
     if (! callbackRegistered.exchange (true))
         deviceManager.addAudioCallback (this);
     refreshDeviceStatus();
@@ -114,6 +137,70 @@ bool LiveAudioEngine::initialise (const juce::XmlElement* savedDeviceState)
     }
 
     return error.isEmpty();
+}
+
+bool LiveAudioEngine::quiesceForPluginSwap() noexcept
+{
+    // This gate is checked before any mutable plugin or DSP member is touched.
+    // Unlike removeAudioCallback(), it does NOT release/prepare the entire graph.
+    vstSwapSuspended.store (true, std::memory_order_release);
+    for (int attempt = 0; attempt < 500; ++attempt)
+    {
+        if (audioCallbacksInFlight.load (std::memory_order_acquire) == 0)
+            return true;
+        juce::Thread::sleep (1); // Message thread only, never the audio callback.
+    }
+    vstSwapSuspended.store (false, std::memory_order_release);
+    return false; // Refuse to destroy a processor while its callback may be stuck.
+}
+
+void LiveAudioEngine::publishLatencyEstimate() noexcept
+{
+    const int voiceLatency = noiseClean.getLatencySamples() + voiceVst3.getLatencySamples()
+                           + voiceEnhancerBridge.latencySamples();
+    const int musicLatency = musicEnhancerBridge.latencySamples();
+    voiceLatencySamples.store (voiceLatency, std::memory_order_relaxed);
+    musicDspLatencySamples.store (musicLatency, std::memory_order_relaxed);
+    if (auto* device = deviceManager.getCurrentAudioDevice())
+        totalLatencySamples.store (juce::jmax (voiceLatency, musicLatency)
+                                   + device->getInputLatencyInSamples()
+                                   + device->getOutputLatencyInSamples(),
+                                   std::memory_order_relaxed);
+}
+
+juce::String LiveAudioEngine::loadVoiceVst3 (const juce::File& pluginFile)
+{
+    const double sampleRate = currentSampleRate.load (std::memory_order_acquire);
+    const int blockSize = currentBufferSize.load (std::memory_order_acquire);
+    InputVst3Rack::PreparedInstance candidate;
+    const auto error = InputVst3Rack::createPrepared (pluginFile, sampleRate, blockSize, candidate);
+    if (error.isNotEmpty())
+        return error;
+
+    if (sampleRate != currentSampleRate.load() || blockSize != currentBufferSize.load())
+    {
+        candidate->releaseResources();
+        return "The audio device changed while preparing the VST3. Try loading again.";
+    }
+
+    if (! quiesceForPluginSwap())
+    {
+        candidate->releaseResources();
+        return "The audio callback did not become idle; VST3 was not replaced.";
+    }
+    voiceVst3.install (std::move (candidate), sampleRate, blockSize);
+    publishLatencyEstimate();
+    vstSwapSuspended.store (false, std::memory_order_release);
+    return {};
+}
+
+void LiveAudioEngine::removeVoiceVst3()
+{
+    if (! quiesceForPluginSwap())
+        return; // Never destroy a processor still in use.
+    voiceVst3.clear();
+    publishLatencyEstimate();
+    vstSwapSuspended.store (false, std::memory_order_release);
 }
 
 void LiveAudioEngine::shutdown()
@@ -408,6 +495,7 @@ LiveAudioEngine::Status LiveAudioEngine::getStatus() const
     status.bufferSize = currentBufferSize.load();
     status.cpuPercent = cpuPercent.load();
     status.callbackPeakPercent = callbackPeakPercent.load();
+    status.callbackDeadlineMisses = callbackDeadlineMisses.load (std::memory_order_relaxed);
     status.inputPeakDbL = inputPeakL.load();
     status.inputPeakDbR = inputPeakR.load();
     status.pcPeakDbL = pcLoopback.peakDbL();
@@ -452,8 +540,18 @@ void LiveAudioEngine::audioDeviceIOCallbackWithContext (
     float* const* outputChannelData, int numOutputChannels,
     int numSamples, const juce::AudioIODeviceCallbackContext&)
 {
+    struct CallbackLifetime final
+    {
+        explicit CallbackLifetime (std::atomic<int>& count) noexcept : inFlight (count)
+        { inFlight.fetch_add (1, std::memory_order_acq_rel); }
+        ~CallbackLifetime() { inFlight.fetch_sub (1, std::memory_order_release); }
+        std::atomic<int>& inFlight;
+    } guard (audioCallbacksInFlight);
+
     const auto start = std::chrono::high_resolution_clock::now();
     clearOutputs (outputChannelData, numOutputChannels, numSamples);
+    if (vstSwapSuspended.load (std::memory_order_acquire))
+        return;
 
     if (! running.load() || ! engineEnabled.load() || numOutputChannels <= 0)
         return;
@@ -529,6 +627,7 @@ void LiveAudioEngine::audioDeviceIOCallbackWithContext (
     expander.process (voiceBlock, detectorBlock);
 
     voiceMidi.clear();
+    voiceVst3.process (voiceBlock, voiceMidi); // Voice FX only; PC Music bypasses this insert.
     voiceEnhancerBridge.process (voiceBlock, voiceMidi);
     if (! voiceEnhancerBypassed.load (std::memory_order_relaxed))
     {
@@ -654,6 +753,8 @@ void LiveAudioEngine::audioDeviceIOCallbackWithContext (
     const auto budget = static_cast<double> (numSamples)
                       / juce::jmax (1.0, currentSampleRate.load());
     const float blockCpu = budget > 0.0 ? static_cast<float> (elapsed / budget * 100.0) : 0.0f;
+    if (blockCpu >= 100.0f)
+        callbackDeadlineMisses.fetch_add (1, std::memory_order_relaxed);
     cpuPercent.store (cpuPercent.load() * 0.92f + blockCpu * 0.08f);
     const float previousPeak = callbackPeakPercent.load (std::memory_order_relaxed);
     callbackPeakPercent.store (blockCpu > previousPeak ? blockCpu : previousPeak * 0.9975f,
@@ -667,6 +768,8 @@ void LiveAudioEngine::audioDeviceAboutToStart (juce::AudioIODevice* device)
 
     const auto sampleRate = device->getCurrentSampleRate();
     const auto blockSize = juce::jmax (64, device->getCurrentBufferSizeSamples());
+    currentSampleRate.store (sampleRate);
+    currentBufferSize.store (blockSize);
     constexpr int channels = 2;
 
     processBuffer.setSize (channels, blockSize, false, true, false);
@@ -676,11 +779,16 @@ void LiveAudioEngine::audioDeviceAboutToStart (juce::AudioIODevice* device)
     detectorBuffer.clear();
     pcAudioBuffer.clear();
 
+    // Clear the per-engine P6B filter state on every real device start.
+    p6bLow1L = p6bLow2L = p6bLow1R = p6bLow2R = 0.0f;
+    p6bHighEnvelope = p6bBodyEnvelope = 0.0f;
+    p6bHissGain = 1.0f;
     noiseClean.prepare (sampleRate, blockSize, channels);
     expander.prepare (sampleRate);
 
     voiceEnhancerBridge.prepare (sampleRate, blockSize);
     musicEnhancerBridge.prepare (sampleRate, blockSize);
+    voiceVst3.prepare (sampleRate, blockSize);
     pleasantPresence.prepare (sampleRate, blockSize, channels);
     updateInputTrimRouting();
     updateOutputTrimRouting();
@@ -736,17 +844,12 @@ void LiveAudioEngine::audioDeviceAboutToStart (juce::AudioIODevice* device)
     pcLoopback.prepare (sampleRate);
     pcLoopback.start();
 
-    const int voiceLatency = noiseClean.getLatencySamples() + voiceEnhancerBridge.latencySamples();
-    const int musicLatency = musicEnhancerBridge.latencySamples();
-    voiceLatencySamples.store (voiceLatency);
-    musicDspLatencySamples.store (musicLatency);
-    totalLatencySamples.store (juce::jmax (voiceLatency, musicLatency)
-                               + device->getInputLatencyInSamples()
-                               + device->getOutputLatencyInSamples());
+    publishLatencyEstimate();
     running.store (true);
     deviceOpen.store (true);
     dropoutCount.store (0);
     callbackPeakPercent.store (0.0f);
+    callbackDeadlineMisses.store (0, std::memory_order_relaxed);
     refreshDeviceStatus();
 }
 
@@ -755,6 +858,7 @@ void LiveAudioEngine::audioDeviceStopped()
     pcLoopback.stop();
     voiceEnhancerBridge.release();
     musicEnhancerBridge.release();
+    voiceVst3.release();
     pleasantPresence.reset();
     masterLimiter.reset();
     running.store (false);

@@ -2,6 +2,7 @@
 
 #include "MusicalNoiseClean.h"
 #include "EnhancerEngineBridge.h"
+#include "InputVst3Rack.h"
 #include "SmartPleasantPresence.h"
 #include "MonitorOutputClient.h"
 #include "PcAudioLoopbackCapture.h"
@@ -35,6 +36,7 @@ public:
         int bufferSize = 0;
         float cpuPercent = 0.0f;
         float callbackPeakPercent = 0.0f;
+        int callbackDeadlineMisses = 0; // Observed callback duration > buffer time.
         float inputPeakDbL = -120.0f;
         float inputPeakDbR = -120.0f;
         float pcPeakDbL = -120.0f;
@@ -84,8 +86,14 @@ public:
     void shutdown();
 
     juce::AudioDeviceManager& getDeviceManager() noexcept { return deviceManager; }
-    askp::Processor& getAskpProcessor() noexcept { return voiceEnhancerBridge.processor(); }
-    const askp::Processor& getAskpProcessor() const noexcept { return voiceEnhancerBridge.processor(); }
+    // UI/message-thread only; the callback is detached during a plugin swap.
+    juce::String loadVoiceVst3 (const juce::File& pluginFile);
+    void removeVoiceVst3();
+    void setVoiceVst3Bypassed (bool bypass) noexcept { voiceVst3.setBypassed (bypass); }
+    bool isVoiceVst3Bypassed() const noexcept { return voiceVst3.isBypassed(); }
+    bool hasVoiceVst3() const noexcept { return voiceVst3.isLoaded(); }
+    juce::String getVoiceVst3Name() const { return voiceVst3.getName(); }
+    juce::AudioPluginInstance* getVoiceVst3Processor() const noexcept { return voiceVst3.getProcessor(); }
     EnhancerEngineBridge& getEnhancerBridge() noexcept { return voiceEnhancerBridge; }
     EnhancerEngineBridge& getVoiceEnhancerBridge() noexcept { return voiceEnhancerBridge; }
     EnhancerEngineBridge& getMusicEnhancerBridge() noexcept { return musicEnhancerBridge; }
@@ -225,6 +233,8 @@ private:
     void updateMeters (const juce::AudioBuffer<float>& finalOutput,
                        float preLimiterPeakDb) noexcept;
     void refreshDeviceStatus();
+    void publishLatencyEstimate() noexcept;
+    bool quiesceForPluginSwap() noexcept;
     juce::String applyDeviceSelection (const juce::String* inputName,
                                        const juce::String* outputName);
     void updateInputTrimRouting() noexcept;
@@ -244,6 +254,13 @@ private:
     SmoothDownwardExpander expander;
     EnhancerEngineBridge voiceEnhancerBridge;
     EnhancerEngineBridge musicEnhancerBridge;
+    InputVst3Rack voiceVst3;
+    // Frozen-profile upper-band suppressor: per-engine audio-thread state,
+    // never function-static shared across multiple engine instances/devices.
+    float p6bLow1L = 0.0f, p6bLow2L = 0.0f;
+    float p6bLow1R = 0.0f, p6bLow2R = 0.0f;
+    float p6bHighEnvelope = 0.0f, p6bBodyEnvelope = 0.0f;
+    float p6bHissGain = 1.0f;
     SmartPleasantPresence pleasantPresence;
     askp::ScopeTap programmeAnalyzer;
     PcAudioLoopbackCapture pcLoopback;
@@ -288,6 +305,10 @@ private:
     std::atomic<bool> loudnessReady { false };
     std::atomic<bool> loudnessResetRequested { false };
 
+    // Active callbacks never wait; the UI swaps a fully prepared VST only
+    // after the in-flight count drains, then destroys the previous processor.
+    std::atomic<bool> vstSwapSuspended { false };
+    std::atomic<int> audioCallbacksInFlight { 0 };
     std::atomic<bool> callbackRegistered { false };
     std::atomic<bool> running { false };
     std::atomic<bool> deviceOpen { false };
@@ -296,6 +317,7 @@ private:
     std::atomic<int> currentBufferSize { 0 };
     std::atomic<float> cpuPercent { 0.0f };
     std::atomic<float> callbackPeakPercent { 0.0f };
+    std::atomic<int> callbackDeadlineMisses { 0 };
     std::atomic<float> inputPeakL { -120.0f };
     std::atomic<float> inputPeakR { -120.0f };
     std::atomic<float> outputPeakL { -120.0f };

@@ -282,7 +282,7 @@ set(_start [=[
 ]=])
 p3r_range(_engine "audio start respects PC Audio OFF"
     "    pcLoopback.prepare (sampleRate);"
-    "    const int voiceLatency ="
+    "    publishLatencyEstimate();\n    running.store (true);"
     "${_start}")
 
 # Migrate legacy SYSTEM DEFAULT pseudo-selection to OFF.

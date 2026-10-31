@@ -234,6 +234,8 @@ private:
     void updateMeters (const juce::AudioBuffer<float>& finalOutput,
                        float preLimiterPeakDb) noexcept;
     void refreshDeviceStatus();
+    void publishLatencyEstimate() noexcept;
+    bool quiesceForPluginSwap() noexcept;
     juce::String applyDeviceSelection (const juce::String* inputName,
                                        const juce::String* outputName);
     void updateInputTrimRouting() noexcept;
@@ -298,6 +300,10 @@ private:
     std::atomic<bool> loudnessReady { false };
     std::atomic<bool> loudnessResetRequested { false };
 
+    // Active callbacks never wait; the UI swaps a fully prepared VST only
+    // after the in-flight count drains, then destroys the previous processor.
+    std::atomic<bool> vstSwapSuspended { false };
+    std::atomic<int> audioCallbacksInFlight { 0 };
     std::atomic<bool> callbackRegistered { false };
     std::atomic<bool> running { false };
     std::atomic<bool> deviceOpen { false };

@@ -36,6 +36,7 @@ public:
         int bufferSize = 0;
         float cpuPercent = 0.0f;
         float callbackPeakPercent = 0.0f;
+        int callbackDeadlineMisses = 0; // Observed callback duration > buffer time.
         float inputPeakDbL = -120.0f;
         float inputPeakDbR = -120.0f;
         float pcPeakDbL = -120.0f;
@@ -318,6 +319,7 @@ private:
     std::atomic<int> currentBufferSize { 0 };
     std::atomic<float> cpuPercent { 0.0f };
     std::atomic<float> callbackPeakPercent { 0.0f };
+    std::atomic<int> callbackDeadlineMisses { 0 };
     std::atomic<float> inputPeakL { -120.0f };
     std::atomic<float> inputPeakR { -120.0f };
     std::atomic<float> outputPeakL { -120.0f };

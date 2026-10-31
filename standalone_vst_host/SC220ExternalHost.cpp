@@ -366,10 +366,11 @@ private:
         {
             chooser = std::make_unique<juce::FileChooser>(
                 "Choose a trusted stereo VST3", juce::File(), "*.vst3");
+            juce::Component::SafePointer<Console> safe(this);
             chooser->launchAsync(juce::FileBrowserComponent::openMode
                 | juce::FileBrowserComponent::canSelectFiles
                 | juce::FileBrowserComponent::canSelectDirectories,
-                [safe = juce::Component::SafePointer<Console>(this), index](const juce::FileChooser& fc)
+                [safe, index](const juce::FileChooser& fc)
                 {
                     if (safe == nullptr) return;
                     auto file = fc.getResult();

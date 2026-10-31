@@ -12,6 +12,7 @@ namespace askp::live {
 class InputVst3Rack final
 {
 public:
+    InputVst3Rack() = default;
     using PreparedInstance = std::unique_ptr<juce::AudioPluginInstance>;
     static juce::String createPrepared (const juce::File& file, double sampleRate,
                                         int blockSize, PreparedInstance& result);

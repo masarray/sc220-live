@@ -256,6 +256,12 @@ private:
     EnhancerEngineBridge voiceEnhancerBridge;
     EnhancerEngineBridge musicEnhancerBridge;
     InputVst3Rack voiceVst3;
+    // Frozen-profile upper-band suppressor: per-engine audio-thread state,
+    // never function-static shared across multiple engine instances/devices.
+    float p6bLow1L = 0.0f, p6bLow2L = 0.0f;
+    float p6bLow1R = 0.0f, p6bLow2R = 0.0f;
+    float p6bHighEnvelope = 0.0f, p6bBodyEnvelope = 0.0f;
+    float p6bHissGain = 1.0f;
     SmartPleasantPresence pleasantPresence;
     askp::ScopeTap programmeAnalyzer;
     PcAudioLoopbackCapture pcLoopback;

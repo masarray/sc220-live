@@ -43,8 +43,27 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
+  preflight:
+    name: Verify access to the pinned private DSP source
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Check read-only submodule credentials before allocating build runners
+        shell: bash
+        env:
+          ASKP_READ_TOKEN: ${{ secrets.SC220_SUBMODULE_TOKEN }}
+        run: |
+          if [[ -z "$ASKP_READ_TOKEN" ]]; then
+            echo "::error::Missing SC220_SUBMODULE_TOKEN. Set a read-only GitHub Actions repository secret that can access masarray/askp-vst."
+            exit 1
+          fi
+          basic="$(printf 'x-access-token:%s' "$ASKP_READ_TOKEN" | base64 -w0)"
+          git -c "http.https://github.com/.extraheader=AUTHORIZATION: basic $basic" \
+            ls-remote --exit-code https://github.com/masarray/askp-vst.git HEAD > /dev/null
+
   build:
     name: ${{ matrix.name }} / build and audit
+    needs: preflight
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 90
     strategy:
@@ -64,7 +83,7 @@ jobs:
         with:
           # GITHUB_TOKEN alone generally cannot read another private repository.
           # Configure SC220_SUBMODULE_TOKEN with read access to masarray/askp-vst.
-          token: ${{ secrets.SC220_SUBMODULE_TOKEN || github.token }}
+          token: ${{ secrets.SC220_SUBMODULE_TOKEN }}
           submodules: recursive
           persist-credentials: false
 

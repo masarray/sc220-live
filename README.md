@@ -139,3 +139,17 @@ See [docs/RELEASE_BOUNDARY.md](docs/RELEASE_BOUNDARY.md), [docs/PUBLIC_RELEASE_G
 - Never select the same endpoint or virtual-cable family as both PC Audio Source and Stream/Monitor destination.
 - Restart Windows after installing or repairing an audio driver when requested.
 - Avoid clipping and verify the complete signal path before a production broadcast.
+
+## Linux and macOS build candidates (not public Windows release replacements)
+
+Linux x64 and macOS universal (Intel + Apple Silicon) are covered by
+[the portable preview workflow](.github/workflows/portable-release.yml),
+[platform limitations and acceptance criteria](docs/PORTABLE_RELEASE.md),
+and native CMake presets. Those builds retain the pinned proprietary ASK-P
+engine and only publish compiled assets to **private** GitHub Releases
+after both platform CI checks pass and an explicit manual release request.
+
+**Not yet feature-equivalent:** Windows-only WASAPI playback capture and
+independent physical Monitor Bus are unavailable on Linux/macOS. Do not
+market the portable builds as tested production stream mixers until native
+capture, monitor routing, real SC220 tests and platform signing are complete.

@@ -267,14 +267,15 @@ class Console final : public juce::Component, private juce::Timer
 public:
     Console()
     {
-        setSize(920, 590);
-        addAndMakeVisible(header);
-        header.setText("SC220  /  LIVE CONSOLE", juce::dontSendNotification);
-        header.setFont(juce::Font(juce::FontOptions(20.0f)));
-        header.setColour(juce::Label::textColourId, juce::Colour(0xffdee7f6));
-        addAndMakeVisible(subhead);
-        subhead.setText("INDEPENDENT VST3 HOST     ·     ASIO / WASAPI", juce::dontSendNotification);
-        subhead.setColour(juce::Label::textColourId, juce::Colour(0xff8293aa));
+        setSize(960, 672);
+        addAndMakeVisible(title);
+        title.setText("SC220  /  LIVE MIXER", juce::dontSendNotification);
+        title.setFont(juce::Font(juce::FontOptions(19.0f)));
+        title.setColour(juce::Label::textColourId, juce::Colour(0xffe4eaf4));
+        addAndMakeVisible(subtitle);
+        subtitle.setText("ASIO / WASAPI     ·     3 FX INSERTS PER CHANNEL     ·     BUNDLED VST3",
+                         juce::dontSendNotification);
+        subtitle.setColour(juce::Label::textColourId, juce::Colour(0xff8596aa));
         addAndMakeVisible(setup);
         setup.setButtonText("AUDIO SETUP");
         setup.onClick = [this]
@@ -282,37 +283,19 @@ public:
             auto* selector = new juce::AudioDeviceSelectorComponent(
                 engine.devices(), 1, 4, 1, 2, false, false, true, false);
             selector->setSize(650, 440);
-            juce::DialogWindow::LaunchOptions opt;
-            opt.content.setOwned(selector);
-            opt.dialogTitle = "SC220 Audio Device / ASIO";
-            opt.dialogBackgroundColour = juce::Colour(0xff202833);
-            opt.launchAsync();
+            juce::DialogWindow::LaunchOptions options;
+            options.content.setOwned(selector);
+            options.dialogTitle = "SC220 Audio Setup / ASIO";
+            options.dialogBackgroundColour = juce::Colour(0xff202833);
+            options.launchAsync();
         };
-        initialiseLane(0, "VOICE  /  INPUT 1–2");
-        initialiseLane(1, "MUSIC  /  INPUT 3–4");
-        // Official ArSonKuPik binary is distributed with the standalone host,
-        // rather than built from private ASK-P source. Loading is on the UI
-        // thread, before the first physical output can be unmuted.
-        const auto exeDir = juce::File::getSpecialLocation(
-            juce::File::currentExecutableFile).getParentDirectory();
-        const auto bundleDir = exeDir.getChildFile("plugins");
-        juce::Array<juce::File> bundled;
-        bundleDir.findChildFiles(bundled, juce::File::findFilesAndDirectories,
-                                 true, "*.vst3");
-        if (bundled.isEmpty())
-            bundleDir.findChildFiles(bundled, juce::File::findFilesAndDirectories,
-                                     true, "*ArSonKuPik*");
-        if (!bundled.isEmpty())
-        {
-            const auto voiceResult = engine.loadPlugin(0, bundled.getFirst());
-            if (voiceResult.isEmpty())
-                engine.loadPlugin(1, bundled.getFirst());
-            else
-                health.setText("BUNDLED ENHANCER: " + voiceResult, juce::dontSendNotification);
-            updatePluginNames();
-        }
+        for (int lane = 0; lane < 2; ++lane)
+            initialiseLane(lane, lane == 0 ? "VOICE  ·  INPUT 1/2"
+                                          : "MUSIC  ·  INPUT 3/4");
+
         addAndMakeVisible(stream);
         stream.setButtonText("GO LIVE");
+        stream.setColour(juce::TextButton::buttonOnColourId, juce::Colour(0xff287f77));
         stream.setClickingTogglesState(true);
         stream.onClick = [this]
         {
@@ -321,141 +304,237 @@ public:
         };
         addAndMakeVisible(health);
         health.setColour(juce::Label::textColourId, juce::Colour(0xff9cadbf));
+        health.setJustificationType(juce::Justification::centredLeft);
+
+        autoLoadBundledPlugins();
         startTimerHz(12);
     }
     ~Console() override
     {
         stopTimer();
-        // All editors are owned by this GUI and closed before the engine.
-        editors = {};
+        for (int lane = 0; lane < 2; ++lane)
+            for (int slot = 0; slot < Engine::slotsPerChannel; ++slot)
+                closeEditor(lane, slot);
     }
     void paint(juce::Graphics& g) override
     {
-        g.fillAll(juce::Colour(0xff141920));
-        g.setColour(juce::Colour(0xff263444));
-        g.drawLine(24.0f, 97.0f, static_cast<float>(getWidth() - 24), 97.0f);
-        g.setColour(juce::Colour(0xff1b2531));
-        g.fillRoundedRectangle(24.0f, 120.0f, static_cast<float>(getWidth() - 48), 335.0f, 12.0f);
-        g.setColour(juce::Colour(0xff2b3849));
-        g.drawRoundedRectangle(24.0f, 120.0f, static_cast<float>(getWidth() - 48), 335.0f, 12.0f, 1.0f);
-        for (int i = 0; i < 2; ++i)
+        g.fillAll(juce::Colour(0xff121820));
+        g.setColour(juce::Colour(0xff293746));
+        g.drawLine(24.0f, 98.0f, static_cast<float>(getWidth() - 24), 98.0f);
+        for (int lane = 0; lane < 2; ++lane)
         {
-            auto r = juce::Rectangle<float>(40.0f + i * 440.0f, 138.0f, 410.0f, 295.0f);
-            g.setColour(juce::Colour(0xff202d3b));
+            const auto r = juce::Rectangle<float>(22.0f + 468.0f * lane,
+                                                   116.0f, 446.0f, 444.0f);
+            g.setColour(juce::Colour(0xff1d2632));
             g.fillRoundedRectangle(r, 9.0f);
+            g.setColour(juce::Colour(0xff304153));
+            g.drawRoundedRectangle(r, 9.0f, 1.0f);
+            g.setColour(juce::Colour(0xff8396ac));
+            for (int slot = 0; slot < Engine::slotsPerChannel; ++slot)
+                g.drawLine(r.getX() + 15.0f, 236.0f + slot * 83.0f,
+                           r.getRight() - 15.0f, 236.0f + slot * 83.0f, 0.5f);
         }
     }
     void resized() override
     {
-        header.setBounds(28, 18, 520, 32);
-        subhead.setBounds(30, 56, 520, 22);
-        setup.setBounds(getWidth() - 175, 37, 145, 34);
-        for (int i = 0; i < 2; ++i)
+        title.setBounds(28, 15, 490, 34);
+        subtitle.setBounds(30, 55, getWidth() - 240, 25);
+        setup.setBounds(getWidth() - 185, 35, 150, 34);
+        for (int lane = 0; lane < 2; ++lane)
         {
-            const int x = 56 + i * 440;
-            title[i].setBounds(x, 152, 265, 30);
-            load[i].setBounds(x, 200, 155, 34);
-            bypass[i].setBounds(x + 165, 200, 105, 34);
-            remove[i].setBounds(x + 280, 200, 98, 34);
-            plugin[i].setBounds(x, 247, 378, 40);
-            gain[i].setBounds(x, 314, 378, 38);
-            meter[i].setBounds(x, 380, 376, 22);
+            const int x = 42 + lane * 468;
+            laneTitles[lane].setBounds(x, 134, 400, 32);
+            rackTitles[lane].setBounds(x, 164, 390, 23);
+            for (int slot = 0; slot < Engine::slotsPerChannel; ++slot)
+            {
+                const int y = 193 + slot * 83;
+                auto& fx = controls[lane][slot];
+                fx.name.setBounds(x + 4, y, 394, 23);
+                fx.load.setBounds(x + 4, y + 29, 97, 29);
+                fx.edit.setBounds(x + 109, y + 29, 76, 29);
+                fx.bypass.setBounds(x + 193, y + 29, 96, 29);
+                fx.remove.setBounds(x + 297, y + 29, 90, 29);
+            }
+            gains[lane].setBounds(x, 475, 390, 33);
+            meters[lane].setBounds(x, 519, 390, 18);
         }
-        stream.setBounds(getWidth() - 210, 492, 180, 52);
-        health.setBounds(30, 490, getWidth() - 260, 56);
+        health.setBounds(30, 583, getWidth() - 235, 61);
+        stream.setBounds(getWidth() - 203, 582, 166, 48);
     }
 private:
-    void initialiseLane(int index, juce::String name)
+    struct FxControls
     {
-        title[index].setText(name, juce::dontSendNotification);
-        title[index].setColour(juce::Label::textColourId, juce::Colour(0xffa2d6f6));
-        addAndMakeVisible(title[index]);
-        addAndMakeVisible(load[index]);
-        load[index].setButtonText("LOAD VST3");
-        load[index].onClick = [this, index]
-        {
-            chooser = std::make_unique<juce::FileChooser>(
-                "Choose a trusted stereo VST3", juce::File(), "*.vst3");
-            juce::Component::SafePointer<Console> safe(this);
-            chooser->launchAsync(juce::FileBrowserComponent::openMode
-                | juce::FileBrowserComponent::canSelectFiles
-                | juce::FileBrowserComponent::canSelectDirectories,
-                [safe, index](const juce::FileChooser& fc)
-                {
-                    if (safe == nullptr) return;
-                    auto file = fc.getResult();
-                    if (file == juce::File()) return;
-                    const auto failure = safe->engine.loadPlugin(index, file);
-                    if (failure.isNotEmpty())
-                        juce::AlertWindow::showMessageBoxAsync(
-                            juce::MessageBoxIconType::WarningIcon, "VST3 unavailable", failure);
-                    safe->updatePluginNames();
-                });
-        };
-        addAndMakeVisible(bypass[index]);
-        bypass[index].setButtonText("BYPASS");
-        bypass[index].setClickingTogglesState(true);
-        bypass[index].onClick = [this, index]
-        {
-            engine.setBypass(index, bypass[index].getToggleState());
-        };
-        addAndMakeVisible(remove[index]);
-        remove[index].setButtonText("REMOVE");
-        remove[index].onClick = [this, index]
-        {
-            // The host destroys a plugin only after its editor.
-            editors[index].reset();
-            engine.removePlugin(index);
-            updatePluginNames();
-        };
-        addAndMakeVisible(plugin[index]);
-        plugin[index].setText("No enhancer loaded  ·  Click LOAD VST3",
-            juce::dontSendNotification);
-        plugin[index].setColour(juce::Label::textColourId, juce::Colour(0xffd7e5f5));
-        plugin[index].setInterceptsMouseClicks(true, false);
-        plugin[index].onTextChange = [] {};
-        addAndMakeVisible(gain[index]);
-        gain[index].setRange(-60.0, 12.0, 0.1);
-        gain[index].setValue(0.0);
-        gain[index].setTextValueSuffix(" dB");
-        gain[index].setSliderStyle(juce::Slider::LinearHorizontal);
-        gain[index].onValueChange = [this, index]
-        {
-            engine.setGain(index, juce::Decibels::decibelsToGain(
-                static_cast<float>(gain[index].getValue())));
-        };
-        addAndMakeVisible(meter[index]);
-        meter[index].setRange(0.0, 1.0);
-        meter[index].setValue(0.0);
-        meter[index].setSliderStyle(juce::Slider::LinearBar);
-        meter[index].setEnabled(false);
+        juce::Label name;
+        juce::TextButton load, edit, bypass, remove;
+    };
+    void closeEditor(int lane, int slot)
+    {
+        if (auto* window = editors[lane][slot].getComponent())
+            delete window; // The editor must die before its AudioPluginInstance.
+        editors[lane][slot] = nullptr;
     }
-    void updatePluginNames()
+    void openEditor(int lane, int slot)
     {
-        for (int i = 0; i < 2; ++i)
+        if (auto* existing = editors[lane][slot].getComponent())
         {
-            const auto name = engine.pluginName(i);
-            plugin[i].setText(name.isEmpty() ? "No enhancer loaded" : name,
-                juce::dontSendNotification);
+            existing->toFront(true);
+            return;
         }
+        auto* processor = engine.processor(lane, slot);
+        if (processor == nullptr) return;
+        auto* editor = processor->createEditorIfNeeded();
+        if (editor == nullptr)
+            editor = new juce::GenericAudioProcessorEditor(*processor);
+        juce::DialogWindow::LaunchOptions options;
+        options.dialogTitle = engine.pluginName(lane, slot);
+        options.dialogBackgroundColour = juce::Colour(0xff202833);
+        options.content.setOwned(editor);
+        options.resizable = true;
+        editors[lane][slot] = options.launchAsync();
+    }
+    void initialiseLane(int lane, const juce::String& heading)
+    {
+        laneTitles[lane].setText(heading, juce::dontSendNotification);
+        laneTitles[lane].setColour(juce::Label::textColourId, juce::Colour(0xffa5d4f2));
+        addAndMakeVisible(laneTitles[lane]);
+        rackTitles[lane].setText("FX INSERT RACK  /  3 SLOTS  /  SERIAL",
+                                 juce::dontSendNotification);
+        rackTitles[lane].setColour(juce::Label::textColourId, juce::Colour(0xff91a5ba));
+        addAndMakeVisible(rackTitles[lane]);
+
+        for (int slot = 0; slot < Engine::slotsPerChannel; ++slot)
+        {
+            auto& fx = controls[lane][slot];
+            addAndMakeVisible(fx.name);
+            fx.name.setText(juce::String(slot + 1) + "   EMPTY SLOT", juce::dontSendNotification);
+            fx.name.setColour(juce::Label::textColourId, juce::Colour(0xffd8e2f1));
+            addAndMakeVisible(fx.load);
+            fx.load.setButtonText("+ LOAD");
+            fx.load.onClick = [this, lane, slot]
+            {
+                chooser = std::make_unique<juce::FileChooser>(
+                    "Select a trusted 64-bit VST3 effect", juce::File(), "*.vst3");
+                juce::Component::SafePointer<Console> safe(this);
+                chooser->launchAsync(juce::FileBrowserComponent::openMode
+                                      | juce::FileBrowserComponent::canSelectFiles
+                                      | juce::FileBrowserComponent::canSelectDirectories,
+                    [safe, lane, slot](const juce::FileChooser& selection)
+                    {
+                        if (safe == nullptr) return;
+                        const auto file = selection.getResult();
+                        if (file == juce::File()) return;
+                        safe->closeEditor(lane, slot);
+                        const auto error = safe->engine.loadPlugin(lane, slot, file);
+                        if (error.isNotEmpty())
+                            juce::AlertWindow::showMessageBoxAsync(
+                                juce::MessageBoxIconType::WarningIcon,
+                                "VST3 load failed", error);
+                        safe->updateSlotNames();
+                    });
+            };
+            addAndMakeVisible(fx.edit);
+            fx.edit.setButtonText("EDIT");
+            fx.edit.onClick = [this, lane, slot] { openEditor(lane, slot); };
+            addAndMakeVisible(fx.bypass);
+            fx.bypass.setButtonText("BYPASS");
+            fx.bypass.setClickingTogglesState(true);
+            fx.bypass.onClick = [this, lane, slot]
+            {
+                engine.setBypass(lane, slot, controls[lane][slot].bypass.getToggleState());
+            };
+            addAndMakeVisible(fx.remove);
+            fx.remove.setButtonText("CLEAR");
+            fx.remove.onClick = [this, lane, slot]
+            {
+                closeEditor(lane, slot);
+                engine.removePlugin(lane, slot);
+                controls[lane][slot].bypass.setToggleState(false, juce::dontSendNotification);
+                updateSlotNames();
+            };
+        }
+        addAndMakeVisible(gains[lane]);
+        gains[lane].setRange(-60.0, 6.0, 0.1);
+        gains[lane].setValue(0.0);
+        gains[lane].setTextValueSuffix(" dB  /  CHANNEL");
+        gains[lane].setSliderStyle(juce::Slider::LinearHorizontal);
+        gains[lane].onValueChange = [this, lane]
+        {
+            engine.setGain(lane, juce::Decibels::decibelsToGain(
+                static_cast<float>(gains[lane].getValue())));
+        };
+        addAndMakeVisible(meters[lane]);
+        meters[lane].setRange(0.0, 1.0);
+        meters[lane].setValue(0.0);
+        meters[lane].setSliderStyle(juce::Slider::LinearBar);
+        meters[lane].setEnabled(false);
+    }
+    void updateSlotNames()
+    {
+        for (int lane = 0; lane < 2; ++lane)
+            for (int slot = 0; slot < Engine::slotsPerChannel; ++slot)
+            {
+                const auto name = engine.pluginName(lane, slot);
+                controls[lane][slot].name.setText(
+                    juce::String(slot + 1) + "   " +
+                        (name.isEmpty() ? juce::String("EMPTY SLOT") : name),
+                    juce::dontSendNotification);
+                controls[lane][slot].bypass.setToggleState(
+                    engine.isBypassed(lane, slot), juce::dontSendNotification);
+            }
+    }
+    void autoLoadBundledPlugins()
+    {
+        const auto folder = juce::File::getSpecialLocation(
+            juce::File::currentExecutableFile).getParentDirectory().getChildFile("plugins");
+        juce::Array<juce::File> bundles;
+        if (folder.isDirectory())
+            folder.findChildFiles(bundles, juce::File::findFilesAndDirectories, true, "*.vst3");
+        juce::File enhancer, reverb;
+        for (const auto& file : bundles)
+        {
+            if (file.getFileName().containsIgnoreCase("arsonkupik"))
+                enhancer = file;
+            if (file.getFileName().containsIgnoreCase("arsonverb"))
+                reverb = file;
+        }
+        if (enhancer.exists())
+        {
+            for (int lane = 0; lane < 2; ++lane)
+            {
+                const auto error = engine.loadPlugin(lane, 0, enhancer);
+                if (error.isNotEmpty())
+                    startupError = "ArSonKuPik: " + error;
+            }
+        }
+        if (reverb.exists())
+        {
+            const auto error = engine.loadPlugin(0, 1, reverb);
+            if (error.isNotEmpty())
+                startupError = "ArSonVerb: " + error;
+        }
+        updateSlotNames();
     }
     void timerCallback() override
     {
-        for (int i = 0; i < 2; ++i)
-            meter[i].setValue(engine.meter(i), juce::dontSendNotification);
-        health.setText("ENGINE STATUS  ·  Callback deadline misses: "
-            + juce::String(engine.deadlineMisses())
-            + "\nOUTPUT: " + juce::String(engine.isStreamMuted() ? "MUTED (safe)" : "LIVE"),
+        for (int lane = 0; lane < 2; ++lane)
+            meters[lane].setValue(engine.meter(lane), juce::dontSendNotification);
+        health.setText("DSP callback deadline misses: " + juce::String(engine.deadlineMisses())
+            + "     ·     Output: "
+            + juce::String(engine.isStreamMuted() ? "MUTED (safe)" : "LIVE")
+            + (startupError.isEmpty() ? juce::String()
+                : juce::String("\nBundled plugin error: ") + startupError),
             juce::dontSendNotification);
     }
     Engine engine;
-    juce::Label header, subhead, health;
+    juce::Label title, subtitle, health;
     juce::TextButton setup, stream;
-    std::array<juce::Label, 2> title, plugin;
-    std::array<juce::TextButton, 2> load, bypass, remove;
-    std::array<juce::Slider, 2> gain, meter;
-    std::array<std::unique_ptr<juce::DocumentWindow>, 2> editors;
+    std::array<juce::Label, 2> laneTitles, rackTitles;
+    std::array<std::array<FxControls, Engine::slotsPerChannel>, 2> controls;
+    std::array<juce::Slider, 2> gains, meters;
+    std::array<std::array<juce::Component::SafePointer<juce::DialogWindow>,
+                          Engine::slotsPerChannel>, 2> editors;
     std::unique_ptr<juce::FileChooser> chooser;
+    juce::String startupError;
 };
 
 class Window final : public juce::DocumentWindow
@@ -467,7 +546,7 @@ public:
         setUsingNativeTitleBar(true);
         setContentOwned(new Console(), true);
         setResizable(true, true);
-        centreWithSize(920, 590);
+        centreWithSize(960, 672);
         setVisible(true);
     }
     void closeButtonPressed() override { juce::JUCEApplication::getInstance()->systemRequestedQuit(); }

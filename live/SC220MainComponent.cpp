@@ -1,4 +1,5 @@
 #include "SC220MainComponent.h"
+#include <juce_audio_utils/juce_audio_utils.h>
 
 #include "BinaryData.h"
 

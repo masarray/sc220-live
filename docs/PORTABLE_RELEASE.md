@@ -66,29 +66,26 @@ slices must be checked on the actual machine.
 6. Confirm PC Audio and independent monitor limitations above before release
    approval; do not mark this preview as equivalent to Windows.
 
-## CI and release boundary
+## Official public CI and release boundary
 
-The source repository `masarray/sc220-live` is private. The pinned
-`third_party/askp-vst` submodule is also private. Configure a GitHub Actions
-repository secret named **`SC220_SUBMODULE_TOKEN`** containing a fine-grained
-read-only token with Contents access to both repositories (or other appropriate
-credential with that access). The ordinary `GITHUB_TOKEN` usually cannot read
-the sibling private repository. CI must fail closed when the submodule cannot
-be fetched or the locked commit does not match.
+The code stays in the **private** `masarray/sc220-live` source repository.
+The **only distribution CI and GitHub Releases authority** is the existing
+**public** `masarray/sc220-download` repository.
 
-The `SC220 Live | Linux and macOS preview` workflow compiles Linux x64 and
-universal macOS from the exact source ref, runs three CTest audits, produces
-a portable archive/DMG and SHA-256 hashes, and uploads build artifacts.
-Pull requests and pushes to `main` **only build and test**.
+The supported path is:
+1. Review and merge the source changes into private `sc220-live/main`.
+2. In public `sc220-download`, configure `SC220_SOURCE_TOKEN` with
+   read-only access to the private `sc220-live` and `askp-vst` repositories.
+3. Run the public `.github/workflows/build-portable-release.yml` with the exact
+   immutable private source SHA and unused
+   `v0.1.2-portable-preview.N` tag.
+4. Check both native build results and compiled CTest audits.
+5. On the public CI, explicitly select `publish_release=true` to upload
+   **binary-only** assets to **sc220-download Releases** as a prerelease.
 
-To create a **private GitHub prerelease**, use Actions → this workflow →
-Run workflow on `main`, set a new tag such as
-`v0.1.2-portable-preview.1`, and enable `publish_release`.
-Release publication is blocked unless **both** platform jobs and tests succeed.
-It must never publish application source or private submodule files. This
-workflow does **not** publish to `masarray/sc220-download`, which is the
-separate public binary-only distribution boundary; public publication needs
-the existing release gate and real-device qualification.
-
-Release provenance is the immutable GitHub Actions commit SHA and the
-SHA-256 checksums beside each package. Do not reuse a release tag.
+No private-repository release is created. No source files, driver installers,
+debug symbols, build directories or signing keys enter public distribution.
+The public Windows release workflow, current v0.1.2 stable release,
+`latest.json`, and production website promotion gates remain unchanged.
+Live hardware testing and platform-specific monitor/capture implementation
+are still required before calling these versions production-ready.

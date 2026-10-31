@@ -4,6 +4,15 @@ project(SC220Live VERSION 0.1.2 LANGUAGES C CXX)
 
 include(CTest)
 
+# Default public/CI product is independent of ASK-P private source and its
+# source-rewriting generator. The original legacy build remains available only
+# behind an explicit switch during the visual/feature parity migration.
+option(SC220_EXTERNAL_VST_ONLY "Build independent first-party/external VST3 live host" ON)
+if(SC220_EXTERNAL_VST_ONLY)
+    include("${CMAKE_CURRENT_SOURCE_DIR}/standalone_vst_host/SC220ExternalVstHost.cmake")
+    return()
+endif()
+
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)

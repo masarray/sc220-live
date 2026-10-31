@@ -472,6 +472,7 @@ LiveAudioEngine::Status LiveAudioEngine::getStatus() const
     status.bufferSize = currentBufferSize.load();
     status.cpuPercent = cpuPercent.load();
     status.callbackPeakPercent = callbackPeakPercent.load();
+    status.callbackDeadlineMisses = callbackDeadlineMisses.load (std::memory_order_relaxed);
     status.inputPeakDbL = inputPeakL.load();
     status.inputPeakDbR = inputPeakR.load();
     status.pcPeakDbL = pcLoopback.peakDbL();
@@ -729,6 +730,8 @@ void LiveAudioEngine::audioDeviceIOCallbackWithContext (
     const auto budget = static_cast<double> (numSamples)
                       / juce::jmax (1.0, currentSampleRate.load());
     const float blockCpu = budget > 0.0 ? static_cast<float> (elapsed / budget * 100.0) : 0.0f;
+    if (blockCpu >= 100.0f)
+        callbackDeadlineMisses.fetch_add (1, std::memory_order_relaxed);
     cpuPercent.store (cpuPercent.load() * 0.92f + blockCpu * 0.08f);
     const float previousPeak = callbackPeakPercent.load (std::memory_order_relaxed);
     callbackPeakPercent.store (blockCpu > previousPeak ? blockCpu : previousPeak * 0.9975f,
@@ -823,6 +826,7 @@ void LiveAudioEngine::audioDeviceAboutToStart (juce::AudioIODevice* device)
     deviceOpen.store (true);
     dropoutCount.store (0);
     callbackPeakPercent.store (0.0f);
+    callbackDeadlineMisses.store (0, std::memory_order_relaxed);
     refreshDeviceStatus();
 }
 

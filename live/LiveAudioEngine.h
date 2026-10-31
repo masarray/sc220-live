@@ -2,6 +2,7 @@
 
 #include "MusicalNoiseClean.h"
 #include "EnhancerEngineBridge.h"
+#include "InputVst3Rack.h"
 #include "SmartPleasantPresence.h"
 #include "MonitorOutputClient.h"
 #include "PcAudioLoopbackCapture.h"
@@ -84,6 +85,14 @@ public:
     void shutdown();
 
     juce::AudioDeviceManager& getDeviceManager() noexcept { return deviceManager; }
+    // UI/message-thread only; the callback is detached during a plugin swap.
+    juce::String loadVoiceVst3 (const juce::File& pluginFile);
+    void removeVoiceVst3();
+    void setVoiceVst3Bypassed (bool bypass) noexcept { voiceVst3.setBypassed (bypass); }
+    bool isVoiceVst3Bypassed() const noexcept { return voiceVst3.isBypassed(); }
+    bool hasVoiceVst3() const noexcept { return voiceVst3.isLoaded(); }
+    juce::String getVoiceVst3Name() const { return voiceVst3.getName(); }
+    juce::AudioPluginInstance* getVoiceVst3Processor() const noexcept { return voiceVst3.getProcessor(); }
     askp::Processor& getAskpProcessor() noexcept { return voiceEnhancerBridge.processor(); }
     const askp::Processor& getAskpProcessor() const noexcept { return voiceEnhancerBridge.processor(); }
     EnhancerEngineBridge& getEnhancerBridge() noexcept { return voiceEnhancerBridge; }
@@ -244,6 +253,7 @@ private:
     SmoothDownwardExpander expander;
     EnhancerEngineBridge voiceEnhancerBridge;
     EnhancerEngineBridge musicEnhancerBridge;
+    InputVst3Rack voiceVst3;
     SmartPleasantPresence pleasantPresence;
     askp::ScopeTap programmeAnalyzer;
     PcAudioLoopbackCapture pcLoopback;

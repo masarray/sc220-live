@@ -1,7 +1,7 @@
 name: SC220 Public Windows ASIO VST3 Build
 on:
   push:
-    branches: [feature/public-ci-bundled-enhancer, main]
+    branches: [main]
     paths:
       - 'live/**'
       - 'cmake/**'

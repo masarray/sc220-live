@@ -1,0 +1,84 @@
+name: SC220 Public Windows ASIO VST3 Build
+on:
+  push:
+    branches: [feature/public-ci-bundled-enhancer, main]
+    paths:
+      - 'live/**'
+      - 'cmake/**'
+      - 'qa/**'
+      - 'assets/**'
+      - 'CMakeLists.txt'
+      - '.github/workflows/sc220-public-windows-ci.yml'
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sc220-public-windows-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  windows-x64:
+    runs-on: windows-2022
+    timeout-minutes: 80
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: false
+          persist-credentials: false
+      - name: Source safety and effective generated engine
+        shell: pwsh
+        run: |
+          python qa/audit_sc220_asio_vst3.py
+          if ($LASTEXITCODE -ne 0) { throw "Public realtime source audit failed" }
+          cmake -P qa/verify_effective_cmake_pipeline.cmake
+          if ($LASTEXITCODE -ne 0) { throw "CMake generator contract failed" }
+      - name: Configure Windows x64 (public source, no secrets)
+        shell: pwsh
+        run: |
+          cmake -S . -B build -G "Visual Studio 17 2022" -A x64
+          if ($LASTEXITCODE -ne 0) { throw "CMake configure failed" }
+      - name: Compile SC220 Live and independent QA
+        shell: pwsh
+        run: |
+          cmake --build build --config Release --target SC220Live SC220LoudnessAudit SC220ProgrammeAnalyzerAudit SC220PleasantPresenceAudit --parallel 3
+          if ($LASTEXITCODE -ne 0) { throw "Windows Release compilation failed" }
+      - name: Run CTest
+        shell: pwsh
+        run: |
+          ctest --test-dir build -C Release --output-on-failure
+          if ($LASTEXITCODE -ne 0) { throw "Windows QA failed" }
+      - name: Verify official ArSonKuPik VST3 SHA-256 and stage app
+        shell: pwsh
+        run: |
+          $ErrorActionPreference="Stop"
+          $url="https://github.com/masarray/vst-enhancer/releases/download/v0.5.26/ArSonKuPik-v0.5.26-Windows-x64-VST3.zip"
+          $expected="e53287c871166bcdc945b4962d7a38b5c93ad6cb0c0fa0bdd02fa42ff47cd5b6"
+          Invoke-WebRequest -Uri $url -OutFile "arsonkupik-vst3.zip" -MaximumRedirection 5
+          $actual=(Get-FileHash "arsonkupik-vst3.zip" -Algorithm SHA256).Hash.ToLowerInvariant()
+          if ($actual -cne $expected) { throw "OFFICIAL VST3 SHA256 MISMATCH: $actual" }
+          Expand-Archive -Path "arsonkupik-vst3.zip" -DestinationPath "vst-archive" -Force
+          $bundle=Get-ChildItem -Path "vst-archive" -Filter "*.vst3" -Recurse |
+            Where-Object { $_.PSIsContainer -or $_.Extension -eq ".vst3" } | Select-Object -First 1
+          if (-not $bundle) { throw "Expected ArSonKuPik.vst3 binary bundle missing from official release" }
+          $exe=Get-ChildItem -Path "build/SC220Live_artefacts" -Recurse -Filter "*.exe" -File |
+            Where-Object { $_.FullName -match "\\Release\\" } | Select-Object -First 1
+          if (-not $exe) { throw "SC220 Windows Release EXE missing" }
+          New-Item -ItemType Directory -Path "sc220-staged/Plugins" -Force | Out-Null
+          Copy-Item -LiteralPath $exe.FullName -Destination "sc220-staged/"
+          Copy-Item -LiteralPath $bundle.FullName -Destination "sc220-staged/Plugins/ArSonKuPik.vst3" -Recurse -Force
+          "SC220 commit: ${{ github.sha }}" | Set-Content "sc220-staged/BUILD-INFO.txt"
+          "Pinned bundled VST3: v0.5.26 / SHA256 $actual" | Add-Content "sc220-staged/BUILD-INFO.txt"
+          "PREVIEW: test ASIO 48 kHz / 256, 128, 64 samples; verify Voice & Music plugins and licensing before stable release." |
+            Add-Content "sc220-staged/BUILD-INFO.txt"
+          Compress-Archive -Path "sc220-staged/*" -DestinationPath "SC220-Live-Windows-x64-VST3-bundled-preview.zip" -CompressionLevel Optimal -Force
+      - name: Upload Windows test build (7 days)
+        uses: actions/upload-artifact@v4
+        with:
+          name: SC220-Live-Windows-x64-ASIO-VST3-public-preview
+          path: SC220-Live-Windows-x64-VST3-bundled-preview.zip
+          retention-days: 7
+          if-no-files-found: error

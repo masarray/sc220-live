@@ -23,3 +23,5 @@ jobs:
           submodules: false
       - name: Verify VST3 voice routing and public runner hygiene
         run: python3 qa/audit_sc220_asio_vst3.py
+      - name: Verify canonical production-generated runtime and UI anchors
+        run: cmake -P qa/verify_effective_cmake_pipeline.cmake

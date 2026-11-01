@@ -41,3 +41,14 @@ if(WIN32)
   target_link_libraries(SC220Live PRIVATE ole32 avrt)
 endif()
 message(STATUS "SC220 independent VST3-host build: no ASK-P source/submodule")
+
+# Public-source CI gate: official ArSonKuPik and ArSonVerb VST3 binaries
+# must instantiate and process stereo on GitHub-hosted Windows MSVC.
+juce_add_console_app(SC220PluginSmoke PRODUCT_NAME "SC220 VST3 Smoke")
+target_sources(SC220PluginSmoke PRIVATE
+  "${CMAKE_CURRENT_SOURCE_DIR}/qa/SC220IndependentVstSmoke.cpp")
+target_link_libraries(SC220PluginSmoke PRIVATE
+  juce::juce_audio_utils juce::juce_audio_processors
+  juce::juce_recommended_config_flags)
+target_compile_definitions(SC220PluginSmoke PRIVATE
+  JUCE_PLUGINHOST_VST3=1 JUCE_WEB_BROWSER=0 JUCE_USE_CURL=0)

@@ -37,6 +37,8 @@ jobs:
         run: |
           cmake --build build --target SC220Live --config Release --parallel 2
           if ($LASTEXITCODE -ne 0) { throw 'MSVC compile failed.' }
+          cmake --build build --target SC220PluginSmoke --config Release --parallel 2
+          if ($LASTEXITCODE -ne 0) { throw 'VST3 smoke harness compile failed.' }
       - name: Fetch and verify official ArSonKuPik + ArSonVerb VST3 assets
         shell: pwsh
         run: |
@@ -75,6 +77,35 @@ jobs:
               throw "$($asset.Label) archive has no .vst3 bundle or file"
             }
           }
+      - name: Smoke-test bundled VST3 load and stereo DSP on Windows
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          function Find-OuterVst([string]$path) {
+            $folder = Get-ChildItem -Path $path -Recurse -Directory -Force |
+              Where-Object { $_.Name.EndsWith('.vst3', [StringComparison]::OrdinalIgnoreCase) } |
+              Sort-Object { $_.FullName.Length } | Select-Object -First 1
+            if ($folder) { return $folder.FullName }
+            $file = Get-ChildItem -Path $path -Recurse -File -Force |
+              Where-Object { $_.Name.EndsWith('.vst3', [StringComparison]::OrdinalIgnoreCase) } |
+              Select-Object -First 1
+            if (-not $file) { throw "No VST3 in $path" }
+            return $file.FullName
+          }
+          $enhancer = Find-OuterVst 'unpacked-vst/ArSonKuPik'
+          $reverb = Find-OuterVst 'unpacked-vst/ArSonVerb'
+          $testExe = Get-ChildItem -Path build -Recurse -File -Filter '*Smoke.exe' |
+            Where-Object { $_.Name -match 'SC220' -and $_.FullName -match '\\Release\\' } |
+            Select-Object -First 1
+          if (-not $testExe) { throw 'VST3 smoke test executable not found' }
+          $args = ('"{0}" "{1}"' -f $enhancer, $reverb)
+          Write-Host 'Testing both official VST3 binaries, stereo DSP and enhancer macros.'
+          $process = Start-Process -FilePath $testExe.FullName -ArgumentList $args -NoNewWindow -PassThru
+          if (-not $process.WaitForExit(90000)) {
+            Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue
+            throw 'VST3 smoke timed out — preview publication blocked.'
+          }
+          if ($process.ExitCode -ne 0) { throw "VST3 smoke failed ($($process.ExitCode))" }
       - name: Package unsigned Windows preview
         shell: pwsh
         run: |
@@ -113,11 +144,12 @@ jobs:
           "Build SHA: $env:GITHUB_SHA" | Set-Content preview/BUILD-INFO.txt
           "SHA256: $((Get-FileHash $exe.FullName -Algorithm SHA256).Hash)" | Add-Content preview/BUILD-INFO.txt
           @'
-          SC220 independent VST3 host - DEVELOPMENT PREVIEW
+          SC220 premium mixer / independent VST3 host - DEVELOPMENT PREVIEW
           Bundled: ArSonKuPik v0.5.26 on FX 1 (both channels),
           ArSonVerb v1.0.1 on FX 2 (Voice). FX 3 free per channel.
           All archives verified against pinned SHA256; no ASK-P source. Windows Setup -> select ASIO or WASAPI.
           Input 1/2 = Voice; Input 3/4 = Music (when supported by device).
+          Recording Tech identity, vertical faders, stereo meters, hosted macro knobs.
           GO LIVE is muted by default. Test routing with monitors off first.
           Audio hardware, editor, streaming and DSP parity remain unverified.
           This is NOT the former full SC220 console or stable public release.
@@ -141,11 +173,13 @@ jobs:
           Compress-Archive -Path 'preview/*' -DestinationPath $archive -CompressionLevel Optimal
           $hash = (Get-FileHash $archive -Algorithm SHA256).Hash.ToLowerInvariant()
           @"
-          SC220 Live ASIO / 3-FX RACK — Windows technical preview
+          SC220 Live premium mixer UI / ASIO / 3-FX RACK — Windows technical preview
 
           Includes: JUCE ASIO/WASAPI, 3 serial VST3 inserts on both channels,
           bundled ArSonKuPik v0.5.26 in Voice/Music FX1, bundled ArSonVerb
-          v1.0.1 in Voice FX2, safe-muted output, and rack Edit/Bypass/Clear.
+          v1.0.1 in Voice FX2, safe-muted output, rack Edit/Bypass/Clear,
+          original-inspired SC220 brand/faders/stereo meters, five working VST3
+          signature macros and Windows VST3 DSP instantiation smoke test.
 
           Source commit: $env:GITHUB_SHA
           ZIP SHA256: $hash
@@ -156,5 +190,5 @@ jobs:
           Physical zero latency is impossible. PC desktop loopback, complete
           legacy mixer parity and long-run hardware tests remain outstanding.
           "@ | Set-Content preview-release-notes.txt
-          gh release create $tag $archive --target $env:GITHUB_SHA --prerelease --title "SC220 Live FX3 + ASIO Technical Preview ($short)" --notes-file preview-release-notes.txt
+          gh release create $tag $archive --target $env:GITHUB_SHA --prerelease --title "SC220 Premium Mixer + ASIO FX3 Preview ($short)" --notes-file preview-release-notes.txt
           if ($LASTEXITCODE -ne 0) { throw 'GitHub preview release creation failed.' }

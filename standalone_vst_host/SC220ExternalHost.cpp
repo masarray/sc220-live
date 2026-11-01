@@ -976,7 +976,7 @@ class Application final : public juce::JUCEApplication
 {
 public:
     const juce::String getApplicationName() override { return "SC220 Live"; }
-    const juce::String getApplicationVersion() override { return "0.1.2"; }
+    const juce::String getApplicationVersion() override { return "0.1.3"; }
     void initialise(const juce::String&) override { window = std::make_unique<Window>(); }
     void shutdown() override { window.reset(); }
 private:

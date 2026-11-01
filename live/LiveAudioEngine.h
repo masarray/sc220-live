@@ -94,6 +94,15 @@ public:
     bool hasVoiceVst3() const noexcept { return voiceVst3.isLoaded(); }
     juce::String getVoiceVst3Name() const { return voiceVst3.getName(); }
     juce::AudioPluginInstance* getVoiceVst3Processor() const noexcept { return voiceVst3.getProcessor(); }
+    // DAW channel insert slots (Voice/PC Music), all plugin lifecycle work on UI thread.
+    static constexpr int insertCount = 3;
+    juce::String loadChannelFx (int channel, int slot, const juce::File& file);
+    void removeChannelFx (int channel, int slot);
+    void setChannelFxBypassed (int channel, int slot, bool bypass) noexcept;
+    bool isChannelFxBypassed (int channel, int slot) const noexcept;
+    bool hasChannelFx (int channel, int slot) const noexcept;
+    juce::String getChannelFxName (int channel, int slot) const;
+    juce::AudioPluginInstance* getChannelFxProcessor (int channel, int slot) const noexcept;
     EnhancerEngineBridge& getEnhancerBridge() noexcept { return voiceEnhancerBridge; }
     EnhancerEngineBridge& getVoiceEnhancerBridge() noexcept { return voiceEnhancerBridge; }
     EnhancerEngineBridge& getMusicEnhancerBridge() noexcept { return musicEnhancerBridge; }
@@ -255,6 +264,8 @@ private:
     EnhancerEngineBridge voiceEnhancerBridge;
     EnhancerEngineBridge musicEnhancerBridge;
     InputVst3Rack voiceVst3;
+    std::array<InputVst3Rack, 2> voiceAdditionalFx; // slots 2/3 (slot 1 is voiceVst3)
+    std::array<InputVst3Rack, 3> musicFx; // PC AUDIO FX1/2/3
     // Frozen-profile upper-band suppressor: per-engine audio-thread state,
     // never function-static shared across multiple engine instances/devices.
     float p6bLow1L = 0.0f, p6bLow2L = 0.0f;

@@ -75,7 +75,14 @@ private:
     LucideIconButton enhancerPowerButton { "Smart Enhancer", "power_svg", juce::Colours::white };
     LucideIconButton monitorPowerButton { "Monitor On / Off", "headphones_svg", juce::Colours::white };
     juce::TextButton goLiveButton { "GO LIVE" };
-    juce::TextButton voiceFxButton { "+ VST3 FX" };
+    juce::TextButton voiceFxButton { "+ VST3 FX" }; // Kept for legacy generated UI geometry.
+    std::array<std::array<juce::TextButton, 3>, 2> stripFxButtons;
+    void showStripFxMenu (int channel, int slot);
+    void loadStripFxFile (int channel, int slot);
+    void openStripFxEditor (int channel, int slot);
+    void refreshStripFxNames();
+    std::array<std::array<std::unique_ptr<juce::DocumentWindow>,3>,2> stripFxEditors;
+    std::unique_ptr<juce::FileChooser> stripFxChooser;
     std::unique_ptr<juce::FileChooser> voiceFxChooser;
     std::unique_ptr<juce::DocumentWindow> voiceFxEditorWindow;
 

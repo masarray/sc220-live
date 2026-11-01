@@ -2,6 +2,7 @@
 #include <juce_audio_utils/juce_audio_utils.h>
 
 #include "BinaryData.h"
+#include <juce_gui_basics/juce_gui_basics.h>
 
 #include <algorithm>
 #include <cmath>
@@ -341,29 +342,26 @@ public:
         g.drawVerticalLine (juce::roundToInt (track.getCentreX()),
                             track.getY() + 3.0f, track.getBottom() - 3.0f);
 
-        const auto cap = juce::Rectangle<float> (centreX - 20.0f, sliderPos - 34.0f, 40.0f, 68.0f);
-
-        // A single metal face avoids any side strip reading as a fake shadow.
-        const auto capFace = cap.reduced (0.75f, 2.0f);
-        juce::ColourGradient capGradient (palette::metalHi, cap.getCentreX(), cap.getY(),
-                                          palette::metalLo, cap.getCentreX(), cap.getBottom(), false);
-        capGradient.addColour (0.18, juce::Colour (0xffd8d9d5));
-        capGradient.addColour (0.48, palette::metalMid);
-        capGradient.addColour (0.72, juce::Colour (0xffeeeeea));
-        capGradient.multiplyOpacity (alpha);
-        g.setGradientFill (capGradient);
-        g.fillRoundedRectangle (capFace, 2.0f);
-        g.setColour (juce::Colour (0xff5b5e5c).withAlpha (alpha));
-        g.drawRoundedRectangle (cap, 3.0f, 1.0f);
-        g.setColour (juce::Colours::white.withAlpha (0.42f * alpha));
-        g.drawHorizontalLine (juce::roundToInt (capFace.getY() + 2.0f),
-                              capFace.getX() + 2.0f, capFace.getRight() - 2.0f);
-        for (int stripe = -24; stripe <= 24; stripe += 6)
+        // The approved SC220 fader-thumb artwork is the single visual authority.
+        // Construct once on the GUI thread, not on the realtime audio callback.
+        static const auto thumb = []() -> std::unique_ptr<juce::Drawable>
         {
-            g.setColour (stripe == 0 ? juce::Colour (0xff343735).withAlpha (alpha)
-                                     : juce::Colours::black.withAlpha (0.16f * alpha));
-            g.drawHorizontalLine (juce::roundToInt (cap.getCentreY() + static_cast<float> (stripe)),
-                                  capFace.getX() + 3.0f, capFace.getRight() - 3.0f);
+            const auto document = juce::XmlDocument::parse (
+                juce::String::fromUTF8 (BinaryData::sc220_fader_thumb_svg,
+                                        BinaryData::sc220_fader_thumb_svgSize));
+            return document != nullptr ? juce::Drawable::createFromSVG (*document) : nullptr;
+        }();
+        const auto cap = juce::Rectangle<float> (centreX - 22.0f, sliderPos - 32.0f, 44.0f, 64.0f);
+        if (thumb != nullptr)
+        {
+            const auto opacity = slider.isEnabled() ? 1.0f : 0.35f;
+            thumb->drawWithin (g, cap, juce::RectanglePlacement::centred, opacity);
+        }
+        else
+        {
+            // Explicit fallback only for malformed external SVG content.
+            g.setColour (palette::metalHi.withAlpha (alpha));
+            g.fillRoundedRectangle (cap, 3.0f);
         }
     }
 
@@ -742,8 +740,19 @@ void SC220MainComponent::configureControls()
     maximiseButton.setTooltip ("Maximise / Restore");
     closeButton.setTooltip ("Close to tray");
     settingsButton.setTooltip ("Audio Setup (WASAPI / ASIO) and License");
-    voiceFxButton.setTooltip ("Voice VST3 insert: choose ArSonVerb or another trusted stereo effect");
+    voiceFxButton.setTooltip ("Legacy voice VST3 menu");
+    voiceFxButton.setVisible(false);
+    for (int channel=0;channel<2;++channel)
+        for (int slot=0;slot<3;++slot)
+        {
+            auto& item=stripFxButtons[static_cast<size_t>(channel)][static_cast<size_t>(slot)];
+            addAndMakeVisible(item);
+            item.setButtonText("FX"+juce::String(slot+1)+"  +");
+            item.setTooltip("Channel insert "+juce::String(slot+1)+" - load, edit, bypass or clear VST3");
+            item.onClick=[this,channel,slot]{showStripFxMenu(channel,slot);};
+        }
     voiceFxButton.onClick = [this] { showVoiceFxMenu(); };
+    refreshStripFxNames();
     enhancerPowerButton.setTooltip ("Smart Enhancer On / Bypass");
     enhancerPowerButton.setIconColour (palette::orange);
     enhancerPowerButton.setOffColour (palette::muted);
@@ -960,6 +969,71 @@ public:
     void closeButtonPressed() override { setVisible (false); }
 };
 
+void SC220MainComponent::refreshStripFxNames()
+{
+    for(int channel=0;channel<2;++channel)
+        for(int slot=0;slot<3;++slot)
+        {
+            auto& button=stripFxButtons[static_cast<size_t>(channel)][static_cast<size_t>(slot)];
+            auto name=audioEngine.getChannelFxName(channel,slot);
+            if(name.isEmpty()) name="+ FX";
+            button.setButtonText(juce::String(slot+1)+"  "+name);
+        }
+}
+void SC220MainComponent::showStripFxMenu(int channel,int slot)
+{
+    juce::PopupMenu menu;
+    const bool loaded=audioEngine.hasChannelFx(channel,slot);
+    menu.addItem(1,"Load VST3...");
+    menu.addItem(2,"Open plugin editor",loaded);
+    menu.addItem(3,audioEngine.isChannelFxBypassed(channel,slot)?"Enable":"Bypass",loaded);
+    menu.addItem(4,"Remove insert",loaded);
+    juce::Component::SafePointer<SC220MainComponent> safe(this);
+    menu.showMenuAsync(juce::PopupMenu::Options().withTargetComponent(
+        &stripFxButtons[static_cast<size_t>(channel)][static_cast<size_t>(slot)]),
+        [safe,channel,slot](int result)
+        {
+            if(safe==nullptr)return;
+            if(result==1)safe->loadStripFxFile(channel,slot);
+            if(result==2)safe->openStripFxEditor(channel,slot);
+            if(result==3)safe->audioEngine.setChannelFxBypassed(
+                channel,slot,!safe->audioEngine.isChannelFxBypassed(channel,slot));
+            if(result==4)
+            {
+                safe->stripFxEditors[static_cast<size_t>(channel)][static_cast<size_t>(slot)].reset();
+                safe->audioEngine.removeChannelFx(channel,slot);
+            }
+            if(result==3||result==4)safe->refreshStripFxNames();
+        });
+}
+void SC220MainComponent::loadStripFxFile(int channel,int slot)
+{
+    stripFxChooser=std::make_unique<juce::FileChooser>("Load stereo VST3",juce::File(),"*.vst3");
+    juce::Component::SafePointer<SC220MainComponent> safe(this);
+    stripFxChooser->launchAsync(juce::FileBrowserComponent::openMode
+        |juce::FileBrowserComponent::canSelectFiles|juce::FileBrowserComponent::canSelectDirectories,
+        [safe,channel,slot](const juce::FileChooser& fc)
+        {
+            if(safe==nullptr||fc.getResult()==juce::File())return;
+            safe->stripFxEditors[static_cast<size_t>(channel)][static_cast<size_t>(slot)].reset();
+            const auto err=safe->audioEngine.loadChannelFx(channel,slot,fc.getResult());
+            if(err.isNotEmpty())juce::AlertWindow::showMessageBoxAsync(
+                juce::MessageBoxIconType::WarningIcon,"FX load failed",err);
+            safe->refreshStripFxNames();
+        });
+}
+void SC220MainComponent::openStripFxEditor(int channel,int slot)
+{
+    auto& window=stripFxEditors[static_cast<size_t>(channel)][static_cast<size_t>(slot)];
+    if(!window)
+        if(auto* plugin=audioEngine.getChannelFxProcessor(channel,slot))
+        {
+            auto* editor=plugin->createEditorIfNeeded();
+            if(editor==nullptr)editor=new juce::GenericAudioProcessorEditor(*plugin);
+            window=std::make_unique<VoiceFxEditorWindow>(audioEngine.getChannelFxName(channel,slot),editor);
+        }
+    if(window){window->setVisible(true);window->toFront(true);}
+}
 void SC220MainComponent::showVoiceFxMenu()
 {
     juce::PopupMenu menu;
@@ -1363,6 +1437,17 @@ void SC220MainComponent::resized()
 
     // Outside the console-grid replacement anchor; retained in the generated production UI.
     voiceFxButton.setBounds (sc220StripArea.getCentreX() - 74, sc220StripArea.getY() + 160, 148, 22);
+    // Compact DAW insert rows live inside each ORIGINAL channel strip,
+    // adjacent to its physical fader; never a separate centre-panel card.
+    for(int channel=0;channel<2;++channel)
+    {
+        auto strip=channel==0?sc220StripArea:pcStripArea;
+        const int x=strip.getRight()-116;
+        const int y=(channel==0?sc220Fader.getY():pcFader.getY())+32;
+        for(int slot=0;slot<3;++slot)
+            stripFxButtons[static_cast<size_t>(channel)][static_cast<size_t>(slot)]
+                .setBounds(x,y+slot*29,108,25);
+    }
     presetBox.setBounds (signatureArea.getCentreX() - 102, signatureArea.getY() + 72, 204, 36);
     enhancerPowerButton.setBounds (signatureArea.getRight() - 54, signatureArea.getY() + 20, 36, 36);
     spectrumDisplay->setBounds (signatureArea.reduced (34, 0).withTop (signatureArea.getY() + 128)

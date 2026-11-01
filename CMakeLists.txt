@@ -60,6 +60,7 @@ juce_add_binary_data(SC220LiveAssets
         assets/ui/askp_header_icon.png
         assets/ui/recording_tech_logo.png
         assets/ui/sc220_mkii_device_alpha.png
+        assets/ui/sc220_fader_thumb.svg
         assets/ui/favicon-96x96.png
         assets/ui/favicon-512x512.png
         assets/fonts/inter_regular.ttf

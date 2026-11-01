@@ -82,6 +82,32 @@ jobs:
           "PREVIEW: test ASIO 48 kHz / 256, 128, 64 samples; verify Voice & Music plugins and licensing before stable release." |
             Add-Content "sc220-staged/BUILD-INFO.txt"
           Compress-Archive -Path "sc220-staged/*" -DestinationPath "SC220-Live-Windows-x64-VST3-bundled-preview.zip" -CompressionLevel Optimal -Force
+      - name: Verify official ArSonVerb VST3 and bundle FX2
+        shell: pwsh
+        run: |
+          $ErrorActionPreference="Stop"
+          $url="https://github.com/masarray/arsonverb/releases/download/v1.0.1/ArSonVerb-Windows-x64-VST3-v1.0.1.zip"
+          $expected="41fdf9132f26e55a1671fe6f00409a5219199b245be4dbccb7615fc4dd7c3e7b"
+          Invoke-WebRequest -Uri $url -OutFile "arsonverb-vst3.zip" -MaximumRedirection 5
+          $actual=(Get-FileHash "arsonverb-vst3.zip" -Algorithm SHA256).Hash.ToLowerInvariant()
+          if ($actual -cne $expected) { throw "ArSonVerb SHA256 mismatch: $actual" }
+          Expand-Archive -Path "arsonverb-vst3.zip" -DestinationPath "verb-unpacked" -Force
+          # Select the outermost VST3 package. Directory bundles can contain
+          # another .vst3 binary inside, which must NOT be copied twice.
+          $bundle=Get-ChildItem "verb-unpacked" -Directory -Recurse -Force |
+            Where-Object { $_.Name.EndsWith('.vst3',[StringComparison]::OrdinalIgnoreCase) } |
+            Sort-Object { $_.FullName.Length } | Select-Object -First 1
+          if (-not $bundle) {
+            $bundle=Get-ChildItem "verb-unpacked" -File -Recurse -Force |
+              Where-Object { $_.Name.EndsWith('.vst3',[StringComparison]::OrdinalIgnoreCase) } |
+              Select-Object -First 1
+          }
+          if (-not $bundle) { throw "Official ArSonVerb VST3 not found" }
+          Copy-Item -LiteralPath $bundle.FullName -Destination "sc220-staged/Plugins/ArSonVerb.vst3" -Recurse -Force
+          "Bundled ArSonVerb v1.0.1: SHA256 $actual" | Add-Content "sc220-staged/BUILD-INFO.txt"
+          # Regenerate artifact so the signed-in CI user downloads ONE complete
+          # SC220+ArSonKuPik+ArSonVerb ZIP, not a partial plugin set.
+          Compress-Archive -Path "sc220-staged/*" -DestinationPath "SC220-Live-Windows-x64-VST3-bundled-preview.zip" -CompressionLevel Optimal -Force
       - name: Upload Windows test build (7 days)
         uses: actions/upload-artifact@v4
         with:

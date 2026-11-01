@@ -1051,6 +1051,99 @@ void SC220MainComponent::showVoiceVst3Editor()
     }
 }
 
+void SC220MainComponent::refreshChannelInserts()
+{
+    for (int channel = 0; channel < 2; ++channel)
+        for (int slot = 0; slot < 3; ++slot)
+        {
+            auto& button = channelInsertButtons[static_cast<size_t>(channel)][static_cast<size_t>(slot)];
+            const auto name = audioEngine.getChannelFxName (channel, slot);
+            const bool active = name.isNotEmpty();
+            const bool bypass = audioEngine.isChannelFxBypassed (channel, slot);
+            // Tight channel-strip label, full plugin identity in native tooltip.
+            button.setButtonText (juce::String (slot + 1) + (active ? (bypass ? " OFF" : " FX") : " +"));
+            button.setTooltip (juce::String (channel == 0 ? "VOICE" : "PC MUSIC")
+                + " / Insert " + juce::String (slot + 1) + ": "
+                + (active ? name + (bypass ? " [BYPASS]" : " [ON]") : "Empty - click to load VST3"));
+            button.setToggleState (active && ! bypass, juce::dontSendNotification);
+        }
+}
+
+void SC220MainComponent::showChannelInsertMenu (int channel, int slot)
+{
+    if (! juce::isPositiveAndBelow (channel, 2) || ! juce::isPositiveAndBelow (slot, 3)) return;
+    auto& button = channelInsertButtons[static_cast<size_t>(channel)][static_cast<size_t>(slot)];
+    const bool loaded = audioEngine.hasChannelFx (channel, slot);
+    juce::PopupMenu menu;
+    menu.addSectionHeader ((channel == 0 ? "SC220 VOICE" : "PC AUDIO")
+        + juce::String ("  -  FX ") + juce::String (slot + 1));
+    if (loaded)
+        menu.addItem (1, audioEngine.getChannelFxName (channel, slot), false);
+    menu.addItem (2, loaded ? "Replace VST3..." : "Load VST3...");
+    menu.addItem (3, "Open plugin editor", loaded);
+    menu.addItem (4, audioEngine.isChannelFxBypassed (channel, slot)
+                         ? "Enable insert" : "Bypass insert", loaded);
+    menu.addItem (5, "Remove effect", loaded);
+    juce::Component::SafePointer<SC220MainComponent> safe (this);
+    menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&button),
+        [safe, channel, slot] (int selected)
+        {
+            if (safe == nullptr) return;
+            if (selected == 2) safe->chooseChannelInsert (channel, slot);
+            else if (selected == 3) safe->showChannelInsertEditor (channel, slot);
+            else if (selected == 4)
+                safe->audioEngine.setChannelFxBypassed (channel, slot,
+                    ! safe->audioEngine.isChannelFxBypassed (channel, slot));
+            else if (selected == 5)
+            {
+                safe->channelInsertEditors[static_cast<size_t>(channel)][static_cast<size_t>(slot)].reset();
+                safe->audioEngine.removeChannelFx (channel, slot);
+            }
+            if (selected == 4 || selected == 5) safe->refreshChannelInserts();
+        });
+}
+
+void SC220MainComponent::chooseChannelInsert (int channel, int slot)
+{
+    channelInsertChooser = std::make_unique<juce::FileChooser> (
+        "Load a trusted 64-bit stereo VST3", juce::File(), "*.vst3");
+    juce::Component::SafePointer<SC220MainComponent> safe (this);
+    channelInsertChooser->launchAsync (
+        juce::FileBrowserComponent::openMode
+            | juce::FileBrowserComponent::canSelectFiles
+            | juce::FileBrowserComponent::canSelectDirectories,
+        [safe, channel, slot] (const juce::FileChooser& chooser)
+        {
+            if (safe == nullptr) return;
+            const auto file = chooser.getResult();
+            if (file == juce::File()) return;
+            safe->channelInsertEditors[static_cast<size_t>(channel)][static_cast<size_t>(slot)].reset();
+            const auto error = safe->audioEngine.loadChannelFx (channel, slot, file);
+            if (error.isNotEmpty())
+                juce::AlertWindow::showMessageBoxAsync (
+                    juce::MessageBoxIconType::WarningIcon, "SC220 VST3 Insert", error);
+            safe->refreshChannelInserts();
+        });
+}
+
+void SC220MainComponent::showChannelInsertEditor (int channel, int slot)
+{
+    if (auto* processor = audioEngine.getChannelFxProcessor (channel, slot))
+    {
+        auto& window = channelInsertEditors[static_cast<size_t>(channel)][static_cast<size_t>(slot)];
+        if (window == nullptr)
+        {
+            auto* editor = processor->createEditorIfNeeded();
+            if (editor == nullptr)
+                editor = new juce::GenericAudioProcessorEditor (*processor);
+            window = std::make_unique<VoiceFxEditorWindow> (
+                audioEngine.getChannelFxName (channel, slot), editor);
+        }
+        window->setVisible (true);
+        window->toFront (true);
+    }
+}
+
 void SC220MainComponent::showAudioSettings()
 {
     auto* selector = new juce::AudioDeviceSelectorComponent (

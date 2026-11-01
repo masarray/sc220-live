@@ -222,9 +222,14 @@ public:
     {
         if (!file.exists() || !file.hasFileExtension(".vst3"))
             return "Please choose an installed .vst3 bundle.";
-        const double rate = sampleRate.load(std::memory_order_acquire);
-        const int block = blockSize.load(std::memory_order_acquire);
-        if (rate < 8000.0 || block < 1) return "Open an audio device first.";
+        // Bundle/restore effects even when the driver is still starting.
+        // audioDeviceAboutToStart() will re-prepare them at the actual ASIO
+        // rate and block size. The host must not show six empty inserts merely
+        // because a device callback arrives after GUI construction.
+        const auto deviceRate = sampleRate.load(std::memory_order_acquire);
+        const auto deviceBlock = blockSize.load(std::memory_order_acquire);
+        const double rate = deviceRate >= 8000.0 ? deviceRate : 48000.0;
+        const int block = deviceBlock > 0 ? deviceBlock : 256;
         juce::VST3PluginFormat vst;
         juce::OwnedArray<juce::PluginDescription> descriptions;
         vst.findAllTypesForFile(descriptions, file.getFullPathName());
@@ -250,9 +255,11 @@ public:
         candidate.prepare(rate, block); // Host preparation outside audio callback.
         if (candidate.latency > 8192)
             return "The VST3 declares more than 8192 samples of plugin latency.";
-        if (rate != sampleRate.load(std::memory_order_acquire)
-            || block != blockSize.load(std::memory_order_acquire))
-            return "Audio device changed while loading VST3; try again.";
+        const auto rateAfter = sampleRate.load(std::memory_order_acquire);
+        const auto blockAfter = blockSize.load(std::memory_order_acquire);
+        if (rateAfter >= 8000.0 &&
+            (rateAfter != rate || blockAfter != block))
+            return "Audio device changed while preparing the VST3; try again.";
         if (!quiesceCallbacks())
             return "Audio callback would not quiesce; active FX slot was preserved.";
         {

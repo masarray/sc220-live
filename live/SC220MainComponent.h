@@ -52,6 +52,10 @@ private:
     void showVoiceFxMenu();
     void chooseVoiceVst3();
     void showVoiceVst3Editor();
+    void showChannelInsertMenu (int channel, int slot);
+    void chooseChannelInsert (int channel, int slot);
+    void showChannelInsertEditor (int channel, int slot);
+    void refreshChannelInserts();
     void drawHeader (juce::Graphics&);
     void drawInputSurface (juce::Graphics&);
     void drawSignatureSurface (juce::Graphics&);
@@ -78,6 +82,10 @@ private:
     juce::TextButton voiceFxButton { "+ VST3 FX" };
     std::unique_ptr<juce::FileChooser> voiceFxChooser;
     std::unique_ptr<juce::DocumentWindow> voiceFxEditorWindow;
+    // Compact DAW insert buttons docked alongside the existing faders.
+    std::array<std::array<juce::TextButton, 3>, 2> channelInsertButtons;
+    std::array<std::array<std::unique_ptr<juce::DocumentWindow>, 3>, 2> channelInsertEditors;
+    std::unique_ptr<juce::FileChooser> channelInsertChooser;
 
     juce::ComboBox presetBox;
     juce::ComboBox outputBox;

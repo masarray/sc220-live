@@ -86,6 +86,23 @@ bool LiveAudioEngine::initialise (const juce::XmlElement* savedDeviceState)
                     "Voice: " + voiceError + "; Music: " + musicError;
     }
 
+    // Optional bundled ArSonVerb is a *normal first-party VST3 insert*
+    // occupying Voice FX2. No source, SDK or runtime plugin search is required.
+    const auto verbBundle = bundle.getParentDirectory().getChildFile ("ArSonVerb.vst3");
+    if (verbBundle.exists())
+    {
+        InputVst3Rack::PreparedInstance verb;
+        const auto verbError = InputVst3Rack::createPrepared (
+            verbBundle, pluginRate, pluginBlock, verb);
+        if (verbError.isEmpty())
+            voiceExtraVst3[0].install (std::move (verb), pluginRate, pluginBlock);
+        else
+        {
+            const juce::ScopedLock lock (statusLock);
+            lastError = "Bundled ArSonVerb insert unavailable: " + verbError;
+        }
+    }
+
     if (! callbackRegistered.exchange (true))
         deviceManager.addAudioCallback (this);
     refreshDeviceStatus();
@@ -156,9 +173,14 @@ bool LiveAudioEngine::quiesceForPluginSwap() noexcept
 
 void LiveAudioEngine::publishLatencyEstimate() noexcept
 {
-    const int voiceLatency = noiseClean.getLatencySamples() + voiceVst3.getLatencySamples()
-                           + voiceEnhancerBridge.latencySamples();
-    const int musicLatency = musicEnhancerBridge.latencySamples();
+    const int voiceLatency = noiseClean.getLatencySamples() + voiceEnhancerBridge.latencySamples()
+        + voiceVst3.getLatencySamples()
+        + voiceExtraVst3[0].getLatencySamples()
+        + voiceExtraVst3[1].getLatencySamples();
+    const int musicLatency = musicEnhancerBridge.latencySamples()
+        + musicVst3[0].getLatencySamples()
+        + musicVst3[1].getLatencySamples()
+        + musicVst3[2].getLatencySamples();
     voiceLatencySamples.store (voiceLatency, std::memory_order_relaxed);
     musicDspLatencySamples.store (musicLatency, std::memory_order_relaxed);
     if (auto* device = deviceManager.getCurrentAudioDevice())
@@ -168,39 +190,85 @@ void LiveAudioEngine::publishLatencyEstimate() noexcept
                                    std::memory_order_relaxed);
 }
 
-juce::String LiveAudioEngine::loadVoiceVst3 (const juce::File& pluginFile)
+InputVst3Rack& LiveAudioEngine::rackAt (int channel, int slot) noexcept
 {
-    const double sampleRate = currentSampleRate.load (std::memory_order_acquire);
-    const int blockSize = currentBufferSize.load (std::memory_order_acquire);
+    jassert (channel >= 0 && channel < 2 && slot >= 0 && slot < fxSlotsPerChannel);
+    return channel == 0 ? (slot == 0 ? voiceVst3 : voiceExtraVst3[static_cast<size_t>(slot - 1)])
+                        : musicVst3[static_cast<size_t>(slot)];
+}
+const InputVst3Rack& LiveAudioEngine::rackAt (int channel, int slot) const noexcept
+{
+    jassert (channel >= 0 && channel < 2 && slot >= 0 && slot < fxSlotsPerChannel);
+    return channel == 0 ? (slot == 0 ? voiceVst3 : voiceExtraVst3[static_cast<size_t>(slot - 1)])
+                        : musicVst3[static_cast<size_t>(slot)];
+}
+void LiveAudioEngine::setChannelFxBypassed (int channel, int slot, bool value) noexcept
+{
+    if (juce::isPositiveAndBelow (channel, 2) && juce::isPositiveAndBelow (slot, fxSlotsPerChannel))
+        rackAt (channel, slot).setBypassed (value);
+}
+bool LiveAudioEngine::isChannelFxBypassed (int channel, int slot) const noexcept
+{
+    return juce::isPositiveAndBelow (channel, 2) && juce::isPositiveAndBelow (slot, fxSlotsPerChannel)
+        ? rackAt (channel, slot).isBypassed() : false;
+}
+bool LiveAudioEngine::hasChannelFx (int channel, int slot) const noexcept
+{
+    return juce::isPositiveAndBelow (channel, 2) && juce::isPositiveAndBelow (slot, fxSlotsPerChannel)
+        ? rackAt (channel, slot).isLoaded() : false;
+}
+juce::String LiveAudioEngine::getChannelFxName (int channel, int slot) const
+{
+    return hasChannelFx (channel, slot) ? rackAt (channel, slot).getName() : juce::String();
+}
+juce::AudioPluginInstance* LiveAudioEngine::getChannelFxProcessor (int channel, int slot) const noexcept
+{
+    return hasChannelFx (channel, slot) ? rackAt (channel, slot).getProcessor() : nullptr;
+}
+juce::String LiveAudioEngine::loadChannelFx (int channel, int slot, const juce::File& pluginFile)
+{
+    if (! juce::isPositiveAndBelow (channel, 2) || ! juce::isPositiveAndBelow (slot, fxSlotsPerChannel))
+        return "Invalid channel/FX slot.";
+    const double currentRate = currentSampleRate.load (std::memory_order_acquire);
+    const int currentBlock = currentBufferSize.load (std::memory_order_acquire);
+    const double rate = currentRate > 0.0 ? currentRate : 48000.0;
+    const int block = currentBlock > 0 ? currentBlock : 256;
     InputVst3Rack::PreparedInstance candidate;
-    const auto error = InputVst3Rack::createPrepared (pluginFile, sampleRate, blockSize, candidate);
-    if (error.isNotEmpty())
-        return error;
-
-    if (sampleRate != currentSampleRate.load() || blockSize != currentBufferSize.load())
+    const auto error = InputVst3Rack::createPrepared (pluginFile, rate, block, candidate);
+    if (error.isNotEmpty()) return error;
+    const double afterRate = currentSampleRate.load (std::memory_order_acquire);
+    const int afterBlock = currentBufferSize.load (std::memory_order_acquire);
+    if ((afterRate > 0.0 && afterRate != rate) || (afterBlock > 0 && afterBlock != block))
     {
         candidate->releaseResources();
-        return "The audio device changed while preparing the VST3. Try loading again.";
+        return "ASIO device format changed during VST3 preparation; retry.";
     }
-
     if (! quiesceForPluginSwap())
     {
         candidate->releaseResources();
-        return "The audio callback did not become idle; VST3 was not replaced.";
+        return "Audio callback did not quiesce; existing FX preserved.";
     }
-    voiceVst3.install (std::move (candidate), sampleRate, blockSize);
+    rackAt (channel, slot).install (std::move (candidate), rate, block);
     publishLatencyEstimate();
     vstSwapSuspended.store (false, std::memory_order_release);
     return {};
 }
-
-void LiveAudioEngine::removeVoiceVst3()
+void LiveAudioEngine::removeChannelFx (int channel, int slot)
 {
-    if (! quiesceForPluginSwap())
-        return; // Never destroy a processor still in use.
-    voiceVst3.clear();
+    if (! juce::isPositiveAndBelow (channel, 2) || ! juce::isPositiveAndBelow (slot, fxSlotsPerChannel))
+        return;
+    if (! quiesceForPluginSwap()) return;
+    rackAt (channel, slot).clear();
     publishLatencyEstimate();
     vstSwapSuspended.store (false, std::memory_order_release);
+}
+juce::String LiveAudioEngine::loadVoiceVst3 (const juce::File& file)
+{
+    return loadChannelFx (0, 0, file);
+}
+void LiveAudioEngine::removeVoiceVst3()
+{
+    removeChannelFx (0, 0);
 }
 
 void LiveAudioEngine::shutdown()
@@ -211,6 +279,9 @@ void LiveAudioEngine::shutdown()
     deviceManager.closeAudioDevice();
     voiceEnhancerBridge.release();
     musicEnhancerBridge.release();
+    voiceVst3.clear();
+    for (auto& effect : voiceExtraVst3) effect.clear();
+    for (auto& effect : musicVst3) effect.clear();
     running.store (false);
     deviceOpen.store (false);
 }
@@ -629,6 +700,8 @@ void LiveAudioEngine::audioDeviceIOCallbackWithContext (
     voiceMidi.clear();
     voiceVst3.process (voiceBlock, voiceMidi); // Voice FX only; PC Music bypasses this insert.
     voiceEnhancerBridge.process (voiceBlock, voiceMidi);
+    // First-party Signature remains canonical; extra inserts are serial post-FX.
+    for (auto& insert : voiceExtraVst3) insert.process (voiceBlock, voiceMidi);
     if (! voiceEnhancerBypassed.load (std::memory_order_relaxed))
     {
         // Coordinate protection with the amount of generated brilliance. It
@@ -666,6 +739,7 @@ void LiveAudioEngine::audioDeviceIOCallbackWithContext (
         // so its bass/detail/stereo character remains stable while voice talks.
         musicMidi.clear();
         musicEnhancerBridge.process (musicBlock, musicMidi);
+        for (auto& insert : musicVst3) insert.process (musicBlock, musicMidi);
 
         const float keyPeak = juce::jmax (sc220PeakL, sc220PeakR);
         const bool voicePresent = dbFromPeak (keyPeak) > -36.0f;
@@ -789,6 +863,8 @@ void LiveAudioEngine::audioDeviceAboutToStart (juce::AudioIODevice* device)
     voiceEnhancerBridge.prepare (sampleRate, blockSize);
     musicEnhancerBridge.prepare (sampleRate, blockSize);
     voiceVst3.prepare (sampleRate, blockSize);
+    for (auto& effect : voiceExtraVst3) effect.prepare (sampleRate, blockSize);
+    for (auto& effect : musicVst3) effect.prepare (sampleRate, blockSize);
     pleasantPresence.prepare (sampleRate, blockSize, channels);
     updateInputTrimRouting();
     updateOutputTrimRouting();
@@ -859,6 +935,8 @@ void LiveAudioEngine::audioDeviceStopped()
     voiceEnhancerBridge.release();
     musicEnhancerBridge.release();
     voiceVst3.release();
+    for (auto& effect : voiceExtraVst3) effect.release();
+    for (auto& effect : musicVst3) effect.release();
     pleasantPresence.reset();
     masterLimiter.reset();
     running.store (false);

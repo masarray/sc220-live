@@ -86,6 +86,18 @@ public:
     void shutdown();
 
     juce::AudioDeviceManager& getDeviceManager() noexcept { return deviceManager; }
+    // DAW-style serial insert rack: voice=0 / PC Music=1; slots 0..2.
+    // Processor creation and retirement stay on the UI thread; no callback locks.
+    static constexpr int fxSlotsPerChannel = 3;
+    juce::String loadChannelFx (int channel, int slot, const juce::File&);
+    void removeChannelFx (int channel, int slot);
+    void setChannelFxBypassed (int channel, int slot, bool bypass) noexcept;
+    bool isChannelFxBypassed (int channel, int slot) const noexcept;
+    bool hasChannelFx (int channel, int slot) const noexcept;
+    juce::String getChannelFxName (int channel, int slot) const;
+    juce::AudioPluginInstance* getChannelFxProcessor (int channel, int slot) const noexcept;
+
+    // Keep legacy voice-FX API functional for existing code and generated UI.
     // UI/message-thread only; the callback is detached during a plugin swap.
     juce::String loadVoiceVst3 (const juce::File& pluginFile);
     void removeVoiceVst3();
@@ -254,7 +266,11 @@ private:
     SmoothDownwardExpander expander;
     EnhancerEngineBridge voiceEnhancerBridge;
     EnhancerEngineBridge musicEnhancerBridge;
-    InputVst3Rack voiceVst3;
+    InputVst3Rack voiceVst3; // Voice FX1: retained for generated-UI compatibility.
+    std::array<InputVst3Rack, 2> voiceExtraVst3; // Voice FX2 / FX3.
+    std::array<InputVst3Rack, 3> musicVst3;      // PC Music FX1 / FX2 / FX3.
+    InputVst3Rack& rackAt (int channel, int slot) noexcept;
+    const InputVst3Rack& rackAt (int channel, int slot) const noexcept;
     // Frozen-profile upper-band suppressor: per-engine audio-thread state,
     // never function-static shared across multiple engine instances/devices.
     float p6bLow1L = 0.0f, p6bLow2L = 0.0f;

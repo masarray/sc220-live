@@ -51,17 +51,8 @@ sc220_p12_range("settings opens native audio setup only"
 sc220_p12_once("remove paid overlay bounds"
 [=[    licensePanel->setBounds (getLocalBounds());]=]
 [=[]=])
-sc220_p12_once("remove trial-gated UI refresh"
-[=[    auto& license = audioEngine.getLicenseManager();
-    license.refresh();
-    const bool creativeEditing = license.editingAllowed();
-    presetBox.setEnabled (creativeEditing);
-    for (auto& knob : macroKnobs)
-        knob.setEnabled (creativeEditing);]=]
-[=[    // Public/free application controls: no trial expiry and no payments.
-    presetBox.setEnabled (true);
-    for (auto& knob : macroKnobs)
-        knob.setEnabled (true);]=])
+# Editing remains enabled by SC220_LIVE_PUBLIC_FREE at the LicenseManager
+# authority, so final legacy refresh code can remain unchanged without gating.
 sc220_p12_once("clean settings tooltip"
 [=[    settingsButton.setTooltip ("Audio Setup (WASAPI / ASIO) and License");]=]
 [=[    settingsButton.setTooltip ("Audio devices, ASIO and Stream / Monitor routing");]=])

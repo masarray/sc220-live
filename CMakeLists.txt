@@ -94,6 +94,9 @@ juce_add_binary_data(SC220LiveAssets
         assets/icons/x.svg
 )
 
+# Public test mode is the default. Licensed historical releases remain separate.
+option(SC220_LIVE_PUBLIC_FREE "Build SC220 Live as a free public application" ON)
+
 # ---------------------------------------------------------------------------
 # SC220 Live
 # ---------------------------------------------------------------------------

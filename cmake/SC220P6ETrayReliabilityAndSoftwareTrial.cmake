@@ -121,6 +121,9 @@ private:
 # ---------------------------------------------------------------------------
 # Hardware entitlement + 90-day software-only gate
 # ---------------------------------------------------------------------------
+# The user-directed free public build keeps P6E tray robustness but excludes
+# every payment / expiry / forced-mute UI transform and licensed panel target.
+if(NOT SC220_LIVE_PUBLIC_FREE)
 # The main surface must use the bridge entitlement (SC220 OR software licence),
 # not the raw ASK-P trial bit by itself.
 sc220_p6e_once(_ui "hardware-aware creative editing"
@@ -328,3 +331,5 @@ endforeach()
 file(WRITE "${SC220_APP_GENERATED_SOURCE}" "${_app}")
 file(WRITE "${SC220_UI_MONITOR_GENERATED_SOURCE}" "${_ui}")
 message(STATUS "SC220 P6E: reliable tray + SC220 hardware entitlement + 90-day software-only licence")
+
+endif() # Paid legacy branch: intentionally absent from free public preview.

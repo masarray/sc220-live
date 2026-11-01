@@ -114,8 +114,6 @@ target_sources(SC220Live PRIVATE
     third_party/sonkupik-sphere-v0.10.4/AskpLookAndFeel.cpp
     live/EnhancerEngineBridge.cpp
     live/LicenseManager.cpp
-    live/LicenseCheckoutClient.cpp
-    live/LiveLicensePanel.cpp
     live/MusicalNoiseClean.cpp
     live/PcAudioLoopbackCapture.cpp
     live/LiveAudioEngine.cpp
@@ -137,9 +135,7 @@ target_compile_definitions(SC220Live PRIVATE
     JUCE_USE_CURL=0
     JUCE_MODAL_LOOPS_PERMITTED=1
     JUCE_PLUGINHOST_VST3=1
-    SONKUPIK_LICENSE_API_URL="https://masarray-license-api.masari.workers.dev"
-    SONKUPIK_LICENSE_PRODUCT_ID="sc220-live"
-    SONKUPIK_LICENSE_PRICE_IDR=399000
+    SC220_LIVE_PUBLIC_FREE=1
 )
 
 target_link_libraries(SC220Live PRIVATE

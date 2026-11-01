@@ -2,7 +2,6 @@
 
 #include "LiveAudioEngine.h"
 #include "LiveIcons.h"
-#include "LiveLicensePanel.h"
 #include "SC220DeviceWatcher.h"
 
 #include <juce_gui_extra/juce_gui_extra.h>
@@ -119,7 +118,6 @@ private:
     std::unique_ptr<StereoMeter> streamMeter;
     std::unique_ptr<LiveSpectrumDisplay> spectrumDisplay;
     std::unique_ptr<LoudnessDisplay> loudnessDisplay;
-    std::unique_ptr<LiveLicensePanel> licensePanel;
 
     juce::Rectangle<int> headerArea;
     juce::Rectangle<int> inputArea;

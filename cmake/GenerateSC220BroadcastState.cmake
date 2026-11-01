@@ -169,3 +169,6 @@ include("${CMAKE_CURRENT_LIST_DIR}/SC220P10AnnotatedConsoleRefinement.cmake")
 
 # P11 is the final native digital-mixer UI/FX authority after all legacy polish.
 include("${CMAKE_CURRENT_LIST_DIR}/SC220P11DigitalMixerFxWorkflow.cmake")
+
+# P12 is the only final production authority for free-public mode + mixer UX.
+include("${CMAKE_CURRENT_LIST_DIR}/SC220P12FreeDigitalMixer.cmake")

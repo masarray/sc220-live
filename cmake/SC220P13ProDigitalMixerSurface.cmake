@@ -89,8 +89,10 @@ sc220_p13_range("Voice and PC channel surfaces"
 
     g.setColour (palette::muted);
     g.setFont (interMediumFont (9.3f));
-    g.drawText ("INPUT TRIM", inputTrim.getX() - 18, inputTrim.getY() - 20,
-                inputTrim.getWidth() + 36, 16, juce::Justification::centred);
+    // The source-status row is immediately above the trim dial. Place this
+    // legend beside the dial to avoid text collisions at 1180 x 720.
+    g.drawText ("TRIM", inputTrim.getRight() + 2, inputTrim.getY() + 20,
+                36, 18, juce::Justification::centredLeft);
     g.drawText ("AUTO DUCK", duckAmount.getX() - 18, duckAmount.getY() - 20,
                 duckAmount.getWidth() + 36, 16, juce::Justification::centred);
     g.setColour (audioEngine.isDuckingEnabled() ? palette::green : palette::muted);
@@ -233,11 +235,8 @@ sc220_p13_range("Master output buses"
     g.drawText ("MASTER  /  OUTPUT", masterArea.getX() + 14,
                 masterArea.getY() + 10, masterArea.getWidth() - 28, 23,
                 juce::Justification::centredLeft);
-    g.setColour (palette::muted);
-    g.setFont (interFont (9.3f));
-    g.drawText ("LIVE LOUDNESS", masterArea.getX() + 14,
-                loudnessDisplay->getY() - 15, masterArea.getWidth() - 28, 18,
-                juce::Justification::centred);
+    // The LUFS instrument already has its own labels; a second caption in
+    // this tight header would collide with the dial at minimum height.
     g.setColour (palette::borderSoft);
     g.drawHorizontalLine (loudnessDisplay->getBottom() + 8,
                           static_cast<float> (masterArea.getX() + 12),

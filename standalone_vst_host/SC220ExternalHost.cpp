@@ -5,6 +5,7 @@
 #include <array>
 #include <atomic>
 #include <memory>
+#include "SC220PremiumTheme.h"
 
 // Independent shipping boundary: no private ASK-P headers, generators or SDK.
 // Each voice/music effect is a normal externally installed VST3 bundle.
@@ -136,10 +137,23 @@ public:
     {
         return slotAt(lane, slot).bypass.load(std::memory_order_relaxed);
     }
-    float meter(int lane) const noexcept
+    float meter(int lane, int channel) const noexcept
     {
-        return (lane == 0 ? voicePeak : musicPeak).load(std::memory_order_relaxed);
+        if (lane == 2)
+            return masterPeak[static_cast<size_t>(channel)].load(std::memory_order_relaxed);
+        return lanePeak[static_cast<size_t>(lane)][static_cast<size_t>(channel)]
+            .load(std::memory_order_relaxed);
     }
+    void setMasterGain(float gain) noexcept
+    {
+        masterGain.store(gain, std::memory_order_relaxed);
+    }
+    bool deviceAvailable() const noexcept
+    {
+        return sampleRate.load(std::memory_order_acquire) >= 8000.0;
+    }
+    double getSampleRate() const noexcept { return sampleRate.load(); }
+    int getBufferSize() const noexcept { return blockSize.load(); }
     void setGain(int lane, float gain) noexcept
     {
         (lane == 0 ? voiceGain : musicGain).store(gain, std::memory_order_relaxed);
@@ -287,8 +301,13 @@ public:
         const auto mg = musicGain.load(std::memory_order_relaxed);
         voiceBuffer.applyGain(vg);
         musicBuffer.applyGain(mg);
-        voicePeak.store(juce::jmax(voiceBuffer.getMagnitude(0, n), 0.0f));
-        musicPeak.store(juce::jmax(musicBuffer.getMagnitude(0, n), 0.0f));
+        for (int channel = 0; channel < 2; ++channel)
+        {
+            lanePeak[0][static_cast<size_t>(channel)].store(
+                voiceBuffer.getMagnitude(channel, 0, n), std::memory_order_relaxed);
+            lanePeak[1][static_cast<size_t>(channel)].store(
+                musicBuffer.getMagnitude(channel, 0, n), std::memory_order_relaxed);
+        }
         if (!streamMuted.load(std::memory_order_relaxed))
         {
             for (int ch = 0; ch < juce::jmin(outChannels, 2); ++ch)
@@ -296,8 +315,13 @@ public:
                 if (!out[ch]) continue;
                 juce::FloatVectorOperations::add(out[ch], voiceBuffer.getReadPointer(ch), n);
                 juce::FloatVectorOperations::add(out[ch], musicBuffer.getReadPointer(ch), n);
-                // Conservative emergency output clip protection.
+                juce::FloatVectorOperations::multiply(out[ch],
+                    masterGain.load(std::memory_order_relaxed), n);
+                // Emergency fixed ceiling; not represented as a brickwall TP limiter.
                 juce::FloatVectorOperations::clip(out[ch], out[ch], -0.98f, 0.98f, n);
+                masterPeak[static_cast<size_t>(ch)].store(
+                    juce::FloatVectorOperations::findMaximum(out[ch], n),
+                    std::memory_order_relaxed);
             }
         }
         const auto seconds = juce::Time::highResolutionTicksToSeconds(
@@ -315,7 +339,9 @@ private:
     std::atomic<double> sampleRate { 0.0 };
     std::atomic<int> blockSize { 0 };
     std::atomic<float> voiceGain { 1.0f }, musicGain { 1.0f };
-    std::atomic<float> voicePeak { 0.0f }, musicPeak { 0.0f };
+    std::array<std::array<std::atomic<float>, 2>, 2> lanePeak {};
+    std::array<std::atomic<float>, 2> masterPeak {};
+    std::atomic<float> masterGain { 1.0f };
     std::atomic<bool> streamMuted { true };
     std::atomic<int> misses { 0 };
     std::atomic<bool> rackSwapPause { false };

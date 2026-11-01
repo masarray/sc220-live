@@ -82,8 +82,11 @@ private:
     juce::TextButton voiceFxButton { "+ VST3 FX" };
     std::unique_ptr<juce::FileChooser> voiceFxChooser;
     std::unique_ptr<juce::DocumentWindow> voiceFxEditorWindow;
-    // Compact DAW insert buttons docked alongside the existing faders.
+    // Native digital-mixer insert strip: editor/load, independent power and context menu.
     std::array<std::array<juce::TextButton, 3>, 2> channelInsertButtons;
+    std::array<std::array<juce::TextButton, 3>, 2> channelInsertPowers;
+    std::array<std::array<juce::TextButton, 3>, 2> channelInsertMenus;
+    std::array<juce::Rectangle<int>, 2> channelRackAreas;
     std::array<std::array<std::unique_ptr<juce::DocumentWindow>, 3>, 2> channelInsertEditors;
     std::unique_ptr<juce::FileChooser> channelInsertChooser;
 

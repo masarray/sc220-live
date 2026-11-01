@@ -171,6 +171,8 @@ set(_music_lane_anchor [=[
         // so its bass/detail/stereo character remains stable while voice talks.
         musicMidi.clear();
         musicEnhancerBridge.process (musicBlock, musicMidi);
+        // Preserve the PC Music FX chain through the generated Music Cue path.
+        for (auto& insert : musicVst3) insert.process (musicBlock, musicMidi);
 
         const float keyPeak = juce::jmax (sc220PeakL, sc220PeakR);
         const bool voicePresent = dbFromPeak (keyPeak) > -36.0f;
@@ -207,6 +209,8 @@ set(_music_lane_replacement [=[
         // same tone and fader but applies the voice-priority gain envelope.
         musicMidi.clear();
         musicEnhancerBridge.process (musicBlock, musicMidi);
+        // Preserve the PC Music FX chain through the generated Music Cue path.
+        for (auto& insert : musicVst3) insert.process (musicBlock, musicMidi);
         for (int channel = 0; channel < processingChannels; ++channel)
             musicCueBlock.copyFrom (channel, 0, musicBlock, channel, 0, numSamples);
 

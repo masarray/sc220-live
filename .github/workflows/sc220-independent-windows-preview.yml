@@ -8,7 +8,7 @@ on:
       - '.github/workflows/sc220-independent-windows-preview.yml'
   workflow_dispatch:
 permissions:
-  contents: read
+  contents: write # Feature branch release publisher is opt-in, never stable.
 concurrency:
   group: sc220-independent-windows-${{ github.ref }}
   cancel-in-progress: true
@@ -128,3 +128,33 @@ jobs:
           path: preview/
           retention-days: 7
           if-no-files-found: error
+      - name: Publish requested public technical preview (never stable latest)
+        if: github.event_name == 'push' && contains(github.event.head_commit.message, '[publish-preview]')
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $short = $env:GITHUB_SHA.Substring(0, 8)
+          $tag = "v0.1.3-asio-fx3-preview.$short"
+          $archive = "SC220-Live-ASIO-FX3-Preview-$short.zip"
+          Compress-Archive -Path 'preview/*' -DestinationPath $archive -CompressionLevel Optimal
+          $hash = (Get-FileHash $archive -Algorithm SHA256).Hash.ToLowerInvariant()
+          @"
+          SC220 Live ASIO / 3-FX RACK — Windows technical preview
+
+          Includes: JUCE ASIO/WASAPI, 3 serial VST3 inserts on both channels,
+          bundled ArSonKuPik v0.5.26 in Voice/Music FX1, bundled ArSonVerb
+          v1.0.1 in Voice FX2, safe-muted output, and rack Edit/Bypass/Clear.
+
+          Source commit: $env:GITHUB_SHA
+          ZIP SHA256: $hash
+
+          HARDWARE TEST PREVIEW — NOT STABLE.
+          Select the correct native ASIO driver; begin at 48 kHz / 256 samples.
+          Test 128/64 samples, plugin bypass, reload and device switching.
+          Physical zero latency is impossible. PC desktop loopback, complete
+          legacy mixer parity and long-run hardware tests remain outstanding.
+          "@ | Set-Content preview-release-notes.txt
+          gh release create $tag $archive --target $env:GITHUB_SHA --prerelease --title "SC220 Live FX3 + ASIO Technical Preview ($short)" --notes-file preview-release-notes.txt
+          if ($LASTEXITCODE -ne 0) { throw 'GitHub preview release creation failed.' }

@@ -137,6 +137,37 @@ public:
     {
         return slotAt(lane, slot).bypass.load(std::memory_order_relaxed);
     }
+    // Bind signature controls to PUBLIC VST3 parameters, never private ASK-P DSP.
+    static juce::AudioProcessorParameter* findMacro(juce::AudioPluginInstance* plugin,
+                                                    const juce::String& label)
+    {
+        if (plugin == nullptr) return nullptr;
+        const auto key = label.removeCharacters(" _-").toLowerCase();
+        for (auto* param : plugin->getParameters())
+        {
+            if (param != nullptr &&
+                param->getName(128).removeCharacters(" _-").toLowerCase() == key)
+                return param;
+        }
+        return nullptr;
+    }
+    float signatureMacro(int lane, const juce::String& label) const
+    {
+        const juce::ScopedLock lock(controlLock); // UI-only; never audio callback.
+        if (auto* param = findMacro(slotAt(lane, 0).instance.get(), label))
+            return param->getValue() * 100.0f;
+        return -1.0f; // Parameter not exposed by this VST3.
+    }
+    bool setSignatureMacro(int lane, const juce::String& label, float percent)
+    {
+        const juce::ScopedLock lock(controlLock);
+        if (auto* param = findMacro(slotAt(lane, 0).instance.get(), label))
+        {
+            param->setValueNotifyingHost(juce::jlimit(0.0f, 1.0f, percent / 100.0f));
+            return true;
+        }
+        return false;
+    }
     float meter(int lane, int channel) const noexcept
     {
         if (lane == 2)

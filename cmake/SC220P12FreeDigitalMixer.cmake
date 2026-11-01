@@ -35,10 +35,10 @@ sc220_p12_once("remove paid overlay initialiser"
 sc220_p12_once("remove paid overlay from children"
 [=[    addChildComponent (*licensePanel);]=]
 [=[]=])
-sc220_p12_once("disable licence overlay callbacks"
-[=[    licensePanel->onClose = [this] { licensePanel->setVisible (false); };
-    licensePanel->onLicenseChanged = [this] { refreshAllControls(); };]=]
-[=[]=])
+# Legacy scripts may decorate these callbacks. Delete each full statement
+# by its stable one-line identity rather than its neighbouring whitespace.
+string(REGEX REPLACE "[ \t]*licensePanel->onClose[^\n]*\n" "" _ui "${_ui}")
+string(REGEX REPLACE "[ \t]*licensePanel->onLicenseChanged[^\n]*\n" "" _ui "${_ui}")
 sc220_p12_range("settings opens native audio setup only"
 [=[void SC220MainComponent::showSettingsMenu()]=]
 [=[class VoiceFxEditorWindow final]=]

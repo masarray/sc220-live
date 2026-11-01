@@ -371,7 +371,7 @@ foreach(_required IN ITEMS
         "showChannelInsertEditor (channel, slot)"
         "chooseChannelInsert (channel, slot)"
         "setIcon (loadImage (\"favicon_96x96_png\"))"
-        "sc220_fader_thumb_svg")
+        "kSc220FaderThumbSvg")
     string(FIND "${_ui}" "${_required}" _i)
     if(_i EQUAL -1)
         message(FATAL_ERROR "SC220 P11 FX workflow contract missing: ${_required}")

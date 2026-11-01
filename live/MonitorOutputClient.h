@@ -25,6 +25,9 @@ namespace askp::live {
 class MonitorOutputClient final
 {
 public:
+    // Each instance owns its own ring buffer and WASAPI worker. The broadcast
+    // instance cannot delay or reconfigure the ASIO device/physical monitor.
+    enum class EndpointPolicy { physicalOnly, virtualCableOnly };
     struct Status
     {
         bool deviceOpen = false;
@@ -46,7 +49,7 @@ public:
         juce::String lastError;
     };
 
-    MonitorOutputClient();
+    explicit MonitorOutputClient (EndpointPolicy policy = EndpointPolicy::physicalOnly);
     ~MonitorOutputClient();
 
     bool initialise();
@@ -84,8 +87,11 @@ public:
 
     Status getStatus() const;
     static bool isUnsafeVirtualOutput (const juce::String& name) noexcept;
+    static bool isVirtualCableInput (const juce::String& name) noexcept;
+    bool acceptsEndpoint (const juce::String& name) const noexcept;
 
 private:
+    const EndpointPolicy endpointPolicy;
     struct Impl;
     std::unique_ptr<Impl> impl;
 

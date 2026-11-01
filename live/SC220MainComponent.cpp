@@ -342,6 +342,20 @@ public:
                             track.getY() + 3.0f, track.getBottom() - 3.0f);
 
         const auto cap = juce::Rectangle<float> (centreX - 20.0f, sliderPos - 34.0f, 40.0f, 68.0f);
+        // Use the original SC220 user-approved SVG thumb, never a generic
+        // substitute. Decode only once; no allocations on subsequent paints.
+        static const auto originalThumb = [] {
+            int length = 0;
+            const auto* bytes = BinaryData::getNamedResource ("sc220_fader_thumb_svg", length);
+            return bytes != nullptr && length > 0
+                ? juce::Drawable::createFromImageData (bytes, static_cast<size_t>(length))
+                : std::unique_ptr<juce::Drawable>();
+        }();
+        if (originalThumb != nullptr)
+        {
+            originalThumb->drawWithin (g, cap, juce::RectanglePlacement::stretchToFit, alpha);
+            return;
+        }
 
         // A single metal face avoids any side strip reading as a fake shadow.
         const auto capFace = cap.reduced (0.75f, 2.0f);
@@ -703,6 +717,7 @@ SC220MainComponent::SC220MainComponent (LiveAudioEngine& engine, WindowActions a
 
     configureControls();
     refreshAllControls();
+    refreshChannelInserts();
     startTimerHz (30);
 }
 
@@ -744,6 +759,16 @@ void SC220MainComponent::configureControls()
     settingsButton.setTooltip ("Audio Setup (WASAPI / ASIO) and License");
     voiceFxButton.setTooltip ("Voice VST3 insert: choose ArSonVerb or another trusted stereo effect");
     voiceFxButton.onClick = [this] { showVoiceFxMenu(); };
+    voiceFxButton.setVisible (false); // Replaced by per-channel 3-slot DAW inserts.
+    for (int channel = 0; channel < 2; ++channel)
+        for (int slot = 0; slot < 3; ++slot)
+        {
+            auto& button = channelInsertButtons[static_cast<size_t>(channel)][static_cast<size_t>(slot)];
+            addAndMakeVisible (button);
+            button.setButtonText (juce::String (slot + 1) + " FX");
+            button.setTooltip ("Click for Insert FX load, edit, bypass or remove");
+            button.onClick = [this, channel, slot] { showChannelInsertMenu (channel, slot); };
+        }
     enhancerPowerButton.setTooltip ("Smart Enhancer On / Bypass");
     enhancerPowerButton.setIconColour (palette::orange);
     enhancerPowerButton.setOffColour (palette::muted);
@@ -892,6 +917,7 @@ void SC220MainComponent::refreshAllControls()
         : juce::String ("+ VST3 FX");
     if (voiceFxButton.getButtonText() != fxLabel)
         voiceFxButton.setButtonText (fxLabel);
+    refreshChannelInserts();
     const auto status = audioEngine.getStatus();
     const auto outputIndex = audioEngine.getOutputDeviceNames().indexOf (status.outputDevice);
     if (outputIndex >= 0)
@@ -1022,6 +1048,99 @@ void SC220MainComponent::showVoiceVst3Editor()
         }
         voiceFxEditorWindow->setVisible (true);
         voiceFxEditorWindow->toFront (true);
+    }
+}
+
+void SC220MainComponent::refreshChannelInserts()
+{
+    for (int channel = 0; channel < 2; ++channel)
+        for (int slot = 0; slot < 3; ++slot)
+        {
+            auto& button = channelInsertButtons[static_cast<size_t>(channel)][static_cast<size_t>(slot)];
+            const auto name = audioEngine.getChannelFxName (channel, slot);
+            const bool active = name.isNotEmpty();
+            const bool bypass = audioEngine.isChannelFxBypassed (channel, slot);
+            // Tight channel-strip label, full plugin identity in native tooltip.
+            button.setButtonText (juce::String (slot + 1) + (active ? (bypass ? " OFF" : " FX") : " +"));
+            button.setTooltip (juce::String (channel == 0 ? "VOICE" : "PC MUSIC")
+                + " / Insert " + juce::String (slot + 1) + ": "
+                + (active ? name + (bypass ? " [BYPASS]" : " [ON]") : "Empty - click to load VST3"));
+            button.setToggleState (active && ! bypass, juce::dontSendNotification);
+        }
+}
+
+void SC220MainComponent::showChannelInsertMenu (int channel, int slot)
+{
+    if (! juce::isPositiveAndBelow (channel, 2) || ! juce::isPositiveAndBelow (slot, 3)) return;
+    auto& button = channelInsertButtons[static_cast<size_t>(channel)][static_cast<size_t>(slot)];
+    const bool loaded = audioEngine.hasChannelFx (channel, slot);
+    juce::PopupMenu menu;
+    menu.addSectionHeader ((channel == 0 ? "SC220 VOICE" : "PC AUDIO")
+        + juce::String ("  -  FX ") + juce::String (slot + 1));
+    if (loaded)
+        menu.addItem (1, audioEngine.getChannelFxName (channel, slot), false);
+    menu.addItem (2, loaded ? "Replace VST3..." : "Load VST3...");
+    menu.addItem (3, "Open plugin editor", loaded);
+    menu.addItem (4, audioEngine.isChannelFxBypassed (channel, slot)
+                         ? "Enable insert" : "Bypass insert", loaded);
+    menu.addItem (5, "Remove effect", loaded);
+    juce::Component::SafePointer<SC220MainComponent> safe (this);
+    menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&button),
+        [safe, channel, slot] (int selected)
+        {
+            if (safe == nullptr) return;
+            if (selected == 2) safe->chooseChannelInsert (channel, slot);
+            else if (selected == 3) safe->showChannelInsertEditor (channel, slot);
+            else if (selected == 4)
+                safe->audioEngine.setChannelFxBypassed (channel, slot,
+                    ! safe->audioEngine.isChannelFxBypassed (channel, slot));
+            else if (selected == 5)
+            {
+                safe->channelInsertEditors[static_cast<size_t>(channel)][static_cast<size_t>(slot)].reset();
+                safe->audioEngine.removeChannelFx (channel, slot);
+            }
+            if (selected == 4 || selected == 5) safe->refreshChannelInserts();
+        });
+}
+
+void SC220MainComponent::chooseChannelInsert (int channel, int slot)
+{
+    channelInsertChooser = std::make_unique<juce::FileChooser> (
+        "Load a trusted 64-bit stereo VST3", juce::File(), "*.vst3");
+    juce::Component::SafePointer<SC220MainComponent> safe (this);
+    channelInsertChooser->launchAsync (
+        juce::FileBrowserComponent::openMode
+            | juce::FileBrowserComponent::canSelectFiles
+            | juce::FileBrowserComponent::canSelectDirectories,
+        [safe, channel, slot] (const juce::FileChooser& chooser)
+        {
+            if (safe == nullptr) return;
+            const auto file = chooser.getResult();
+            if (file == juce::File()) return;
+            safe->channelInsertEditors[static_cast<size_t>(channel)][static_cast<size_t>(slot)].reset();
+            const auto error = safe->audioEngine.loadChannelFx (channel, slot, file);
+            if (error.isNotEmpty())
+                juce::AlertWindow::showMessageBoxAsync (
+                    juce::MessageBoxIconType::WarningIcon, "SC220 VST3 Insert", error);
+            safe->refreshChannelInserts();
+        });
+}
+
+void SC220MainComponent::showChannelInsertEditor (int channel, int slot)
+{
+    if (auto* processor = audioEngine.getChannelFxProcessor (channel, slot))
+    {
+        auto& window = channelInsertEditors[static_cast<size_t>(channel)][static_cast<size_t>(slot)];
+        if (window == nullptr)
+        {
+            auto* editor = processor->createEditorIfNeeded();
+            if (editor == nullptr)
+                editor = new juce::GenericAudioProcessorEditor (*processor);
+            window = std::make_unique<VoiceFxEditorWindow> (
+                audioEngine.getChannelFxName (channel, slot), editor);
+        }
+        window->setVisible (true);
+        window->toFront (true);
     }
 }
 
@@ -1391,6 +1510,18 @@ void SC220MainComponent::resized()
     monitorKnob.setBounds (masterArea.getRight() - 164, masterLower.getY() + 52, 108, 108);
     outputBox.setBounds (masterArea.getRight() - 184, masterArea.getBottom() - 108, 154, 36);
 
+    // FX rows live INSIDE their channel strips, beside the hardware fader,
+    // not as a large detached centre dashboard. Compact enough at min width.
+    for (int channel = 0; channel < 2; ++channel)
+    {
+        const auto strip = channel == 0 ? sc220StripArea : pcStripArea;
+        const auto fader = channel == 0 ? sc220Fader.getBounds() : pcFader.getBounds();
+        const int left = fader.getRight() + 7;
+        const int width = juce::jmax (42, strip.getRight() - left - 4);
+        for (int slot = 0; slot < 3; ++slot)
+            channelInsertButtons[static_cast<size_t>(channel)][static_cast<size_t>(slot)]
+                .setBounds (left, fader.getY() + 16 + slot * 29, width, 25);
+    }
     licensePanel->setBounds (getLocalBounds());
 }
 

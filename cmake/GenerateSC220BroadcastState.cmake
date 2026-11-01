@@ -166,3 +166,15 @@ include("${CMAKE_CURRENT_LIST_DIR}/SC220P9DigitalConsoleStyle.cmake")
 # P10 consumes the annotated runtime audit: alpha product art, reclaimed input
 # space, aligned source rows, unified button heights, and one enhancer card.
 include("${CMAKE_CURRENT_LIST_DIR}/SC220P10AnnotatedConsoleRefinement.cmake")
+
+# P11 is the final native digital-mixer UI/FX authority after all legacy polish.
+include("${CMAKE_CURRENT_LIST_DIR}/SC220P11DigitalMixerFxWorkflow.cmake")
+
+# P12 is the only final production authority for free-public mode + mixer UX.
+include("${CMAKE_CURRENT_LIST_DIR}/SC220P12FreeDigitalMixer.cmake")
+
+# P13 re-styles the final effective native mixer while preserving controls.
+include("${CMAKE_CURRENT_LIST_DIR}/SC220P13ProDigitalMixerSurface.cmake")
+
+# P14 implements ASIO-first and a separately clocked best-effort broadcast bus.
+include("${CMAKE_CURRENT_LIST_DIR}/SC220P14AsioFirstBroadcast.cmake")

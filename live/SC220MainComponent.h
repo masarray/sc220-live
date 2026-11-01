@@ -2,7 +2,6 @@
 
 #include "LiveAudioEngine.h"
 #include "LiveIcons.h"
-#include "LiveLicensePanel.h"
 #include "SC220DeviceWatcher.h"
 
 #include <juce_gui_extra/juce_gui_extra.h>
@@ -52,6 +51,10 @@ private:
     void showVoiceFxMenu();
     void chooseVoiceVst3();
     void showVoiceVst3Editor();
+    void showChannelInsertMenu (int channel, int slot);
+    void chooseChannelInsert (int channel, int slot);
+    void showChannelInsertEditor (int channel, int slot);
+    void refreshChannelInserts();
     void drawHeader (juce::Graphics&);
     void drawInputSurface (juce::Graphics&);
     void drawSignatureSurface (juce::Graphics&);
@@ -78,6 +81,13 @@ private:
     juce::TextButton voiceFxButton { "+ VST3 FX" };
     std::unique_ptr<juce::FileChooser> voiceFxChooser;
     std::unique_ptr<juce::DocumentWindow> voiceFxEditorWindow;
+    // Native digital-mixer insert strip: editor/load, independent power and context menu.
+    std::array<std::array<juce::TextButton, 3>, 2> channelInsertButtons;
+    std::array<std::array<juce::TextButton, 3>, 2> channelInsertPowers;
+    std::array<std::array<juce::TextButton, 3>, 2> channelInsertMenus;
+    std::array<juce::Rectangle<int>, 2> channelRackAreas;
+    std::array<std::array<std::unique_ptr<juce::DocumentWindow>, 3>, 2> channelInsertEditors;
+    std::unique_ptr<juce::FileChooser> channelInsertChooser;
 
     juce::ComboBox presetBox;
     juce::ComboBox outputBox;
@@ -108,7 +118,6 @@ private:
     std::unique_ptr<StereoMeter> streamMeter;
     std::unique_ptr<LiveSpectrumDisplay> spectrumDisplay;
     std::unique_ptr<LoudnessDisplay> loudnessDisplay;
-    std::unique_ptr<LiveLicensePanel> licensePanel;
 
     juce::Rectangle<int> headerArea;
     juce::Rectangle<int> inputArea;

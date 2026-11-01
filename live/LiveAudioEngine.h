@@ -59,6 +59,12 @@ public:
         bool pcAudioLoopBlocked = false;
         int pcUnderflows = 0;
         int pcOverflows = 0;
+        bool broadcastRunning = false;
+        bool broadcastPrimed = false;
+        int broadcastUnderflows = 0;
+        int broadcastOverflows = 0;
+        juce::String broadcastDevice;
+        juce::String broadcastError;
         bool monitorRunning = false;
         bool monitorPrimed = false;
         int monitorBufferedSamples = 0;
@@ -86,6 +92,18 @@ public:
     void shutdown();
 
     juce::AudioDeviceManager& getDeviceManager() noexcept { return deviceManager; }
+    // DAW-style serial insert rack: voice=0 / PC Music=1; slots 0..2.
+    // Processor creation and retirement stay on the UI thread; no callback locks.
+    static constexpr int fxSlotsPerChannel = 3;
+    juce::String loadChannelFx (int channel, int slot, const juce::File&);
+    void removeChannelFx (int channel, int slot);
+    void setChannelFxBypassed (int channel, int slot, bool bypass) noexcept;
+    bool isChannelFxBypassed (int channel, int slot) const noexcept;
+    bool hasChannelFx (int channel, int slot) const noexcept;
+    juce::String getChannelFxName (int channel, int slot) const;
+    juce::AudioPluginInstance* getChannelFxProcessor (int channel, int slot) const noexcept;
+
+    // Keep legacy voice-FX API functional for existing code and generated UI.
     // UI/message-thread only; the callback is detached during a plugin swap.
     juce::String loadVoiceVst3 (const juce::File& pluginFile);
     void removeVoiceVst3();
@@ -114,6 +132,7 @@ public:
     juce::StringArray getInputDeviceNames();
     juce::StringArray getOutputDeviceNames();
     juce::StringArray getMonitorOutputDeviceNames();
+    juce::StringArray getBroadcastOutputDeviceNames();
     juce::StringArray getPcAudioEndpointNames();
     juce::Array<double> getAvailableSampleRates() const;
     juce::Array<int> getAvailableBufferSizes() const;
@@ -121,6 +140,7 @@ public:
     juce::String selectInputDevice (const juce::String& name);
     juce::String selectOutputDevice (const juce::String& name);
     juce::String selectMonitorOutputDevice (const juce::String& name);
+    juce::String selectBroadcastOutputDevice (const juce::String& name);
     juce::String selectPcAudioEndpoint (const juce::String& name);
     juce::String getPcAudioEndpointName() const;
     juce::String setSampleRate (double value);
@@ -168,7 +188,15 @@ public:
     bool isVoiceEnhancerBypassed() const noexcept { return voiceEnhancerBypassed.load(); }
     void setMusicEnhancerBypassed (bool value) noexcept;
     bool isMusicEnhancerBypassed() const noexcept { return musicEnhancerBypassed.load(); }
-    void setOutputMuted (bool value) noexcept { outputMuted.store (value); }
+    void setOutputMuted (bool value) noexcept
+    {
+        // GO LIVE gates only the best-effort broadcast renderer.
+        // Never mute/reconfigure native ASIO headphones here.
+        outputMuted.store (value, std::memory_order_release);
+        broadcastOutput.setMuted (value);
+        if (value)
+            broadcastOutput.flush(); // Secondary worker clears stale live frames.
+    }
     bool isOutputMuted() const noexcept { return outputMuted.load(); }
     void restartAudio();
     void applyVstReferenceConditions() noexcept;
@@ -254,7 +282,11 @@ private:
     SmoothDownwardExpander expander;
     EnhancerEngineBridge voiceEnhancerBridge;
     EnhancerEngineBridge musicEnhancerBridge;
-    InputVst3Rack voiceVst3;
+    InputVst3Rack voiceVst3; // Voice FX1: retained for generated-UI compatibility.
+    std::array<InputVst3Rack, 2> voiceExtraVst3; // Voice FX2 / FX3.
+    std::array<InputVst3Rack, 3> musicVst3;      // PC Music FX1 / FX2 / FX3.
+    InputVst3Rack& rackAt (int channel, int slot) noexcept;
+    const InputVst3Rack& rackAt (int channel, int slot) const noexcept;
     // Frozen-profile upper-band suppressor: per-engine audio-thread state,
     // never function-static shared across multiple engine instances/devices.
     float p6bLow1L = 0.0f, p6bLow2L = 0.0f;
@@ -264,7 +296,8 @@ private:
     SmartPleasantPresence pleasantPresence;
     askp::ScopeTap programmeAnalyzer;
     PcAudioLoopbackCapture pcLoopback;
-    MonitorOutputClient monitorOutput;
+    MonitorOutputClient monitorOutput; // WASAPI physical - optional.
+    MonitorOutputClient broadcastOutput { MonitorOutputClient::EndpointPolicy::virtualCableOnly };
     juce::dsp::Limiter<float> masterLimiter;
 
     juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> inputGainLinear;

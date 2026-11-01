@@ -15,10 +15,20 @@ foreach(required IN ITEMS "voiceVst3.process (voiceBlock, voiceMidi)" "monitorOu
     message(FATAL_ERROR "Effective engine lost required source: ${required}")
   endif()
 endforeach()
-foreach(required IN ITEMS "voiceFxButton" "monitorOutputBox" "musicCueButton")
+foreach(required IN ITEMS "voiceFxButton" "monitorOutputBox" "musicCueButton"
+                          "channelInsertPowers" "channelInsertMenus"
+                          "showChannelInsertEditor (channel, slot)"
+                          "chooseChannelInsert (channel, slot)"
+                          "favicon_96x96_png")
   string(FIND "${UI}" "${required}" found)
   if(found EQUAL -1)
     message(FATAL_ERROR "Effective UI lost required source: ${required}")
   endif()
 endforeach()
-message(STATUS "PASS: SC220 canonical generated engine/UI/app sources")
+foreach(stale IN ITEMS "sharedFaderTop" "sharedFaderHeight" "sourceSelectorY")
+  string(FIND "${UI}" "${stale}" found)
+  if(NOT found EQUAL -1)
+    message(FATAL_ERROR "Obsolete mixer geometry override survived: ${stale}")
+  endif()
+endforeach()
+message(STATUS "PASS: SC220 native mixer, slot controls, monitor, VST UI and engine")

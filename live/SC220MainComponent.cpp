@@ -1469,12 +1469,12 @@ void SC220MainComponent::drawInputSurface (juce::Graphics& g)
 
     const bool ducking = audioEngine.isDuckingEnabled();
     g.setColour (ducking ? palette::green : palette::muted);
-    g.fillEllipse (static_cast<float> (duckAmount.getRight() + 8),
-                   static_cast<float> (duckAmount.getBounds().getCentreY() - 4), 8.0f, 8.0f);
-    g.setColour (palette::ink);
-    g.setFont (interFont (8.8f, true));
-    g.drawText ("KEY: SC220", duckAmount.getRight() + 20, duckAmount.getY(),
-                82, duckAmount.getHeight(), juce::Justification::centredLeft);
+    g.fillEllipse (static_cast<float> (duckAmount.getRight() - 5),
+                   static_cast<float> (duckAmount.getY() + 4), 7.0f, 7.0f);
+    g.setColour (palette::graphite);
+    g.setFont (interFont (8.6f, true));
+    g.drawText ("KEY: SC220", duckAmount.getX() - 9, duckAmount.getBottom() + 1,
+                duckAmount.getWidth() + 18, 17, juce::Justification::centred);
 }
 
 void SC220MainComponent::drawSignatureSurface (juce::Graphics& g)
@@ -1586,8 +1586,8 @@ void SC220MainComponent::resized()
     footerArea = area.removeFromBottom (58);
     // Give the two real mixer channels room for fader + stereo meter + VST rack.
     // Preserve responsive Signature spectrum/macro and Stream Master regions.
-    const int inputWidth = juce::roundToInt (area.getWidth() * 0.40f);
-    const int signatureWidth = juce::roundToInt (area.getWidth() * 0.395f);
+    const int inputWidth = juce::roundToInt (area.getWidth() * 0.44f);
+    const int signatureWidth = juce::roundToInt (area.getWidth() * 0.355f);
     inputArea = area.removeFromLeft (inputWidth);
     signatureArea = area.removeFromLeft (signatureWidth);
     masterArea = area;
@@ -1621,7 +1621,8 @@ void SC220MainComponent::resized()
                         23, juce::jmax (74, pcStripArea.getHeight() - 304));
     pcFader.setBounds (pcStripArea.getX() + 40, pcStripArea.getY() + 214,
                        62, juce::jmax (74, pcStripArea.getHeight() - 300));
-    duckAmount.setBounds (pcStripArea.getX() + 24, pcStripArea.getBottom() - 82, 70, 70);
+    // Final placement is relative to the PC insert rack (below).
+    duckAmount.setBounds (0, 0, 70, 70);
 
     // Outside the console-grid replacement anchor; retained in the generated production UI.
     voiceFxButton.setBounds (sc220StripArea.getCentreX() - 74, sc220StripArea.getY() + 160, 148, 22);
@@ -1664,6 +1665,8 @@ void SC220MainComponent::resized()
         const int rackY = fader.getY() + 3;
         channelRackAreas[static_cast<size_t> (channel)]
             = { rackX, rackY, rackWidth, 137 };
+        if (channel == 1)
+            duckAmount.setBounds (rackX + (rackWidth - 70) / 2, rackY + 153, 70, 70);
         for (int slot = 0; slot < 3; ++slot)
         {
             const auto c = static_cast<size_t> (channel);

@@ -51,22 +51,14 @@ sc220_p14_once(_engine "reset independent output on ASIO stop"
 [=[    monitorOutput.flush();
     broadcastOutput.flush();]=])
 
-# Earlier generator passes may already remove the legacy automatic VB-CABLE
-# startup switch. Only remove it here when the original exact anchor survives.
-string(FIND "${_engine}" "const auto outputs = getOutputDeviceNames();" _legacy_auto)
-if(NOT _legacy_auto EQUAL -1)
-sc220_p14_range(_engine "remove incorrect startup auto reroute to VB-CABLE"
-[=[    if (savedDeviceState == nullptr)
-    {
-        const auto outputs = getOutputDeviceNames();]=]
-[=[    // P0: SC220 Live is a dedicated hardware companion.]=]
-[=[    // ASIO must retain its own input/output device. NEVER automatically switch
-    // the primary JUCE output to VB-CABLE at first launch. The separate
-    // Broadcast Output (WASAPI) is restored/configured independently.
-
-]=])
-
-
+# Some earlier generators have reformatted the legacy startup device scan.
+# Its single side effect must never call the JUCE/ASIO output selector. If
+# present, redirect it onto the separate WASAPI broadcast sink instead.
+string(FIND "${_engine}" "selectOutputDevice (name);" _legacy_call)
+if(NOT _legacy_call EQUAL -1)
+  sc220_p14_once(_engine "startup cannot steal ASIO output"
+[=[selectOutputDevice (name);]=]
+[=[selectBroadcastOutputDevice (name);]=])
 endif()
 
 sc220_p14_once(_engine "add independent broadcast WASAPI selection"

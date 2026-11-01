@@ -59,6 +59,12 @@ public:
         bool pcAudioLoopBlocked = false;
         int pcUnderflows = 0;
         int pcOverflows = 0;
+        bool broadcastRunning = false;
+        bool broadcastPrimed = false;
+        int broadcastUnderflows = 0;
+        int broadcastOverflows = 0;
+        juce::String broadcastDevice;
+        juce::String broadcastError;
         bool monitorRunning = false;
         bool monitorPrimed = false;
         int monitorBufferedSamples = 0;
@@ -126,6 +132,7 @@ public:
     juce::StringArray getInputDeviceNames();
     juce::StringArray getOutputDeviceNames();
     juce::StringArray getMonitorOutputDeviceNames();
+    juce::StringArray getBroadcastOutputDeviceNames();
     juce::StringArray getPcAudioEndpointNames();
     juce::Array<double> getAvailableSampleRates() const;
     juce::Array<int> getAvailableBufferSizes() const;
@@ -133,6 +140,7 @@ public:
     juce::String selectInputDevice (const juce::String& name);
     juce::String selectOutputDevice (const juce::String& name);
     juce::String selectMonitorOutputDevice (const juce::String& name);
+    juce::String selectBroadcastOutputDevice (const juce::String& name);
     juce::String selectPcAudioEndpoint (const juce::String& name);
     juce::String getPcAudioEndpointName() const;
     juce::String setSampleRate (double value);
@@ -280,7 +288,8 @@ private:
     SmartPleasantPresence pleasantPresence;
     askp::ScopeTap programmeAnalyzer;
     PcAudioLoopbackCapture pcLoopback;
-    MonitorOutputClient monitorOutput;
+    MonitorOutputClient monitorOutput; // WASAPI physical - optional.
+    MonitorOutputClient broadcastOutput { MonitorOutputClient::EndpointPolicy::virtualCableOnly };
     juce::dsp::Limiter<float> masterLimiter;
 
     juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> inputGainLinear;

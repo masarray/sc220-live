@@ -175,3 +175,6 @@ include("${CMAKE_CURRENT_LIST_DIR}/SC220P12FreeDigitalMixer.cmake")
 
 # P13 re-styles the final effective native mixer while preserving controls.
 include("${CMAKE_CURRENT_LIST_DIR}/SC220P13ProDigitalMixerSurface.cmake")
+
+# P14 implements ASIO-first and a separately clocked best-effort broadcast bus.
+include("${CMAKE_CURRENT_LIST_DIR}/SC220P14AsioFirstBroadcast.cmake")

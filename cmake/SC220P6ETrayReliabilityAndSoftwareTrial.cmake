@@ -1,3 +1,9 @@
+# Script-mode QA does not evaluate CMakeLists.txt options, so the free
+# public edition must retain the same default during generator-only checks.
+if(NOT DEFINED SC220_LIVE_PUBLIC_FREE)
+    set(SC220_LIVE_PUBLIC_FREE ON)
+endif()
+
 # P6E hardware/licensing polish.
 #
 # 1) Make the Windows tray icon deterministic even when Explorer is still

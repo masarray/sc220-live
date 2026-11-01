@@ -275,8 +275,8 @@ sc220_p11_once(_ui "mixer workspace ratios"
 [=[    const int inputWidth = juce::roundToInt (area.getWidth() * 0.440f);
     const int signatureWidth = juce::roundToInt (area.getWidth() * 0.310f);]=])
 
-sc220_p11_range(_ui "final FX layout with original fader and dual-mono support"
-[=[    // FX rows live INSIDE their channel strips]=] [=[    licensePanel->setBounds (getLocalBounds());]=]
+sc220_p11_once(_ui "append FX positions without stale comment dependency"
+[=[    licensePanel->setBounds (getLocalBounds());]=]
 [=[    // Space-saving DAW insert bay beside each real channel strip. The stock
     // SVG fader is still drawn by the existing JUCE LookAndFeel.
     for (int channel = 0; channel < 2; ++channel)
@@ -319,7 +319,7 @@ sc220_p11_range(_ui "final FX layout with original fader and dual-mono support"
             channelInsertMenus[c][s].setBounds (rackX + rackWidth - 20, rowY, 16, 28);
         }
     }
-]=])
+    licensePanel->setBounds (getLocalBounds());]=])
 
 sc220_p11_once(_ui "FX rack chassis and always-visible gain value"
 [=[}

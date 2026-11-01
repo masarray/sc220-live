@@ -51,6 +51,10 @@ sc220_p14_once(_engine "reset independent output on ASIO stop"
 [=[    monitorOutput.flush();
     broadcastOutput.flush();]=])
 
+# Earlier generator passes may already remove the legacy automatic VB-CABLE
+# startup switch. Only remove it here when the original exact anchor survives.
+string(FIND "${_engine}" "const auto outputs = getOutputDeviceNames();" _legacy_auto)
+if(NOT _legacy_auto EQUAL -1)
 sc220_p14_range(_engine "remove incorrect startup auto reroute to VB-CABLE"
 [=[    if (savedDeviceState == nullptr)
     {
@@ -61,6 +65,9 @@ sc220_p14_range(_engine "remove incorrect startup auto reroute to VB-CABLE"
     // Broadcast Output (WASAPI) is restored/configured independently.
 
 ]=])
+
+
+endif()
 
 sc220_p14_once(_engine "add independent broadcast WASAPI selection"
 [=[juce::StringArray LiveAudioEngine::getMonitorOutputDeviceNames()]=]

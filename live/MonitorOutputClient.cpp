@@ -860,6 +860,10 @@ struct MonitorOutputClient::Impl : public juce::Thread
 MonitorOutputClient::MonitorOutputClient (EndpointPolicy policy)
     : endpointPolicy (policy), impl (std::make_unique<Impl> (*this))
 {
+    // GO LIVE already gates the broadcast SPSC producer. Do not inherit the
+    // physical AUX monitor's default mute on the virtual output instance:
+    // otherwise observers receive silence even though frames are queued.
+    muted.store (policy == EndpointPolicy::physicalOnly, std::memory_order_release);
 }
 
 MonitorOutputClient::~MonitorOutputClient()

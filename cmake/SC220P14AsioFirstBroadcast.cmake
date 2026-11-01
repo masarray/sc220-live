@@ -95,16 +95,6 @@ sc220_p14_once(_engine "independent broadcast status telemetry"
     status.broadcastError = broadcastStatus.lastError;
     status.outputIsVirtualCable = status.broadcastRunning;]=])
 
-sc220_p14_once(_engine "nonblocking post-FX broadcast tee"
-[=[    updateMeters (voiceBlock, preLimiterPeakDb);]=]
-[=[    updateMeters (voiceBlock, preLimiterPeakDb);
-
-    // The only additional realtime work is a bounded planar stereo copy into
-    // a preallocated SPSC FIFO. NEVER call the WASAPI APIs here.
-    // Overflow / disconnected endpoint -> frame is dropped, not ASIO delayed.
-    if (! outputMuted.load (std::memory_order_relaxed))
-        broadcastOutput.push (voiceBlock, numSamples);]=])
-
 sc220_p14_range(_engine "ASIO headphones always independent of GO LIVE"
 [=[    if (! outputMuted.load())
     {
@@ -121,6 +111,12 @@ sc220_p14_range(_engine "ASIO headphones always independent of GO LIVE"
                                            voiceBlock.getReadPointer (sourceChannel),
                                            numSamples);
     }
+
+    // ASIO buffer has already been filled. Only now copy for the best-effort
+    // audience path; never delay writing native headphone output with WASAPI.
+    // A disconnected/full FIFO simply drops this audience block.
+    if (! outputMuted.load (std::memory_order_relaxed))
+        broadcastOutput.push (voiceBlock, numSamples);
 
 ]=])
 

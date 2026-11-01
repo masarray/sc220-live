@@ -485,6 +485,34 @@ public:
         addAndMakeVisible(notification);
         notification.setColour(juce::Label::textColourId, visual::amber);
         notification.setJustificationType(juce::Justification::centredLeft);
+        addAndMakeVisible(signatureVoice);
+        addAndMakeVisible(signatureMusic);
+        signatureVoice.setButtonText("VOICE");
+        signatureMusic.setButtonText("MUSIC");
+        signatureVoice.setClickingTogglesState(true);
+        signatureMusic.setClickingTogglesState(true);
+        signatureVoice.setRadioGroupId(2026);
+        signatureMusic.setRadioGroupId(2026);
+        signatureVoice.onClick=[this]{signatureLane=0;refreshSignatureKnobs();};
+        signatureMusic.onClick=[this]{signatureLane=1;refreshSignatureKnobs();};
+        signatureVoice.setToggleState(true,juce::dontSendNotification);
+        for(int index=0;index<5;++index)
+        {
+            auto& knob=signatureKnobs[static_cast<size_t>(index)];
+            addAndMakeVisible(knob);
+            knob.setSliderStyle(juce::Slider::RotaryHorizontalVerticalDrag);
+            knob.setRange(0.0,100.0,0.1);
+            knob.setTextBoxStyle(juce::Slider::NoTextBox,false,0,0);
+            knob.setDoubleClickReturnValue(false,0.0);
+            knob.setMouseDragSensitivity(160);
+            knob.setTooltip(macroNames[static_cast<size_t>(index)]+" - hosted ArSonKuPik VST3");
+            knob.onValueChange=[this,index]
+            {
+                engine.setSignatureMacro(signatureLane,
+                    macroNames[static_cast<size_t>(index)],
+                    static_cast<float>(signatureKnobs[static_cast<size_t>(index)].getValue()));
+            };
+        }
         autoLoadBundledPlugins();
         updateSlotNames();
         resized();
@@ -588,7 +616,7 @@ public:
         {
             auto r = juce::Rectangle<int>(
                 centerPanel.getX()+13+slot*(cardW+10),
-                centerPanel.getY()+99+lane*259,cardW,185);
+                centerPanel.getY()+99+lane*230,cardW,175);
             auto& c=fx[lane][slot];
             c.name.setBounds(r.getX()+11,r.getY()+49,r.getWidth()-22,29);
             const int w = (r.getWidth()-30)/2;
@@ -597,8 +625,15 @@ public:
             c.bypass.setBounds(r.getX()+10,r.getY()+143,w,29);
             c.remove.setBounds(r.getX()+20+w,r.getY()+143,w,29);
         }
-        notification.setBounds(centerPanel.getX()+21,
-            centerPanel.getBottom()-75,centerPanel.getWidth()-42,58);
+        signatureVoice.setBounds(centerPanel.getRight()-155,centerPanel.getY()+515,66,28);
+        signatureMusic.setBounds(centerPanel.getRight()-83,centerPanel.getY()+515,67,28);
+        const int macroWidth=(centerPanel.getWidth()-37)/5;
+        for(int index=0;index<5;++index)
+            signatureKnobs[static_cast<size_t>(index)].setBounds(
+                centerPanel.getX()+18+index*macroWidth,
+                centerPanel.getY()+546,macroWidth-5,80);
+        notification.setBounds(centerPanel.getX()+20,
+            centerPanel.getY()+648,centerPanel.getWidth()-40,24);
 
         masterFader.setBounds(rightPanel.getX()+42,rightPanel.getY()+179,
                               87,juce::jmax(204,rightPanel.getHeight()-355));
@@ -655,7 +690,7 @@ private:
         using namespace visual;
         for(int lane=0;lane<2;++lane)
         {
-            const int y = centerPanel.getY()+55+lane*259;
+            const int y = centerPanel.getY()+55+lane*230;
             const auto name=lane==0?"VOICE / SMART SIGNATURE":"MUSIC / SIGNATURE BUS";
             caption(g,name,{centerPanel.getX()+17,y,420,26},12.0f,text);
             g.setColour(lane==0?orange:cyan);
@@ -667,8 +702,8 @@ private:
             {
                 const auto r=juce::Rectangle<float>(
                     static_cast<float>(centerPanel.getX()+13+slot*(cardW+10)),
-                    static_cast<float>(centerPanel.getY()+99+lane*259),
-                    static_cast<float>(cardW),185.0f);
+                    static_cast<float>(centerPanel.getY()+99+lane*230),
+                    static_cast<float>(cardW),175.0f);
                 g.setColour(inset);
                 g.fillRoundedRectangle(r,6.0f);
                 g.setColour(border);
@@ -695,12 +730,30 @@ private:
             }
         }
         g.setColour(borderSoft);
-        g.drawHorizontalLine(centerPanel.getBottom()-94,
-            static_cast<float>(centerPanel.getX()+13),
-            static_cast<float>(centerPanel.getRight()-13));
-        caption(g,"INSERTS ARE PROCESSED IN ORDER  1  >  2  >  3",
-            {centerPanel.getX()+20,centerPanel.getBottom()-90,
-             centerPanel.getWidth()-40,19},9.5f,muted);
+        g.drawHorizontalLine(centerPanel.getY()+512,
+            static_cast<float>(centerPanel.getX()+14),
+            static_cast<float>(centerPanel.getRight()-14));
+        caption(g,"SMART SIGNATURE / VST3 MACROS",
+            {centerPanel.getX()+20,centerPanel.getY()+516,
+             centerPanel.getWidth()-204,26},12.0f,text);
+        static constexpr const char* macroTitles[5] = {
+            "ENHANCE","SMART BASS","SMART TREBLE","VOCAL BODY","STEREO MAGIC"
+        };
+        const int columnWidth=(centerPanel.getWidth()-37)/5;
+        for(int index=0;index<5;++index)
+        {
+            const auto value=signatureKnobs[static_cast<size_t>(index)].getValue();
+            caption(g,macroTitles[index],
+                {centerPanel.getX()+18+index*columnWidth,
+                 centerPanel.getY()+629,columnWidth-5,17},
+                9.2f,signatureKnobs[static_cast<size_t>(index)].isEnabled()?text:muted,
+                true,juce::Justification::centred);
+            caption(g,signatureKnobs[static_cast<size_t>(index)].isEnabled()
+                    ?juce::String(value,0)+"%":"N/A",
+                {centerPanel.getX()+18+index*columnWidth,
+                 centerPanel.getY()+642,columnWidth-5,16},
+                10.2f,cyan,true,juce::Justification::centred);
+        }
     }
     void drawMaster(juce::Graphics& g)
     {
@@ -801,6 +854,20 @@ private:
             fx[lane][slot].bypass.setToggleState(
                 engine.isBypassed(lane,slot),juce::dontSendNotification);
         }
+        refreshSignatureKnobs();
+        repaint(centerPanel);
+    }
+    void refreshSignatureKnobs()
+    {
+        for(int index=0;index<5;++index)
+        {
+            auto& knob=signatureKnobs[static_cast<size_t>(index)];
+            const auto value=engine.signatureMacro(signatureLane,
+                macroNames[static_cast<size_t>(index)]);
+            knob.setEnabled(value>=0.0f);
+            if(value>=0.0f && !knob.isMouseOverOrDragging())
+                knob.setValue(value,juce::dontSendNotification);
+        }
         repaint(centerPanel);
     }
     void autoLoadBundledPlugins()
@@ -859,6 +926,7 @@ private:
         notification.setText(startupError.isEmpty()?
             "ASIO / VST3   -   FX rack active. Select input 3/4 for MUSIC.":startupError,
             juce::dontSendNotification);
+        refreshSignatureKnobs();
         notification.setColour(juce::Label::textColourId,
             startupError.isEmpty()?visual::muted:visual::amber);
         repaint({0,0,getWidth(),64});
@@ -877,6 +945,12 @@ private:
     juce::Slider masterFader;
     juce::Label masterLabel,notification;
     std::array<std::array<FxControls,3>,2> fx;
+    const std::array<juce::String,5> macroNames {
+        "Enhance","Smart Bass","Smart Treble","Vocal Body","Stereo Magic"
+    };
+    std::array<juce::Slider,5> signatureKnobs;
+    juce::TextButton signatureVoice,signatureMusic;
+    int signatureLane=0;
     std::array<std::array<std::unique_ptr<FxEditorWindow>,3>,2> editors;
     std::unique_ptr<juce::FileChooser> fileChooser;
     juce::String startupError;
@@ -891,7 +965,7 @@ public:
         setUsingNativeTitleBar(true);
         setContentOwned(new Console(), true);
         setResizable(true, true);
-        setResizeLimits(1180, 750, 1920, 1200);
+        setResizeLimits(1180, 816, 1920, 1200);
         centreWithSize(1376, 816);
         setVisible(true);
     }

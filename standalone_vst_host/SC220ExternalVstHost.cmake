@@ -16,9 +16,18 @@ juce_add_gui_app(SC220Live
   BUNDLE_ID "com.masarray.sc220.live"
   ICON_BIG "${CMAKE_CURRENT_SOURCE_DIR}/assets/ui/favicon-512x512.png"
   ICON_SMALL "${CMAKE_CURRENT_SOURCE_DIR}/assets/ui/favicon-96x96.png")
+# Reuse the original SC220 visual identity: fonts, device image and logo.
+# These assets are public repository files; no private DSP/submodule is needed.
+juce_add_binary_data(SC220PremiumAssets SOURCES
+  "${CMAKE_CURRENT_SOURCE_DIR}/assets/ui/recording_tech_logo.png"
+  "${CMAKE_CURRENT_SOURCE_DIR}/assets/ui/sc220_mkii_device_alpha.png"
+  "${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts/inter_regular.ttf"
+  "${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts/inter_medium.ttf"
+  "${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts/inter_semibold.ttf")
 target_sources(SC220Live PRIVATE
   "${CMAKE_CURRENT_SOURCE_DIR}/standalone_vst_host/SC220ExternalHost.cpp")
 target_link_libraries(SC220Live PRIVATE
+  SC220PremiumAssets
   juce::juce_audio_utils juce::juce_audio_processors
   juce::juce_dsp juce::juce_gui_extra
   juce::juce_recommended_config_flags juce::juce_recommended_lto_flags

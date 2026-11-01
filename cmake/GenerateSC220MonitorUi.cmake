@@ -209,67 +209,68 @@ set(_master_labels_anchor [=[
                 outputBox.getWidth(), 18, juce::Justification::centred);
 ]=])
 set(_master_labels_replacement [=[
-    g.drawText ("MONITOR", monitorKnob.getX() - 12, monitorKnob.getY() - 25,
-                monitorKnob.getWidth() + 24, 21, juce::Justification::centred);
-    g.setColour (palette::muted);
-    g.setFont (interFont (9.0f, true));
-    g.drawText ("STREAM OUTPUT", outputBox.getX(), outputBox.getY() - 19,
-                outputBox.getWidth(), 17, juce::Justification::centred);
-    g.drawText ("MONITOR OUTPUT", monitorOutputBox.getX(), monitorOutputBox.getY() - 19,
-                monitorOutputBox.getWidth(), 17, juce::Justification::centred);
+    g.drawText ("MONITOR", monitorOutputBox.getX(), monitorOutputBox.getY() - 47,
+                monitorOutputBox.getWidth(), 22, juce::Justification::centred);
     const bool monitorHealthy = lastStatus.monitorRunning
                              && lastStatus.monitorError.isEmpty();
     g.setColour (monitorHealthy ? palette::green : palette::muted);
-    g.setFont (interFont (8.6f, true));
-    g.drawText (monitorHealthy ? "MONITOR ACTIVE" : "MONITOR NOT READY",
-                masterArea.getRight() - 156, musicCueButton.getBottom() + 6,
-                144, 16, juce::Justification::centred);
+    g.setFont (interFont (8.8f, true));
+    g.drawText (monitorHealthy ? "PHYSICAL OUTPUT ACTIVE" : "SELECT PHYSICAL OUTPUT",
+                monitorOutputBox.getX(), musicCueButton.getBottom() + 8,
+                monitorOutputBox.getWidth(), 18, juce::Justification::centred);
 ]=])
 sc220_monitor_ui_replace_once(_ui "monitor labels and health"
     "${_master_labels_anchor}" "${_master_labels_replacement}")
 
-set(_mixer_master_anchor [=[
-    loudnessDisplay->setBounds (masterArea.getCentreX() - 100, masterArea.getY() + 48, 200, 200);
-    auto masterLower = masterArea.reduced (24, 0);
-    masterLower.setTop (masterArea.getY() + 300);
-    streamMeter->setBounds (masterLower.getX(), masterLower.getY() + 42, 32,
-                            masterLower.getHeight() - 140);
-    streamFader.setBounds (masterLower.getX() + 40, masterLower.getY() + 38, 72,
-                           masterLower.getHeight() - 134);
-    streamMute.setBounds (streamFader.getBounds().getCentreX() - 36, masterArea.getBottom() - 44, 72, 31);
-    monitorKnob.setBounds (masterArea.getRight() - 164, masterLower.getY() + 52, 108, 108);
-    outputBox.setBounds (masterArea.getRight() - 184, masterArea.getBottom() - 108, 154, 36);
-]=])
-
-set(_mixer_master_replacement [=[
-    // Compact digital master strip: streaming fader, monitor section, two real outputs.
+set(_aligned_master_anchor [=[
     loudnessDisplay->setBounds (masterArea.getCentreX() - 100,
                                 masterArea.getY() + 48, 200, 200);
-    const int streamTop = masterArea.getY() + 287;
-    const int streamHeight = juce::jmax (95, masterArea.getBottom() - 197 - streamTop);
-    streamMeter->setBounds (masterArea.getX() + 8, streamTop + 4, 23, streamHeight - 8);
-    streamFader.setBounds (masterArea.getX() + 35, streamTop, 62, streamHeight);
-    streamMute.setBounds (streamFader.getBounds().getCentreX() - 35,
-                          masterArea.getBottom() - 44, 70, 31);
-    monitorKnob.setBounds (masterArea.getRight() - 138,
-                           masterArea.getY() + 298, 88, 88);
-    monitorPowerButton.setBounds (masterArea.getRight() - 49,
-                                  masterArea.getY() + 272, 31, 31);
-    const int modeY = monitorKnob.getBottom() + 10;
-    const int modeHalfWidth = juce::jmin (74, (masterArea.getWidth() - 30) / 2);
-    programMonitorButton.setBounds (masterArea.getRight() - 18 - 2 * modeHalfWidth,
-                                    modeY, modeHalfWidth, 29);
-    musicCueButton.setBounds (programMonitorButton.getRight(),
-                              modeY, modeHalfWidth, 29);
-    const int outputWidth = juce::jmin (185, masterArea.getWidth() - 28);
-    outputBox.setBounds (masterArea.getCentreX() - outputWidth / 2,
-                         masterArea.getBottom() - 145, outputWidth, 33);
-    monitorOutputBox.setBounds (outputBox.getX(),
-                                masterArea.getBottom() - 88, outputWidth, 33);
-]=])
+    auto masterLower = masterArea.reduced (24, 0);
+    const int streamColumnWidth = juce::jmin (174, masterLower.getWidth() / 2);
+    auto streamColumn = masterLower.removeFromLeft (streamColumnWidth);
 
-sc220_monitor_ui_replace_once(_ui "responsive monitor/master mixer layout"
-    "${_mixer_master_anchor}" "${_mixer_master_replacement}")
+    outputBox.setBounds (streamColumn.getCentreX() - 82,
+                         sourceSelectorY, 164, 34);
+    streamMeter->setBounds (streamColumn.getX() + 8, sharedFaderTop,
+                            sharedMeterWidth, sharedFaderHeight);
+    streamFader.setBounds (streamColumn.getCentreX() - sharedFaderWidth / 2,
+                           sharedFaderTop, sharedFaderWidth, sharedFaderHeight);
+    streamMute.setBounds (streamColumn.getCentreX() - 36,
+                          masterArea.getBottom() - 44, 72, 31);
+
+    monitorKnob.setBounds (masterLower.getCentreX() - 54,
+                           sourceSelectorY + 72, 108, 108);
+]=])
+set(_aligned_master_replacement [=[
+    loudnessDisplay->setBounds (masterArea.getCentreX() - 100,
+                                masterArea.getY() + 48, 200, 200);
+    auto masterLower = masterArea.reduced (24, 0);
+    const int streamColumnWidth = juce::jmin (174, masterLower.getWidth() / 2);
+    auto streamColumn = masterLower.removeFromLeft (streamColumnWidth);
+    auto monitorColumn = masterLower;
+
+    outputBox.setBounds (streamColumn.getCentreX() - 82,
+                         sourceSelectorY, 164, 34);
+    streamMeter->setBounds (streamColumn.getX() + 8, sharedFaderTop,
+                            sharedMeterWidth, sharedFaderHeight);
+    streamFader.setBounds (streamColumn.getCentreX() - sharedFaderWidth / 2,
+                           sharedFaderTop, sharedFaderWidth, sharedFaderHeight);
+    streamMute.setBounds (streamColumn.getCentreX() - 36,
+                          masterArea.getBottom() - 44, 72, 31);
+
+    monitorOutputBox.setBounds (monitorColumn.getCentreX() - 82,
+                                sourceSelectorY, 164, 34);
+    monitorPowerButton.setBounds (monitorOutputBox.getRight() - 36,
+                                  monitorOutputBox.getY() - 48, 34, 34);
+    monitorKnob.setBounds (monitorColumn.getCentreX() - 48,
+                           sourceSelectorY + 62, 96, 96);
+    const int modeY = monitorKnob.getBottom() + 18;
+    programMonitorButton.setBounds (monitorColumn.getCentreX() - 82,
+                                    modeY, 82, 30);
+    musicCueButton.setBounds (monitorColumn.getCentreX(), modeY, 82, 30);
+]=])
+sc220_monitor_ui_replace_once(_ui "monitor column layout"
+    "${_aligned_master_anchor}" "${_aligned_master_replacement}")
 
 get_filename_component(_generated_directory "${SC220_UI_MONITOR_GENERATED_SOURCE}" DIRECTORY)
 file(MAKE_DIRECTORY "${_generated_directory}")

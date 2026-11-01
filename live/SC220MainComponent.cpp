@@ -164,34 +164,6 @@ public:
                                const juce::Colour&, bool highlighted, bool down) override
     {
         const auto area = button.getLocalBounds().toFloat().reduced (0.7f);
-        const auto& props = button.getProperties();
-        const bool fxSlot = static_cast<bool> (props["sc220FxSlot"]);
-        const bool fxPower = static_cast<bool> (props["sc220FxPower"]);
-        const bool fxMenu = static_cast<bool> (props["sc220FxMenu"]);
-        if (fxSlot || fxPower || fxMenu)
-        {
-            const bool loaded = static_cast<bool> (props["sc220FxLoaded"]);
-            const bool active = loaded && ! static_cast<bool> (props["sc220FxBypassed"]);
-            auto fill = fxPower ? (active ? palette::cyanDeep : palette::surface)
-                                : (fxSlot && loaded ? palette::surfaceAlt : palette::screen);
-            if (highlighted && button.isEnabled())
-                fill = fill.brighter (0.16f);
-            if (down)
-                fill = fill.darker (0.17f);
-            g.setColour (fill);
-            g.fillRoundedRectangle (area, 4.0f);
-            g.setColour (fxPower && active ? palette::cyan.withAlpha (0.8f)
-                        : fxSlot && active ? palette::cyan.withAlpha (0.45f)
-                        : palette::borderSoft);
-            g.drawRoundedRectangle (area, 4.0f, 1.0f);
-            if (fxSlot)
-            {
-                g.setColour (active ? palette::cyan : loaded ? palette::amber : palette::muted);
-                g.fillRoundedRectangle (area.getX() + 1.0f, area.getY() + 4.0f,
-                                        2.0f, area.getHeight() - 8.0f, 1.0f);
-            }
-            return;
-        }
         const bool liveButton = button.getButtonText() == "GO LIVE" || button.getButtonText() == "LIVE";
         auto fill = button.getToggleState() ? palette::cyanDeep : palette::surfaceAlt;
         if (liveButton)
@@ -213,25 +185,6 @@ public:
     void drawButtonText (juce::Graphics& g, juce::TextButton& button,
                          bool, bool) override
     {
-        const auto& props = button.getProperties();
-        const bool fxSlot = static_cast<bool> (props["sc220FxSlot"]);
-        const bool fxPower = static_cast<bool> (props["sc220FxPower"]);
-        const bool fxMenu = static_cast<bool> (props["sc220FxMenu"]);
-        if (fxSlot || fxPower || fxMenu)
-        {
-            const bool active = static_cast<bool> (props["sc220FxLoaded"])
-                                && ! static_cast<bool> (props["sc220FxBypassed"]);
-            g.setColour (! button.isEnabled() ? palette::muted.withAlpha (0.52f)
-                         : fxPower && active ? juce::Colours::white
-                         : fxPower ? palette::muted
-                         : fxSlot && active ? palette::ink : palette::graphite);
-            g.setFont (fxSlot ? interMediumFont (11.0f) : interFont (10.0f, fxPower));
-            g.drawFittedText (button.getButtonText(),
-                              button.getLocalBounds().reduced (fxSlot ? 8 : 2, 2),
-                              fxSlot ? juce::Justification::centredLeft
-                                     : juce::Justification::centred, 1);
-            return;
-        }
         const bool liveButton = button.getButtonText() == "GO LIVE" || button.getButtonText() == "LIVE";
         const bool inverse = button.getToggleState() || liveButton;
         g.setColour (inverse ? juce::Colours::white : palette::ink);
@@ -771,12 +724,7 @@ SC220MainComponent::SC220MainComponent (LiveAudioEngine& engine, WindowActions a
 SC220MainComponent::~SC220MainComponent()
 {
     stopTimer();
-    // Editors must be destroyed before their processors can be replaced/shut down.
-    for (auto& channel : channelInsertEditors)
-        for (auto& editor : channel)
-            editor.reset();
-    channelInsertChooser.reset();
-    voiceFxEditorWindow.reset();
+    voiceFxEditorWindow.reset(); // Editor must die before its VST3 AudioProcessor.
     voiceFxChooser.reset();
     audioEngine.getVoiceEnhancerBridge().setVisualTapEnabled (false);
     audioEngine.getMusicEnhancerBridge().setVisualTapEnabled (false);
@@ -815,35 +763,11 @@ void SC220MainComponent::configureControls()
     for (int channel = 0; channel < 2; ++channel)
         for (int slot = 0; slot < 3; ++slot)
         {
-            const auto c = static_cast<size_t> (channel);
-            const auto s = static_cast<size_t> (slot);
-            auto& button = channelInsertButtons[c][s];
-            auto& power = channelInsertPowers[c][s];
-            auto& menu = channelInsertMenus[c][s];
+            auto& button = channelInsertButtons[static_cast<size_t>(channel)][static_cast<size_t>(slot)];
             addAndMakeVisible (button);
-            addAndMakeVisible (power);
-            addAndMakeVisible (menu);
-            button.getProperties().set ("sc220FxSlot", true);
-            power.getProperties().set ("sc220FxPower", true);
-            menu.getProperties().set ("sc220FxMenu", true);
-            // One-click DAW workflow: empty -> Explorer, occupied -> VST editor.
-            button.onClick = [this, channel, slot]
-            {
-                if (audioEngine.hasChannelFx (channel, slot))
-                    showChannelInsertEditor (channel, slot);
-                else
-                    chooseChannelInsert (channel, slot);
-            };
-            // Separate power; never remove or open a VST to bypass its DSP.
-            power.onClick = [this, channel, slot]
-            {
-                if (! audioEngine.hasChannelFx (channel, slot)) return;
-                audioEngine.setChannelFxBypassed (channel, slot,
-                    ! audioEngine.isChannelFxBypassed (channel, slot));
-                refreshChannelInserts();
-            };
-            menu.setButtonText ("...");
-            menu.onClick = [this, channel, slot] { showChannelInsertMenu (channel, slot); };
+            button.setButtonText (juce::String (slot + 1) + " FX");
+            button.setTooltip ("Click for Insert FX load, edit, bypass or remove");
+            button.onClick = [this, channel, slot] { showChannelInsertMenu (channel, slot); };
         }
     enhancerPowerButton.setTooltip ("Smart Enhancer On / Bypass");
     enhancerPowerButton.setIconColour (palette::orange);
@@ -1049,12 +973,10 @@ class VoiceFxEditorWindow final : public juce::DocumentWindow
 {
 public:
     VoiceFxEditorWindow (const juce::String& title, juce::AudioProcessorEditor* editor)
-        : juce::DocumentWindow (title, palette::surface,
+        : juce::DocumentWindow (title, juce::Colours::darkgrey,
                                 juce::DocumentWindow::closeButton, true)
     {
         setUsingNativeTitleBar (true);
-        // Match the SC220 Live executable/tray identity instead of a VST vendor icon.
-        setIcon (loadImage ("favicon_96x96_png"));
         setContentOwned (editor, true);
         setResizable (false, false);
         centreWithSize (juce::jmax (350, editor->getWidth()),
@@ -1134,36 +1056,16 @@ void SC220MainComponent::refreshChannelInserts()
     for (int channel = 0; channel < 2; ++channel)
         for (int slot = 0; slot < 3; ++slot)
         {
-            const auto c = static_cast<size_t> (channel);
-            const auto s = static_cast<size_t> (slot);
-            auto& button = channelInsertButtons[c][s];
-            auto& power = channelInsertPowers[c][s];
-            auto& menu = channelInsertMenus[c][s];
+            auto& button = channelInsertButtons[static_cast<size_t>(channel)][static_cast<size_t>(slot)];
             const auto name = audioEngine.getChannelFxName (channel, slot);
-            const bool loaded = name.isNotEmpty();
-            const bool bypassed = loaded && audioEngine.isChannelFxBypassed (channel, slot);
-            const auto label = juce::String (slot + 1).paddedLeft ('0', 2) + "   "
-                + (loaded ? name : juce::String ("+ LOAD VST3"));
-            if (button.getButtonText() != label)
-                button.setButtonText (label);
-            const auto explanation = juce::String (channel == 0 ? "VOICE" : "PC MUSIC")
-                + " / FX " + juce::String (slot + 1) + ": "
-                + (loaded ? name + (bypassed ? " [OFF]" : " [ON]")
-                          + ". Click to open editor; use ... to replace or remove."
-                          : "Click to browse for a .vst3 effect.");
-            button.setTooltip (explanation);
-            power.setButtonText (bypassed || ! loaded ? "OFF" : "ON");
-            power.setEnabled (loaded);
-            power.setTooltip (loaded ? (bypassed ? "Enable this FX slot" : "Bypass this FX slot")
-                                     : "Load a VST3 to enable this insert");
-            menu.setTooltip (loaded ? "More: replace, open, bypass, remove"
-                                    : "Browse for a VST3 plugin");
-            for (auto* b : { &button, &power, &menu })
-            {
-                b->getProperties().set ("sc220FxLoaded", loaded);
-                b->getProperties().set ("sc220FxBypassed", bypassed);
-                b->repaint();
-            }
+            const bool active = name.isNotEmpty();
+            const bool bypass = audioEngine.isChannelFxBypassed (channel, slot);
+            // Tight channel-strip label, full plugin identity in native tooltip.
+            button.setButtonText (juce::String (slot + 1) + (active ? (bypass ? " OFF" : " FX") : " +"));
+            button.setTooltip (juce::String (channel == 0 ? "VOICE" : "PC MUSIC")
+                + " / Insert " + juce::String (slot + 1) + ": "
+                + (active ? name + (bypass ? " [BYPASS]" : " [ON]") : "Empty - click to load VST3"));
+            button.setToggleState (active && ! bypass, juce::dontSendNotification);
         }
 }
 
@@ -1178,13 +1080,12 @@ void SC220MainComponent::showChannelInsertMenu (int channel, int slot)
     if (loaded)
         menu.addItem (1, audioEngine.getChannelFxName (channel, slot), false);
     menu.addItem (2, loaded ? "Replace VST3..." : "Load VST3...");
-    menu.addItem (3, "Open VST editor", loaded);
+    menu.addItem (3, "Open plugin editor", loaded);
     menu.addItem (4, audioEngine.isChannelFxBypassed (channel, slot)
                          ? "Enable insert" : "Bypass insert", loaded);
     menu.addItem (5, "Remove effect", loaded);
     juce::Component::SafePointer<SC220MainComponent> safe (this);
-    menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (
-                            &channelInsertMenus[static_cast<size_t>(channel)][static_cast<size_t>(slot)]),
+    menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&button),
         [safe, channel, slot] (int selected)
         {
             if (safe == nullptr) return;
@@ -1236,9 +1137,7 @@ void SC220MainComponent::showChannelInsertEditor (int channel, int slot)
             if (editor == nullptr)
                 editor = new juce::GenericAudioProcessorEditor (*processor);
             window = std::make_unique<VoiceFxEditorWindow> (
-                "SC220 Live  |  " + juce::String (channel == 0 ? "VOICE" : "PC MUSIC")
-                + " FX" + juce::String (slot + 1) + "  |  "
-                + audioEngine.getChannelFxName (channel, slot), editor);
+                audioEngine.getChannelFxName (channel, slot), editor);
         }
         window->setVisible (true);
         window->toFront (true);
@@ -1365,32 +1264,6 @@ void SC220MainComponent::drawInputSurface (juce::Graphics& g)
     g.drawVerticalLine (inputArea.getRight() - 1, static_cast<float> (inputArea.getY()),
                         static_cast<float> (inputArea.getBottom()));
 
-    // Digital-console channel strips are distinct but not bulky card stacks.
-    for (const auto strip : { sc220StripArea, pcStripArea })
-    {
-        const auto plate = strip.reduced (3, 0).toFloat();
-        g.setColour (palette::surfaceAlt.withAlpha (0.54f));
-        g.fillRoundedRectangle (plate, 7.0f);
-        g.setColour (palette::borderSoft);
-        g.drawRoundedRectangle (plate, 7.0f, 1.0f);
-    }
-    for (int channel = 0; channel < 2; ++channel)
-    {
-        const auto rack = channelRackAreas[static_cast<size_t> (channel)];
-        if (rack.isEmpty()) continue;
-        g.setColour (palette::header.withAlpha (0.48f));
-        g.fillRoundedRectangle (rack.toFloat(), 5.0f);
-        g.setColour (palette::borderSoft);
-        g.drawRoundedRectangle (rack.toFloat(), 5.0f, 1.0f);
-        g.setColour (palette::graphite);
-        g.setFont (interMediumFont (9.5f));
-        g.drawText ("INSERT FX  /  VST3", rack.reduced (9, 0).withHeight (25),
-                    juce::Justification::centredLeft);
-        g.setColour (palette::borderSoft);
-        g.drawHorizontalLine (rack.getY() + 26, static_cast<float> (rack.getX() + 8),
-                              static_cast<float> (rack.getRight() - 8));
-    }
-
     g.setColour (palette::ink);
     g.setFont (interFont (15.0f, true));
     g.drawText ("INPUT MIX", inputArea.withHeight (50), juce::Justification::centred);
@@ -1452,29 +1325,21 @@ void SC220MainComponent::drawInputSurface (juce::Graphics& g)
     g.setFont (interFont (9.0f, true));
     g.drawText ("INPUT TRIM", inputTrim.getX() - 14, inputTrim.getY() - 22,
                 inputTrim.getWidth() + 28, 18, juce::Justification::centred);
-    g.drawText ("VOICE", sc220Fader.getX() - 12, sc220Fader.getBottom() + 2,
-                sc220Fader.getWidth() + 24, 16, juce::Justification::centred);
-    g.drawText ("PC AUDIO", pcFader.getX() - 12, pcFader.getBottom() + 2,
-                pcFader.getWidth() + 24, 16, juce::Justification::centred);
-    g.setFont (interMediumFont (11.0f));
-    g.setColour (palette::cyan);
-    g.drawText (juce::String (sc220Fader.getValue(), 1) + " dB",
-                sc220Fader.getX() - 9, sc220Fader.getBottom() + 18,
-                sc220Fader.getWidth() + 18, 18, juce::Justification::centred);
-    g.drawText (juce::String (pcFader.getValue(), 1) + " dB",
-                pcFader.getX() - 9, pcFader.getBottom() + 18,
-                pcFader.getWidth() + 18, 18, juce::Justification::centred);
+    g.drawText ("SC220", sc220Fader.getX() - 15, sc220Fader.getBottom() + 2,
+                sc220Fader.getWidth() + 30, 18, juce::Justification::centred);
+    g.drawText ("PC AUDIO", pcFader.getX() - 20, pcFader.getBottom() + 2,
+                pcFader.getWidth() + 40, 18, juce::Justification::centred);
     g.drawText ("DUCK", duckAmount.getX() - 10, duckAmount.getY() - 17,
                 duckAmount.getWidth() + 20, 18, juce::Justification::centred);
 
     const bool ducking = audioEngine.isDuckingEnabled();
     g.setColour (ducking ? palette::green : palette::muted);
-    g.fillEllipse (static_cast<float> (duckAmount.getRight() - 5),
-                   static_cast<float> (duckAmount.getY() + 4), 7.0f, 7.0f);
-    g.setColour (palette::graphite);
-    g.setFont (interFont (8.6f, true));
-    g.drawText ("KEY: SC220", duckAmount.getX() - 9, duckAmount.getBottom() + 1,
-                duckAmount.getWidth() + 18, 17, juce::Justification::centred);
+    g.fillEllipse (static_cast<float> (duckAmount.getRight() + 8),
+                   static_cast<float> (duckAmount.getBounds().getCentreY() - 4), 8.0f, 8.0f);
+    g.setColour (palette::ink);
+    g.setFont (interFont (8.8f, true));
+    g.drawText ("KEY: SC220", duckAmount.getRight() + 20, duckAmount.getY(),
+                82, duckAmount.getHeight(), juce::Justification::centredLeft);
 }
 
 void SC220MainComponent::drawSignatureSurface (juce::Graphics& g)
@@ -1542,11 +1407,6 @@ void SC220MainComponent::drawMasterSurface (juce::Graphics& g)
                 masterArea.getWidth(), 22, juce::Justification::centred);
     g.drawText ("STREAM", streamFader.getX() - 25, streamFader.getY() - 28,
                 streamFader.getWidth() + 50, 22, juce::Justification::centred);
-    g.setColour (palette::cyan);
-    g.setFont (interMediumFont (11.5f));
-    g.drawText (juce::String (streamFader.getValue(), 1) + " dB",
-                streamFader.getX() - 12, streamFader.getBottom() + 1,
-                streamFader.getWidth() + 24, 21, juce::Justification::centred);
     g.drawText ("MONITOR", monitorKnob.getX() - 16, monitorKnob.getY() - 24,
                 monitorKnob.getWidth() + 32, 22, juce::Justification::centred);
     g.setColour (palette::muted);
@@ -1584,10 +1444,8 @@ void SC220MainComponent::resized()
     auto area = getLocalBounds();
     headerArea = area.removeFromTop (66);
     footerArea = area.removeFromBottom (58);
-    // Give the two real mixer channels room for fader + stereo meter + VST rack.
-    // Preserve responsive Signature spectrum/macro and Stream Master regions.
-    const int inputWidth = juce::roundToInt (area.getWidth() * 0.44f);
-    const int signatureWidth = juce::roundToInt (area.getWidth() * 0.355f);
+    const int inputWidth = juce::roundToInt (area.getWidth() * 0.325f);
+    const int signatureWidth = juce::roundToInt (area.getWidth() * 0.455f);
     inputArea = area.removeFromLeft (inputWidth);
     signatureArea = area.removeFromLeft (signatureWidth);
     masterArea = area;
@@ -1608,21 +1466,19 @@ void SC220MainComponent::resized()
     dualMonoButton.setBounds (stereoButton.getRight(), stereoButton.getY(),
                               sc220StripArea.getWidth() / 2 - 10, 31);
     inputTrim.setBounds (sc220StripArea.getCentreX() - 46, sc220StripArea.getY() + 186, 92, 92);
-    sc220Meter->setBounds (sc220StripArea.getX() + 9, sc220StripArea.getY() + 306,
-                           23, juce::jmax (74, sc220StripArea.getHeight() - 392));
-    sc220Fader.setBounds (sc220StripArea.getX() + 40, sc220StripArea.getY() + 302,
-                          62, juce::jmax (74, sc220StripArea.getHeight() - 388));
-    sc220Mute.setBounds (sc220Fader.getBounds().getCentreX() - 36,
-                         sc220StripArea.getBottom() - 42, 72, 31);
+    sc220Meter->setBounds (sc220StripArea.getX() + 18, sc220StripArea.getY() + 306,
+                           30, sc220StripArea.getHeight() - 392);
+    sc220Fader.setBounds (sc220StripArea.getCentreX() - 34, sc220StripArea.getY() + 302,
+                          68, sc220StripArea.getHeight() - 388);
+    sc220Mute.setBounds (sc220StripArea.getCentreX() - 36, sc220StripArea.getBottom() - 42, 72, 31);
 
     pcSourceBox.setBounds (pcStripArea.getX() + 30, pcStripArea.getY() + 104,
                            pcStripArea.getWidth() - 60, 34);
-    pcMeter->setBounds (pcStripArea.getX() + 9, pcStripArea.getY() + 218,
-                        23, juce::jmax (74, pcStripArea.getHeight() - 304));
-    pcFader.setBounds (pcStripArea.getX() + 40, pcStripArea.getY() + 214,
-                       62, juce::jmax (74, pcStripArea.getHeight() - 300));
-    // Final placement is relative to the PC insert rack (below).
-    duckAmount.setBounds (0, 0, 70, 70);
+    pcMeter->setBounds (pcStripArea.getX() + 18, pcStripArea.getY() + 218,
+                        30, pcStripArea.getHeight() - 304);
+    pcFader.setBounds (pcStripArea.getCentreX() - 34, pcStripArea.getY() + 214,
+                       68, pcStripArea.getHeight() - 300);
+    duckAmount.setBounds (pcStripArea.getX() + 24, pcStripArea.getBottom() - 82, 70, 70);
 
     // Outside the console-grid replacement anchor; retained in the generated production UI.
     voiceFxButton.setBounds (sc220StripArea.getCentreX() - 74, sc220StripArea.getY() + 160, 148, 22);
@@ -1654,29 +1510,17 @@ void SC220MainComponent::resized()
     monitorKnob.setBounds (masterArea.getRight() - 164, masterLower.getY() + 52, 108, 108);
     outputBox.setBounds (masterArea.getRight() - 184, masterArea.getBottom() - 108, 154, 36);
 
-    // Each channel has a complete, visible insert rack beside its authentic
-    // SVG fader. Slot opens the editor / Explorer; ON-OFF is never a menu action.
+    // FX rows live INSIDE their channel strips, beside the hardware fader,
+    // not as a large detached centre dashboard. Compact enough at min width.
     for (int channel = 0; channel < 2; ++channel)
     {
         const auto strip = channel == 0 ? sc220StripArea : pcStripArea;
         const auto fader = channel == 0 ? sc220Fader.getBounds() : pcFader.getBounds();
-        const int rackX = strip.getX() + 123;
-        const int rackWidth = juce::jmax (72, strip.getRight() - rackX - 9);
-        const int rackY = fader.getY() + 3;
-        channelRackAreas[static_cast<size_t> (channel)]
-            = { rackX, rackY, rackWidth, 137 };
-        if (channel == 1)
-            duckAmount.setBounds (rackX + (rackWidth - 70) / 2, rackY + 153, 70, 70);
+        const int left = fader.getRight() + 7;
+        const int width = juce::jmax (42, strip.getRight() - left - 4);
         for (int slot = 0; slot < 3; ++slot)
-        {
-            const auto c = static_cast<size_t> (channel);
-            const auto s = static_cast<size_t> (slot);
-            const int rowY = rackY + 31 + slot * 33;
-            const int slotWidth = juce::jmax (23, rackWidth - 57);
-            channelInsertButtons[c][s].setBounds (rackX + 6, rowY, slotWidth, 29);
-            channelInsertPowers[c][s].setBounds (rackX + rackWidth - 48, rowY, 27, 29);
-            channelInsertMenus[c][s].setBounds (rackX + rackWidth - 20, rowY, 15, 29);
-        }
+            channelInsertButtons[static_cast<size_t>(channel)][static_cast<size_t>(slot)]
+                .setBounds (left, fader.getY() + 16 + slot * 29, width, 25);
     }
     licensePanel->setBounds (getLocalBounds());
 }

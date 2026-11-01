@@ -122,6 +122,43 @@ public:
         g.drawFittedText (button.getButtonText(), button.getLocalBounds().reduced(3,1),
                           juce::Justification::centred, 1);
     }
+    void drawRotarySlider(juce::Graphics& g, int x, int y, int width, int height,
+                           float position, float start, float end,
+                           juce::Slider& slider) override
+    {
+        juce::ignoreUnused(slider);
+        const float diameter = static_cast<float>(juce::jmin(width,height)) - 10.0f;
+        const auto centre = juce::Point<float>(
+            static_cast<float>(x)+width*0.5f, static_cast<float>(y)+height*0.5f);
+        const auto knob = juce::Rectangle<float>(diameter,diameter).withCentre(centre);
+        g.setColour(juce::Colours::black.withAlpha(0.52f));
+        g.fillEllipse(knob.translated(0,2.0f));
+        juce::ColourGradient rim(juce::Colour(0xffd5dce0),knob.getCentreX(),knob.getY(),
+                                 juce::Colour(0xff38444c),knob.getCentreX(),knob.getBottom(),false);
+        rim.addColour(0.50,juce::Colour(0xff87949b));
+        g.setGradientFill(rim);
+        g.fillEllipse(knob);
+        auto face=knob.reduced(4.3f);
+        g.setGradientFill(juce::ColourGradient(juce::Colour(0xff353c41),face.getX(),face.getY(),
+                                              juce::Colour(0xff0a0e12),face.getRight(),face.getBottom(),false));
+        g.fillEllipse(face);
+        g.setColour(juce::Colours::white.withAlpha(0.09f));
+        g.drawEllipse(face,0.8f);
+        const float radius=diameter*0.39f;
+        juce::Path track;
+        track.addCentredArc(centre.x,centre.y,radius,radius,0.0f,start,end,true);
+        g.setColour(border);
+        g.strokePath(track,juce::PathStrokeType(2.1f));
+        juce::Path arc;
+        const float angle=start+position*(end-start);
+        arc.addCentredArc(centre.x,centre.y,radius,radius,0.0f,start,angle,true);
+        g.setColour(cyan);
+        g.strokePath(arc,juce::PathStrokeType(2.4f));
+        const auto from=centre.getPointOnCircumference(radius*0.35f,angle);
+        const auto to=centre.getPointOnCircumference(radius*0.82f,angle);
+        g.setColour(juce::Colours::white.withAlpha(0.95f));
+        g.drawLine({from,to},1.9f);
+    }
     void drawLinearSlider (juce::Graphics& g, int x, int y, int w, int h,
                            float pos, float minPos, float maxPos,
                            const juce::Slider::SliderStyle style, juce::Slider& slider) override

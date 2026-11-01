@@ -129,6 +129,9 @@ private:
 # ---------------------------------------------------------------------------
 # The user-directed free public build keeps P6E tray robustness but excludes
 # every payment / expiry / forced-mute UI transform and licensed panel target.
+# Flush native-tray transforms even when the paid/expiry block is disabled.
+file(WRITE "${SC220_APP_GENERATED_SOURCE}" "${_app}")
+file(WRITE "${SC220_UI_MONITOR_GENERATED_SOURCE}" "${_ui}")
 if(NOT SC220_LIVE_PUBLIC_FREE)
 # The main surface must use the bridge entitlement (SC220 OR software licence),
 # not the raw ASK-P trial bit by itself.

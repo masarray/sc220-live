@@ -194,6 +194,8 @@ public:
         // Never mute/reconfigure native ASIO headphones here.
         outputMuted.store (value, std::memory_order_release);
         broadcastOutput.setMuted (value);
+        if (value)
+            broadcastOutput.flush(); // Secondary worker clears stale live frames.
     }
     bool isOutputMuted() const noexcept { return outputMuted.load(); }
     void restartAudio();

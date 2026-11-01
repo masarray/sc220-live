@@ -686,8 +686,28 @@ struct MonitorOutputClient::Impl : public juce::Thread
         endpointPaddingFrames.store (static_cast<int> (padding),
                                      std::memory_order_relaxed);
 
-        const int ready = fifo.getNumReady();
+        int ready = fifo.getNumReady();
         const int primeTarget = juce::jmax (1, primeTargetSamples.load());
+        // Audience output follows a different clock and can fall behind during
+        // Windows scheduling stalls. Only the WASAPI worker (FIFO consumer)
+        // may skip STALE frames; never burden or stop the ASIO producer.
+        if (owner.endpointPolicy == EndpointPolicy::virtualCableOnly)
+        {
+            const int lagLimit = juce::jmax (
+                primeTarget * 3,
+                juce::roundToInt (juce::jmax (1.0, sourceRate.load()) * 0.18));
+            if (ready > lagLimit)
+            {
+                const int stale = ready - primeTarget;
+                int start1 = 0, size1 = 0, start2 = 0, size2 = 0;
+                fifo.prepareToRead (stale, start1, size1, start2, size2);
+                fifo.finishedRead (size1 + size2); // Consumer side only.
+                leftInterpolator.reset();
+                rightInterpolator.reset();
+                overflowCount.fetch_add (1, std::memory_order_relaxed);
+                ready = fifo.getNumReady();
+            }
+        }
         if (! endpointStarted && ready < primeTarget)
             return;
 

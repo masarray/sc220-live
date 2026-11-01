@@ -57,3 +57,5 @@ Never feed `CABLE Output` into PC MUSIC loopback: that would feed the post-FX pr
 3. Unplug/restart VB-CABLE, exhaust secondary FIFO and force worker stall: overflows/underflows may increase, ASIO audio and timing must remain unaffected.
 4. Verify USB interface ASIO monitor with GO LIVE OFF and ON; microphone+PC Music after all FX through `CABLE Output` in OBS/TikTok; no doubling/echo/loop.
 5. If measurements fail, do not publish stable. Keep previous preview available for rollback.
+## Backlog/drop policy refinement
+If the secondary WASAPI render worker is stalled and the FIFO grows beyond the larger of three prime windows or ~180 ms, its **consumer thread only** discards old frames down to the normal priming target before resampling. This bounds stale audience audio without ever forcing the ASIO producer to wait, adjust its clock or move the FIFO consumer pointer. GO LIVE OFF asynchronously flushes broadcast data (and marks WASAPI renderer muted), preserving the ASIO singer monitor. This is a deliberate best-effort tradeoff: audience may hear a discontinuity after endpoint starvation, but the singer must not.

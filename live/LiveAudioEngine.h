@@ -188,7 +188,13 @@ public:
     bool isVoiceEnhancerBypassed() const noexcept { return voiceEnhancerBypassed.load(); }
     void setMusicEnhancerBypassed (bool value) noexcept;
     bool isMusicEnhancerBypassed() const noexcept { return musicEnhancerBypassed.load(); }
-    void setOutputMuted (bool value) noexcept { outputMuted.store (value); }
+    void setOutputMuted (bool value) noexcept
+    {
+        // GO LIVE gates only the best-effort broadcast renderer.
+        // Never mute/reconfigure native ASIO headphones here.
+        outputMuted.store (value, std::memory_order_release);
+        broadcastOutput.setMuted (value);
+    }
     bool isOutputMuted() const noexcept { return outputMuted.load(); }
     void restartAudio();
     void applyVstReferenceConditions() noexcept;

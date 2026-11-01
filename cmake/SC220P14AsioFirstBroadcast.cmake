@@ -162,6 +162,41 @@ sc220_p14_once(_app "restore separate WASAPI output without touching ASIO"
             if (broadcastDevice.isNotEmpty())
                 audioEngine->selectBroadcastOutputDevice (broadcastDevice);]=])
 
+# Virtual CABLE playback must also be identified as the stream endpoint
+# for the existing PC Music loopback anti-feedback guard. ASIO's physical
+# output is not the broadcast sink and must not be used for this comparison.
+sc220_p14_once(_engine "PC capture sees actual broadcast output"
+[=[juce::StringArray LiveAudioEngine::getPcAudioEndpointNames()
+{
+    juce::String streamOutput;
+    {
+        const juce::ScopedLock lock (statusLock);
+        streamOutput = currentOutputName;
+    }]=]
+[=[juce::StringArray LiveAudioEngine::getPcAudioEndpointNames()
+{
+    const auto streamOutput = broadcastOutput.getStatus().deviceName;
+]=])
+sc220_p14_once(_engine "PC endpoint routing blocks output self capture"
+[=[juce::String LiveAudioEngine::selectPcAudioEndpoint (const juce::String& name)
+{
+    const auto requested = name.trim().isNotEmpty()
+        ? name.trim()
+        : juce::String (PcAudioLoopbackCapture::systemDefaultLabel);
+
+    juce::String streamOutput;
+    {
+        const juce::ScopedLock lock (statusLock);
+        streamOutput = currentOutputName;
+    }]=]
+[=[juce::String LiveAudioEngine::selectPcAudioEndpoint (const juce::String& name)
+{
+    const auto requested = name.trim().isNotEmpty()
+        ? name.trim()
+        : juce::String (PcAudioLoopbackCapture::systemDefaultLabel);
+    const auto streamOutput = broadcastOutput.getStatus().deviceName;
+]=])
+
 # Effective generated-code acceptance. Fail closed on accidental re-routing.
 foreach(_must "broadcastOutput.push (voiceBlock, numSamples)"
               "broadcastOutput.prepareSource (sampleRate, blockSize)"

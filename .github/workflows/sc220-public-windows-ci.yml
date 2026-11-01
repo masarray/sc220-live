@@ -1,7 +1,7 @@
 name: SC220 Public Windows ASIO VST3 Build
 on:
   push:
-    branches: [main]
+    branches: [main, feature/original-ui-studio-one-fx-racks]
     paths:
       - 'live/**'
       - 'cmake/**'
@@ -14,7 +14,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write # Preview publishing is guarded to a maintainer branch push.
 
 concurrency:
   group: sc220-public-windows-${{ github.ref }}
@@ -22,6 +22,7 @@ concurrency:
 
 jobs:
   windows-x64:
+    if: github.event_name != 'pull_request' || github.head_ref != 'feature/original-ui-studio-one-fx-racks'
     runs-on: windows-2022
     timeout-minutes: 80
     steps:
@@ -115,3 +116,36 @@ jobs:
           path: SC220-Live-Windows-x64-VST3-bundled-preview.zip
           retention-days: 7
           if-no-files-found: error
+      - name: Publish public hardware-test ZIP (PR #14, never stable)
+        if: github.event_name == 'push' && github.ref_name == 'feature/original-ui-studio-one-fx-racks' && contains(github.event.head_commit.message, '[publish-preview]')
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $ErrorActionPreference='Stop'
+          $short=$env:GITHUB_SHA.Substring(0,8)
+          $tag="v0.1.3-original-ui-fx3-preview.$short"
+          $zip="SC220-Live-Original-GUI-ASIO-FX3-$short.zip"
+          Copy-Item -LiteralPath "SC220-Live-Windows-x64-VST3-bundled-preview.zip" -Destination $zip
+          $hash=(Get-FileHash $zip -Algorithm SHA256).Hash.ToLowerInvariant()
+          @"
+          SC220 Live Original GUI + native ASIO + per-channel 3 FX inserts
+          WINDOWS PHYSICAL TEST PREVIEW — NOT PRODUCTION STABLE
+
+          Source commit: $env:GITHUB_SHA
+          ZIP SHA256: $hash
+
+          Restores original SC220MainComponent UI, approved SVG fader thumb,
+          Voice/PC Audio 3-slot VST3 DAW inserts, original PC loopback, Smart
+          Enhancer, monitoring, loudness, ducking and master routing.
+          Pinned ArSonKuPik v0.5.26 + ArSonVerb v1.0.1.
+          Voice FX2 auto-loads bundled ArSonVerb.
+
+          Unzip completely, keep Plugins/ beside EXE.
+          Begin with the physical output muted and low monitoring levels.
+          Choose correct ASIO driver, then test 48 kHz at 256/128/64 samples.
+          Record any problems with startup plugins, latency or GUI layout.
+          This build passed CI, not hardware endurance or screenshot parity.
+          "@ | Set-Content "physical-test-notes.txt"
+          gh release create $tag $zip --target $env:GITHUB_SHA --prerelease --title "SC220 Original GUI + ASIO 3 FX Hardware Test ($short)" --notes-file "physical-test-notes.txt"
+          if ($LASTEXITCODE -ne 0) { throw 'Public hardware preview publication failed.' }

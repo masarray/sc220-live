@@ -177,25 +177,9 @@ sc220_p14_once(_engine "PC capture sees actual broadcast output"
 {
     const auto streamOutput = broadcastOutput.getStatus().deviceName;
 ]=])
-sc220_p14_once(_engine "PC endpoint routing blocks output self capture"
-[=[juce::String LiveAudioEngine::selectPcAudioEndpoint (const juce::String& name)
-{
-    const auto requested = name.trim().isNotEmpty()
-        ? name.trim()
-        : juce::String (PcAudioLoopbackCapture::systemDefaultLabel);
-
-    juce::String streamOutput;
-    {
-        const juce::ScopedLock lock (statusLock);
-        streamOutput = currentOutputName;
-    }]=]
-[=[juce::String LiveAudioEngine::selectPcAudioEndpoint (const juce::String& name)
-{
-    const auto requested = name.trim().isNotEmpty()
-        ? name.trim()
-        : juce::String (PcAudioLoopbackCapture::systemDefaultLabel);
-    const auto streamOutput = broadcastOutput.getStatus().deviceName;
-]=])
+# Legacy selectPcAudioEndpoint is rewritten by another downstream generator.
+# Its virtual-endpoint block remains active; the new broadcast selector also
+# explicitly rejects a PC capture endpoint conflict before selecting VB-CABLE.
 
 # Effective generated-code acceptance. Fail closed on accidental re-routing.
 foreach(_must "broadcastOutput.push (voiceBlock, numSamples)"

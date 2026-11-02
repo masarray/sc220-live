@@ -37,6 +37,18 @@ require("void run() override" in monitor and "renderAvailableLocked" in monitor,
         "Physical monitor must render on its own worker")
 require("buffer.setSample" not in noise.split("void MusicalNoiseClean::process (",1)[1].split(
     "void SmoothDownwardExpander::prepare",1)[0], "Noise Learn must not delay dry voice")
+ui=source("live/SC220MainComponent.cpp")
+application=source("live/LiveApplication.cpp")
+p14=source("cmake/SC220P14AsioFirstBroadcast.cmake")
+require("selectOutputDevice (name);" not in engine,
+        "Legacy auto VB-CABLE output switch must not steal ASIO at startup")
+require("setBroadcastGainDb (static_cast<float> (streamFader.getValue()))" in ui,
+        "STREAM fader must exclusively control the WASAPI broadcast gain")
+require("file->getDoubleValue (\"broadcastGainDb\", legacyStreamGain)" in application,
+        "Restore broadcast gain independently and migrate old streaming fader")
+require("broadcastOutput.push (voiceBlock, numSamples)" in p14
+        and "juce::FloatVectorOperations::copy (outputChannelData[channel]" in p14,
+        "Post-FX broadcast must follow native ASIO output with no second device")
 require("getTotalNumOutputChannels() != 2" in rack,
         "Require a stereo VST3 output bus")
 for f in list((root/".github/workflows").glob("*.yml")):

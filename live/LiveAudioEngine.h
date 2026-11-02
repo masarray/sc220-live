@@ -173,6 +173,10 @@ public:
     void setDuckingDepthDb (float value) noexcept;
     float getDuckingDepthDb() const noexcept { return duckingDepthDb.load(); }
 
+    // Broadcast gain belongs ONLY to the secondary WASAPI audience renderer.
+    // It must never change the native ASIO singer monitoring level.
+    void setBroadcastGainDb (float value) noexcept { broadcastOutput.setGainDb (value); }
+    float getBroadcastGainDb() const noexcept { return broadcastOutput.getGainDb(); }
     void setMonitorSource (MonitorSource value) noexcept { monitorSource.store (value); }
     MonitorSource getMonitorSource() const noexcept { return monitorSource.load(); }
     void setMonitorGainDb (float value) noexcept { monitorOutput.setGainDb (value); }

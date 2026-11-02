@@ -47,6 +47,19 @@ target_link_libraries(SC220BundledVstSmoke PRIVATE
     PUBLIC juce::juce_recommended_config_flags juce::juce_recommended_warning_flags)
 target_compile_definitions(SC220BundledVstSmoke PRIVATE JUCE_WEB_BROWSER=0 JUCE_USE_CURL=0 JUCE_PLUGINHOST_VST3=1)
 
+# P15 hardware-test acceptance: exercise the actual dual-policy WASAPI class
+# without requiring SC220 hardware or a VB-CABLE driver on the CI runner.
+if(WIN32)
+    juce_add_console_app(SC220BroadcastIsolationAudit PRODUCT_NAME "SC220 Broadcast Isolation Audit")
+    target_sources(SC220BroadcastIsolationAudit PRIVATE
+        qa/BroadcastIsolationAudit.cpp live/MonitorOutputClient.cpp)
+    target_include_directories(SC220BroadcastIsolationAudit PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/live")
+    target_link_libraries(SC220BroadcastIsolationAudit PRIVATE
+        juce::juce_audio_utils ole32 avrt)
+    target_compile_definitions(SC220BroadcastIsolationAudit PRIVATE JUCE_WEB_BROWSER=0 JUCE_USE_CURL=0)
+    add_test(NAME SC220BroadcastIsolationAudit COMMAND SC220BroadcastIsolationAudit)
+endif()
+
 # ---------------------------------------------------------------------------
 # Embedded UI assets
 # ---------------------------------------------------------------------------

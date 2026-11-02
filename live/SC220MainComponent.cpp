@@ -864,7 +864,11 @@ void SC220MainComponent::configureControls()
         audioEngine.setDuckingDepthDb (-static_cast<float> (duckAmount.getValue()));
         audioEngine.setDuckingEnabled (duckAmount.getValue() > 0.0);
     };
-    streamFader.onValueChange = [this] { audioEngine.setOutputTrimDb (static_cast<float> (streamFader.getValue())); };
+    // Audience fader: never manipulate the shared master/ASIO headphone bus.
+    streamFader.onValueChange = [this]
+    {
+        audioEngine.setBroadcastGainDb (static_cast<float> (streamFader.getValue()));
+    };
 
     macroKnobs[0].onValueChange = [this] { audioEngine.setEnhance (static_cast<float> (macroKnobs[0].getValue())); };
     macroKnobs[1].onValueChange = [this] { audioEngine.setSmartBass (static_cast<float> (macroKnobs[1].getValue())); };
@@ -895,7 +899,7 @@ void SC220MainComponent::refreshAllControls()
     sc220Fader.setValue (audioEngine.getSc220FaderDb(), juce::dontSendNotification);
     pcFader.setValue (audioEngine.getPcAudioGainDb(), juce::dontSendNotification);
     duckAmount.setValue (-audioEngine.getDuckingDepthDb(), juce::dontSendNotification);
-    streamFader.setValue (audioEngine.getOutputTrimDb(), juce::dontSendNotification);
+    streamFader.setValue (audioEngine.getBroadcastGainDb(), juce::dontSendNotification);
     macroKnobs[0].setValue (audioEngine.getEnhance(), juce::dontSendNotification);
     macroKnobs[1].setValue (audioEngine.getSmartBass(), juce::dontSendNotification);
     macroKnobs[2].setValue (audioEngine.getSmartTreble(), juce::dontSendNotification);
@@ -1431,12 +1435,21 @@ void SC220MainComponent::drawFooter (juce::Graphics& g)
     const float latencyMs = lastStatus.sampleRate > 0.0
         ? static_cast<float> (lastStatus.totalLatencySamples / lastStatus.sampleRate * 1000.0)
         : 0.0f;
-    const juce::String health = "CPU  " + juce::String (lastStatus.cpuPercent, 1) + "%      "
-                              + "DROP  " + juce::String (lastStatus.dropouts) + "      "
-                              + "LATENCY  " + juce::String (latencyMs, 1) + " ms";
-    g.drawText (health, footerArea.getCentreX(), footerArea.getY(),
-                footerArea.getWidth() / 2 - 42, footerArea.getHeight(),
-                juce::Justification::centredRight);
+    // Compact but truthful dual-clock health strip. Broadcast failures are
+    // visible without suggesting that a Windows worker controls ASIO timing.
+    const bool streaming = ! audioEngine.isOutputMuted();
+    const juce::String broadcastState = ! streaming ? "BC OFF"
+        : (lastStatus.broadcastRunning ? "BC LIVE"
+           : (lastStatus.broadcastError.isNotEmpty() ? "BC ERROR" : "BC WAIT"));
+    const juce::String health = "ASIO " + juce::String (latencyMs, 1) + " ms  "
+        + "CPU " + juce::String (lastStatus.cpuPercent, 1) + "%  "
+        + "XRUN " + juce::String (lastStatus.callbackDeadlineMisses) + "  "
+        + broadcastState + "  DROP " + juce::String (lastStatus.broadcastOverflows);
+    g.setColour (streaming && ! lastStatus.broadcastRunning ? palette::amber : palette::ink);
+    g.setFont (interMediumFont (9.2f));
+    g.drawFittedText (health, footerArea.getCentreX(), footerArea.getY(),
+                      footerArea.getWidth() / 2 - 36, footerArea.getHeight(),
+                      juce::Justification::centredRight, 1);
 }
 
 void SC220MainComponent::resized()

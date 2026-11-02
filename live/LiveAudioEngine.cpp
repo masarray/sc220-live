@@ -107,18 +107,9 @@ bool LiveAudioEngine::initialise (const juce::XmlElement* savedDeviceState)
         deviceManager.addAudioCallback (this);
     refreshDeviceStatus();
 
-    if (savedDeviceState == nullptr)
-    {
-        const auto outputs = getOutputDeviceNames();
-        for (const auto& name : outputs)
-        {
-            if (looksLikeVirtualCable (name) && name.containsIgnoreCase ("input"))
-            {
-                selectOutputDevice (name);
-                break;
-            }
-        }
-    }
+    // No automatic VB-CABLE selection through JUCE AudioDeviceManager.
+    // ASIO headphones remain the primary output. The audience chooses
+    // the independent WASAPI Broadcast sink in the digital mixer.
 
     // P0: SC220 Live is a dedicated hardware companion. Do not depend on the
     // Windows default recording endpoint or on a stale saved device state.

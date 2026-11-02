@@ -45,7 +45,7 @@ jobs:
       - name: Compile SC220 Live and independent QA
         shell: pwsh
         run: |
-          cmake --build build --config Release --target SC220Live SC220LoudnessAudit SC220ProgrammeAnalyzerAudit SC220PleasantPresenceAudit SC220BundledVstSmoke --parallel 3
+          cmake --build build --config Release --target SC220Live SC220LoudnessAudit SC220ProgrammeAnalyzerAudit SC220PleasantPresenceAudit SC220BundledVstSmoke SC220BroadcastIsolationAudit --parallel 3
           if ($LASTEXITCODE -ne 0) { throw "Windows Release compilation failed" }
       - name: Run CTest
         shell: pwsh

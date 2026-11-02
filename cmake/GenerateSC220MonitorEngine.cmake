@@ -20,13 +20,13 @@ endfunction()
 set(_initialise_anchor [=[
     refreshDeviceStatus();
 
-    if (savedDeviceState == nullptr)
+    // No automatic VB-CABLE selection through JUCE AudioDeviceManager.
 ]=])
 set(_initialise_replacement [=[
     refreshDeviceStatus();
     monitorOutput.initialise();
 
-    if (savedDeviceState == nullptr)
+    // No automatic VB-CABLE selection through JUCE AudioDeviceManager.
 ]=])
 sc220_engine_replace_once(_engine "monitor initialisation"
     "${_initialise_anchor}" "${_initialise_replacement}")

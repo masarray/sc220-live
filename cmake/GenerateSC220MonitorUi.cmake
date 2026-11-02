@@ -119,10 +119,18 @@ sc220_monitor_ui_replace_once(_ui "monitor gain range"
     "${_monitor_knob_anchor}" "${_monitor_knob_replacement}")
 
 set(_monitor_callback_anchor [=[
-    streamFader.onValueChange = [this] { audioEngine.setOutputTrimDb (static_cast<float> (streamFader.getValue())); };
+    // Audience fader: never manipulate the shared master/ASIO headphone bus.
+    streamFader.onValueChange = [this]
+    {
+        audioEngine.setBroadcastGainDb (static_cast<float> (streamFader.getValue()));
+    };
 ]=])
 set(_monitor_callback_replacement [=[
-    streamFader.onValueChange = [this] { audioEngine.setOutputTrimDb (static_cast<float> (streamFader.getValue())); };
+    // Audience fader: never manipulate the shared master/ASIO headphone bus.
+    streamFader.onValueChange = [this]
+    {
+        audioEngine.setBroadcastGainDb (static_cast<float> (streamFader.getValue()));
+    };
     monitorKnob.onValueChange = [this]
     {
         audioEngine.setMonitorGainDb (static_cast<float> (monitorKnob.getValue()));

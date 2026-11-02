@@ -151,10 +151,10 @@ sc220_monitor_ui_replace_once(_ui "enable physical monitor"
     "${_disabled_monitor_anchor}" "${_disabled_monitor_replacement}")
 
 set(_refresh_values_anchor [=[
-    streamFader.setValue (audioEngine.getOutputTrimDb(), juce::dontSendNotification);
+    streamFader.setValue (audioEngine.getBroadcastGainDb(), juce::dontSendNotification);
 ]=])
 set(_refresh_values_replacement [=[
-    streamFader.setValue (audioEngine.getOutputTrimDb(), juce::dontSendNotification);
+    streamFader.setValue (audioEngine.getBroadcastGainDb(), juce::dontSendNotification);
     monitorKnob.setValue (audioEngine.getMonitorGainDb(), juce::dontSendNotification);
 ]=])
 sc220_monitor_ui_replace_once(_ui "refresh monitor gain"

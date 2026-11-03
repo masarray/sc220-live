@@ -1,0 +1,32 @@
+name: SC220 P16 quick source-only sibling integration gate
+on:
+  push:
+    branches: ['feature/p16-sibling-vst3-bundle']
+    paths:
+      - 'live/**'
+      - 'cmake/**'
+      - 'qa/**'
+      - 'scripts/**'
+      - 'docs/**'
+      - 'CMakeLists.txt'
+      - '.github/workflows/sc220-p16-preflight.yml'
+      - '.github/workflows/sc220-public-windows-ci.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate-without-rebuilding-juce:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Verify pinned sibling VST3 manifest and archive safety offline
+        run: python3 scripts/stage_sc220_sibling_vst3.py --self-test
+      - name: Source real-time safety and final P3-P16 CMake generator contract
+        run: |
+          python3 qa/audit_sc220_asio_vst3.py
+          cmake -P qa/verify_effective_cmake_pipeline.cmake

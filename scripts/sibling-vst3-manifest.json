@@ -1,0 +1,40 @@
+{
+  "schema": 1,
+  "purpose": "SC220 Live P16 reproducible separate Windows VST3 sibling plugins (not a mutable latest tag)",
+  "plugins": [
+    {
+      "name": "ArSonEQ",
+      "repo": "masarray/arson-eq",
+      "version": "0.1.0-M3.1 engineering",
+      "source_commit": "1f9513d75faea306e06bafd7b68119d4b8bef276",
+      "tag": "v0.1.0-m3.1-sc220-test",
+      "asset": "ArSonEQ-v0.1.0-M3.1-Windows-x64-VST3.zip",
+      "sha256": "08940083bdc40b64faedaacc647a91cdd95d707e8187084345824e9222978c06",
+      "license": "AGPL-3.0",
+      "role": "Voice FX1 / built-in any slot"
+    },
+    {
+      "name": "ArSonComp",
+      "repo": "masarray/arson-comp",
+      "version": "0.2.0",
+      "source_commit": "0a039ef6d340e26aa01a62df3670f74da1f03a12",
+      "build_commit": "b1a8452a238bb237215788ed71b19e6e9d6c5f68",
+      "tag": "v0.2.0-sc220-vst3-test",
+      "asset": "ArSonComp-v0.2.0-Windows-x64-VST3.zip",
+      "sha256": "891131df39c07f4a9821db209ab19f9565d8c314ff035c58156ef6a728e46adc",
+      "license": "AGPL-3.0",
+      "role": "Voice FX2 / built-in any slot"
+    },
+    {
+      "name": "ArSonVerb",
+      "repo": "masarray/arsonverb",
+      "version": "1.0.1",
+      "tag": "v1.0.1",
+      "asset": "ArSonVerb-Windows-x64-VST3-v1.0.1.zip",
+      "sha256": "41fdf9132f26e55a1671fe6f00409a5219199b245be4dbccb7615fc4dd7c3e7b",
+      "license": "AGPL-3.0",
+      "role": "Voice FX3 / built-in any slot",
+      "prepackaged_by_prior_step": true
+    }
+  ]
+}

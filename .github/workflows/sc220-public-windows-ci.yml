@@ -109,6 +109,23 @@ jobs:
           # Regenerate artifact so the signed-in CI user downloads ONE complete
           # SC220+ArSonKuPik+ArSonVerb ZIP, not a partial plugin set.
           Compress-Archive -Path "sc220-staged/*" -DestinationPath "SC220-Live-Windows-x64-VST3-bundled-preview.zip" -CompressionLevel Optimal -Force
+      - name: Retrieve SHA256-pinned ArSonEQ and ArSonComp from sibling releases
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          python scripts/stage_sc220_sibling_vst3.py --out "sc220-staged/Plugins"
+          if ($LASTEXITCODE -ne 0) { throw 'Sibling VST3 provenance/integrity gate failed' }
+          $smoke = Get-ChildItem "build/SC220BundledVstSmoke_artefacts" -Recurse -File -Filter "*.exe" |
+            Where-Object { $_.FullName -match '\\Release\\' } | Select-Object -First 1
+          if (-not $smoke) { throw 'Missing compiled VST3 host smoke executable' }
+          foreach ($name in @('ArSonEQ','ArSonComp','ArSonVerb')) {
+            $path = (Resolve-Path "sc220-staged/Plugins/$name.vst3").Path
+            & $smoke.FullName --generic $path
+            if ($LASTEXITCODE -ne 0) { throw "Host failed to instantiate/process $name" }
+          }
+          "P16 pinned sibling VST3 binaries SHA256 verified; EQ/Comp/Verb host smoke PASS" |
+            Add-Content "sc220-staged/BUILD-INFO.txt"
+          Compress-Archive -Path "sc220-staged/*" -DestinationPath "SC220-Live-Windows-x64-VST3-bundled-preview.zip" -CompressionLevel Optimal -Force
       - name: Upload Windows test build (7 days)
         uses: actions/upload-artifact@v4
         with:

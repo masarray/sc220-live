@@ -86,22 +86,41 @@ bool LiveAudioEngine::initialise (const juce::XmlElement* savedDeviceState)
                     "Voice: " + voiceError + "; Music: " + musicError;
     }
 
-    // Optional bundled ArSonVerb is a *normal first-party VST3 insert*
-    // occupying Voice FX2. No source, SDK or runtime plugin search is required.
-    const auto verbBundle = bundle.getParentDirectory().getChildFile ("ArSonVerb.vst3");
-    if (verbBundle.exists())
+    // P16: a deterministic studio voice chain: EQ -> Signature -> COMP -> VERB.
+    // All three remain ordinary independent VST3 slot instances. Their UI,
+    // bypass and replacement controls remain owned by the existing FX rack.
+    // Preparing plugin instances here is safe: the ASIO callback has not been
+    // registered yet. No network traffic, file scanning or allocation occurs
+    // in the realtime callback.
+    const char* const defaultVoiceFx[] { "ArSonEQ", "ArSonComp", "ArSonVerb" };
+    juce::String siblingWarnings;
+    for (int slot = 0; slot < fxSlotsPerChannel; ++slot)
     {
-        InputVst3Rack::PreparedInstance verb;
-        const auto verbError = InputVst3Rack::createPrepared (
-            verbBundle, pluginRate, pluginBlock, verb);
-        if (verbError.isEmpty())
-            voiceExtraVst3[0].install (std::move (verb), pluginRate, pluginBlock);
-        else
+        const auto path = getBundledFxFile (defaultVoiceFx[slot]);
+        if (! path.exists())
         {
-            const juce::ScopedLock lock (statusLock);
-            lastError = "Bundled ArSonVerb insert unavailable: " + verbError;
+            siblingWarnings += juce::String (defaultVoiceFx[slot])
+                + " not bundled; FX" + juce::String (slot + 1) + " stays empty. ";
+            continue;
         }
+        InputVst3Rack::PreparedInstance effect;
+        const auto fxError = InputVst3Rack::createPrepared (
+            path, pluginRate, pluginBlock, effect);
+        if (fxError.isEmpty())
+            rackAt (0, slot).install (std::move (effect), pluginRate, pluginBlock);
+        else
+            siblingWarnings += juce::String (defaultVoiceFx[slot])
+                + ": " + fxError + ". ";
     }
+    if (siblingWarnings.isNotEmpty())
+    {
+        const juce::ScopedLock lock (statusLock);
+        lastError = "Bundled Voice FX incomplete: " + siblingWarnings;
+    }
+
+    // Music insert bays stay empty until chosen (low idle CPU and no duplicate
+    // reverb tail). Any bundled plugin can be selected from the slot's '...'
+    // menu on either Voice or PC Music.
 
     if (! callbackRegistered.exchange (true))
         deviceManager.addAudioCallback (this);
@@ -216,6 +235,16 @@ juce::AudioPluginInstance* LiveAudioEngine::getChannelFxProcessor (int channel, 
 {
     return hasChannelFx (channel, slot) ? rackAt (channel, slot).getProcessor() : nullptr;
 }
+juce::File LiveAudioEngine::getBundledFxFile (const juce::String& pluginName) const
+{
+    if (pluginName != "ArSonEQ" && pluginName != "ArSonComp"
+        && pluginName != "ArSonVerb")
+        return {};
+    return juce::File::getSpecialLocation (juce::File::currentExecutableFile)
+        .getParentDirectory().getChildFile ("Plugins")
+        .getChildFile (pluginName + ".vst3");
+}
+
 juce::String LiveAudioEngine::loadChannelFx (int channel, int slot, const juce::File& pluginFile)
 {
     if (! juce::isPositiveAndBelow (channel, 2) || ! juce::isPositiveAndBelow (slot, fxSlotsPerChannel))

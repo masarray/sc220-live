@@ -49,6 +49,14 @@ require("file->getDoubleValue (\"broadcastGainDb\", legacyStreamGain)" in applic
 require("broadcastOutput.push (voiceBlock, numSamples)" in p14
         and "juce::FloatVectorOperations::copy (outputChannelData[channel]" in p14,
         "Post-FX broadcast must follow native ASIO output with no second device")
+require('getBundledFxFile (const juce::String& pluginName)' in engine,
+        "SC220 VST3 internal catalogue must be explicit, not arbitrary folder scanning")
+require('"ArSonEQ", "ArSonComp", "ArSonVerb"' in engine,
+        "SC220 Voice startup must retain pinned EQ/Comp/Verb insert order")
+require('BUNDLED  /  SC220 INTERNAL FX' in source('cmake/SC220P11DigitalMixerFxWorkflow.cmake'),
+        "All six FX slots must expose one-click internal sibling plugin choices")
+require('stage_sc220_sibling_vst3.py' in source('.github/workflows/sc220-public-windows-ci.yml'),
+        "Windows packaging must verify sibling SHA256 and install VST3 bundles")
 require("getTotalNumOutputChannels() != 2" in rack,
         "Require a stereo VST3 output bus")
 for f in list((root/".github/workflows").glob("*.yml")):

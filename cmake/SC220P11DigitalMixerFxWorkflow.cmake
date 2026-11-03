@@ -127,6 +127,15 @@ sc220_p11_range(_ui "FX context actions and replacement"
     if (loaded)
         menu.addItem (1, audioEngine.getChannelFxName (channel, slot), false);
     menu.addItem (2, loaded ? "Replace VST3..." : "Load VST3...");
+    menu.addSeparator();
+    menu.addSectionHeader ("BUNDLED  /  SC220 INTERNAL FX");
+    menu.addItem (6, "ArSonEQ  |  Parametric EQ",
+                  audioEngine.getBundledFxFile ("ArSonEQ").exists());
+    menu.addItem (7, "ArSonComp  |  Compressor",
+                  audioEngine.getBundledFxFile ("ArSonComp").exists());
+    menu.addItem (8, "ArSonVerb  |  Reverb",
+                  audioEngine.getBundledFxFile ("ArSonVerb").exists());
+    menu.addSeparator();
     menu.addItem (3, "Open VST editor", loaded);
     menu.addItem (4, audioEngine.isChannelFxBypassed (channel, slot)
                          ? "Enable insert" : "Bypass insert", loaded);
@@ -137,7 +146,26 @@ sc220_p11_range(_ui "FX context actions and replacement"
         [safe, channel, slot] (int selected)
         {
             if (safe == nullptr) return;
-            if (selected == 2) safe->chooseChannelInsert (channel, slot);
+            if (selected >= 6 && selected <= 8)
+            {
+                static constexpr const char* bundled[] {
+                    "ArSonEQ", "ArSonComp", "ArSonVerb"
+                };
+                const auto name = juce::String (bundled[selected - 6]);
+                const auto plugin = safe->audioEngine.getBundledFxFile (name);
+                if (plugin.exists())
+                {
+                    // Close any editor before replacing its owning processor.
+                    safe->channelInsertEditors[static_cast<size_t>(channel)][static_cast<size_t>(slot)].reset();
+                    const auto error = safe->audioEngine.loadChannelFx (channel, slot, plugin);
+                    if (error.isNotEmpty())
+                        juce::AlertWindow::showMessageBoxAsync (
+                            juce::MessageBoxIconType::WarningIcon,
+                            "Bundled VST3 could not load", error);
+                }
+                safe->refreshChannelInserts();
+            }
+            else if (selected == 2) safe->chooseChannelInsert (channel, slot);
             else if (selected == 3) safe->showChannelInsertEditor (channel, slot);
             else if (selected == 4)
                 safe->audioEngine.setChannelFxBypassed (channel, slot,

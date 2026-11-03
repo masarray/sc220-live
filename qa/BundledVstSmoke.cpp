@@ -6,7 +6,39 @@
 int main (int argc, char** argv)
 {
     juce::ScopedJuceInitialiser_GUI juceInitialiser;
-    if (argc != 2) { std::cerr << "Usage: smoke <bundled .vst3 path>\n"; return 2; }
+    if (argc == 3 && juce::String (argv[1]) == "--generic")
+    {
+        const auto plugin = juce::File (juce::String::fromUTF8 (argv[2]));
+        askp::live::InputVst3Rack::PreparedInstance effect;
+        const auto error = askp::live::InputVst3Rack::createPrepared (
+            plugin, 48000.0, 256, effect);
+        if (error.isNotEmpty())
+        {
+            std::cerr << "Generic VST3 instantiation failed: " << error << "\n";
+            return 3;
+        }
+        askp::live::InputVst3Rack rack;
+        rack.install (std::move (effect), 48000.0, 256);
+        if (rack.getLatencySamples() > 8192)
+            return 4;
+        juce::AudioBuffer<float> block (2, 256);
+        juce::MidiBuffer midi;
+        for (int i = 0; i < 64; ++i)
+        {
+            block.clear();
+            if (i % 8 == 0)
+                block.setSample (0, 0, 0.1f);
+            rack.setBypassed (i >= 32);
+            rack.process (block, midi);
+            for (int ch = 0; ch < 2; ++ch)
+                for (int s = 0; s < 256; ++s)
+                    if (! std::isfinite (block.getSample (ch, s)))
+                        return 5;
+        }
+        std::cout << "PASS: independently compiled stereo VST3 host/bypass sanity\n";
+        return 0;
+    }
+    if (argc != 2) { std::cerr << "Usage: smoke [--generic] <bundled .vst3 path>\n"; return 2; }
     const auto bundle = juce::File (juce::String::fromUTF8 (argv[1]));
     if (! bundle.exists() || ! bundle.hasFileExtension (".vst3"))
         { std::cerr << "Bundled VST3 not found\n"; return 2; }

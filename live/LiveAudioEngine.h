@@ -96,6 +96,9 @@ public:
     // Processor creation and retirement stay on the UI thread; no callback locks.
     static constexpr int fxSlotsPerChannel = 3;
     juce::String loadChannelFx (int channel, int slot, const juce::File&);
+    // Audited, immutable sibling plugin catalogue: only known bundle names
+    // below our own portable Plugins/ directory; no system-wide VST3 scan.
+    juce::File getBundledFxFile (const juce::String& pluginName) const;
     void removeChannelFx (int channel, int slot);
     void setChannelFxBypassed (int channel, int slot, bool bypass) noexcept;
     bool isChannelFxBypassed (int channel, int slot) const noexcept;

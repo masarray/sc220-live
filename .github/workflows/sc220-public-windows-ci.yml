@@ -123,6 +123,10 @@ jobs:
             & $smoke.FullName --generic $path
             if ($LASTEXITCODE -ne 0) { throw "Host failed to instantiate/process $name" }
           }
+          # All siblings use AGPL-3.0; include full licence text for Verb
+          # as well as the separate EQ/Comp source/rights provenance.
+          Copy-Item "sc220-staged/Plugins/ArSonEQ-AGPL-3.0.txt" "sc220-staged/Plugins/ArSonVerb-AGPL-3.0.txt" -Force
+          Copy-Item THIRD_PARTY_NOTICES.md "sc220-staged/THIRD_PARTY_NOTICES.md" -Force
           "P16 pinned sibling VST3 binaries SHA256 verified; EQ/Comp/Verb host smoke PASS" |
             Add-Content "sc220-staged/BUILD-INFO.txt"
           Compress-Archive -Path "sc220-staged/*" -DestinationPath "SC220-Live-Windows-x64-VST3-bundled-preview.zip" -CompressionLevel Optimal -Force

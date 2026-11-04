@@ -34,13 +34,26 @@ juce::String InputVst3Rack::createPrepared (const juce::File& file, double sampl
     if (candidate == nullptr)
         return error.isNotEmpty() ? error : "No compatible audio effect could be created.";
 
-    juce::AudioProcessor::BusesLayout layout;
-    layout.inputBuses.add (juce::AudioChannelSet::stereo());
-    layout.outputBuses.add (juce::AudioChannelSet::stereo());
+    // Preserve each plugin's bus topology. A professional dynamics plugin
+    // such as ArSonComp may advertise an OPTIONAL sidechain input bus: JUCE
+    // rejects a freshly constructed one-input-bus layout even though the main
+    // signal path is stereo. Explicitly disable every auxiliary bus, while
+    // retaining its existence and enforcing exactly 2 active IN/OUT channels.
+    auto layout = candidate->getBusesLayout();
+    if (layout.inputBuses.isEmpty() || layout.outputBuses.isEmpty())
+        return "A stereo audio effect requires main input and output buses.";
+    layout.inputBuses.set (0, juce::AudioChannelSet::stereo());
+    layout.outputBuses.set (0, juce::AudioChannelSet::stereo());
+    for (int bus = 1; bus < layout.inputBuses.size(); ++bus)
+        layout.inputBuses.set (bus, juce::AudioChannelSet::disabled());
+    for (int bus = 1; bus < layout.outputBuses.size(); ++bus)
+        layout.outputBuses.set (bus, juce::AudioChannelSet::disabled());
+
     if (! candidate->setBusesLayout (layout)
         || candidate->getTotalNumInputChannels() != 2
         || candidate->getTotalNumOutputChannels() != 2)
-        return "The VST3 must support exactly one stereo input/output bus.";
+        return "VST3 must expose exactly 2 active stereo main IN/OUT channels; "
+               "optional sidechain buses are disabled for SC220 Live.";
 
     // Initialisation is strictly outside the realtime callback, following
     // Steinberg's VST3 main-thread lifecycle contract.

@@ -51,3 +51,13 @@ not automatically resolve licensing obligations that may arise from distributing
 the host with the plugin binaries. Keep associated corresponding source links,
 licences and build provenance available, and resolve combined-work/dual licence
 status before stable/commercial redistribution. See THIRD_PARTY_NOTICES.md.
+
+## Host compatibility refinement (sidechain FX)
+ArSonComp declares a main stereo I/O plus an optional stereo sidechain input.
+A one-input-bus `BusesLayout` is structurally invalid for this plugin, even
+though its default main chain supports stereo. The SC220 host now starts from
+the plugin's advertised layout, forces main stereo, explicitly disables all
+optional sidechain/auxiliary buses, and still strictly validates exactly
+two ACTIVE input channels plus two output channels. This is not a mono
+fallback and does not mix external sidechains into PC Music/ASIO. The Windows
+generic host smoke checks the actual ArSonComp VST3 with this contract.

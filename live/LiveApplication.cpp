@@ -268,7 +268,14 @@ public:
             audioEngine->setPcAudioMuted (file->getBoolValue ("pcAudioMuted", false));
             audioEngine->setDuckingEnabled (file->getBoolValue ("duckingEnabled", true));
             audioEngine->setDuckingDepthDb (static_cast<float> (file->getDoubleValue ("duckingDepthDb", -12.0)));
-            audioEngine->setOutputTrimDb (static_cast<float> (file->getDoubleValue ("outputTrimDb", 0.0)));
+            // Backward-compatible gain migration: the old STREAM fader
+            // controlled Master and could inadvertently mute ASIO headphones.
+            // Restore its saved setting to the separate broadcast fader.
+            const float legacyStreamGain = static_cast<float> (
+                file->getDoubleValue ("outputTrimDb", 0.0));
+            audioEngine->setBroadcastGainDb (static_cast<float> (
+                file->getDoubleValue ("broadcastGainDb", legacyStreamGain)));
+            audioEngine->setOutputTrimDb (0.0f); // Real-time native ASIO unity.
             audioEngine->setInputTrimBypassed (file->getBoolValue ("inputTrimBypassed", false));
             audioEngine->setOutputTrimBypassed (file->getBoolValue ("outputTrimBypassed", false));
             audioEngine->setPresetIndex (file->getIntValue ("presetIndex", 0));
@@ -411,6 +418,7 @@ private:
             file->setValue ("duckingEnabled", audioEngine->isDuckingEnabled());
             file->setValue ("duckingDepthDb", audioEngine->getDuckingDepthDb());
             file->setValue ("outputTrimDb", audioEngine->getOutputTrimDb());
+            file->setValue ("broadcastGainDb", audioEngine->getBroadcastGainDb());
             file->setValue ("inputTrimBypassed", audioEngine->isInputTrimBypassed());
             file->setValue ("outputTrimBypassed", audioEngine->isOutputTrimBypassed());
             file->setValue ("enhance", audioEngine->getEnhance());

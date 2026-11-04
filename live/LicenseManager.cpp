@@ -101,6 +101,11 @@ LicenseManager::LicenseManager()
 
 bool LicenseManager::editingAllowed() const noexcept
 {
+#if defined(SC220_LIVE_PUBLIC_FREE) && SC220_LIVE_PUBLIC_FREE
+    // SC220-owned entitlement is public/free in this build. This does NOT
+    // change licences belonging to independently hosted VST3 plugins.
+    return true;
+#endif
     const auto s = state();
     return s == State::BetaActive || s == State::BetaExpiring || s == State::Licensed;
 }
@@ -410,6 +415,9 @@ juce::String LicenseManager::licensedTo() const
 
 juce::String LicenseManager::statusText() const
 {
+#if defined(SC220_LIVE_PUBLIC_FREE) && SC220_LIVE_PUBLIC_FREE
+    return "SC220 Live - Free Public Preview";
+#endif
     switch (state()) {
         case State::Licensed:
             return licensedTo_.isNotEmpty() ? "Licensed to " + licensedTo_ : "Licensed";
@@ -427,6 +435,14 @@ juce::String LicenseManager::statusText() const
 
 void LicenseManager::evaluateState(bool forcePersist)
 {
+#if defined(SC220_LIVE_PUBLIC_FREE) && SC220_LIVE_PUBLIC_FREE
+    // Non-expiring application controls; no trial countdown or purchase
+    // requirement. Preserve old activation records for possible later builds.
+    juce::ignoreUnused (forcePersist);
+    state_.store (State::BetaActive, std::memory_order_release);
+    daysRemaining_.store (0, std::memory_order_release);
+    return;
+#endif
     const auto now = nowUtcSeconds();
 
     if (!activationValidationKnown_) {

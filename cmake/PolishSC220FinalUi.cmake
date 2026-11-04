@@ -398,12 +398,8 @@ foreach(_required_engine_token IN ITEMS
     endif()
 endforeach()
 
-# Recover the intended SC220 -> VB-CABLE routing even when an older settings file
-# persisted headphones as the primary stream output.
-set(_default_stream_anchor "    if (savedDeviceState == nullptr)")
-set(_default_stream_replacement "    if (savedDeviceState == nullptr || ! outputCable.load())")
-sc220_polish_replace_once(_engine "restore VB-CABLE stream authority"
-    "${_default_stream_anchor}" "${_default_stream_replacement}")
+# P15: ASIO is the permanent performer output. Legacy auto-reroute to
+# VB-CABLE is obsolete; the audience sink has its own independent WASAPI bus.
 
 file(WRITE "${SC220_UI_MONITOR_GENERATED_SOURCE}" "${_ui}")
 file(WRITE "${SC220_ENGINE_GENERATED_SOURCE}" "${_engine}")

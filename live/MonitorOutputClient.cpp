@@ -153,8 +153,7 @@ std::vector<EndpointInfo> enumerateActiveEndpoints()
         EndpointInfo endpoint;
         endpoint.friendlyName = endpointFriendlyName (device.Get());
         endpoint.id = endpointId (device.Get());
-        if (endpoint.friendlyName.isEmpty() || endpoint.id.empty()
-            || MonitorOutputClient::isUnsafeVirtualOutput (endpoint.friendlyName))
+        if (endpoint.friendlyName.isEmpty() || endpoint.id.empty())
             continue;
 
         endpoint.label = endpoint.friendlyName;
@@ -214,7 +213,11 @@ struct MonitorOutputClient::Impl : public juce::Thread
         pcm32
     };
 
-    explicit Impl (MonitorOutputClient& parent) : juce::Thread ("SC220 Monitor WASAPI Worker"), owner (parent)
+    explicit Impl (MonitorOutputClient& parent)
+        : juce::Thread (parent.endpointPolicy == EndpointPolicy::virtualCableOnly
+                            ? "SC220 Broadcast WASAPI Worker"
+                            : "SC220 Auxiliary Monitor WASAPI Worker"),
+          owner (parent)
     {
         ringBuffer.setSize (2, fifoCapacitySamples, false, true, false);
         resampleInput.setSize (2, resampleScratchCapacity, false, true, false);
@@ -459,9 +462,9 @@ struct MonitorOutputClient::Impl : public juce::Thread
         }
 
         const auto actualFriendlyName = endpointFriendlyName (device.Get());
-        if (MonitorOutputClient::isUnsafeVirtualOutput (actualFriendlyName))
+        if (! owner.acceptsEndpoint (actualFriendlyName))
         {
-            setError ("Monitor output must be a physical speaker or headphone endpoint, not VB-CABLE.");
+            setError ("Output endpoint is not permitted for this WASAPI bus.");
             return false;
         }
 
@@ -683,8 +686,28 @@ struct MonitorOutputClient::Impl : public juce::Thread
         endpointPaddingFrames.store (static_cast<int> (padding),
                                      std::memory_order_relaxed);
 
-        const int ready = fifo.getNumReady();
+        int ready = fifo.getNumReady();
         const int primeTarget = juce::jmax (1, primeTargetSamples.load());
+        // Audience output follows a different clock and can fall behind during
+        // Windows scheduling stalls. Only the WASAPI worker (FIFO consumer)
+        // may skip STALE frames; never burden or stop the ASIO producer.
+        if (owner.endpointPolicy == EndpointPolicy::virtualCableOnly)
+        {
+            const int lagLimit = juce::jmax (
+                primeTarget * 3,
+                juce::roundToInt (juce::jmax (1.0, sourceRate.load()) * 0.18));
+            if (ready > lagLimit)
+            {
+                const int stale = ready - primeTarget;
+                int start1 = 0, size1 = 0, start2 = 0, size2 = 0;
+                fifo.prepareToRead (stale, start1, size1, start2, size2);
+                fifo.finishedRead (size1 + size2); // Consumer side only.
+                leftInterpolator.reset();
+                rightInterpolator.reset();
+                overflowCount.fetch_add (1, std::memory_order_relaxed);
+                ready = fifo.getNumReady();
+            }
+        }
         if (! endpointStarted && ready < primeTarget)
             return;
 
@@ -854,9 +877,13 @@ struct MonitorOutputClient::Impl : public juce::Thread
     juce::String errorMessage;
 };
 
-MonitorOutputClient::MonitorOutputClient()
-    : impl (std::make_unique<Impl> (*this))
+MonitorOutputClient::MonitorOutputClient (EndpointPolicy policy)
+    : endpointPolicy (policy), impl (std::make_unique<Impl> (*this))
 {
+    // GO LIVE already gates the broadcast SPSC producer. Do not inherit the
+    // physical AUX monitor's default mute on the virtual output instance:
+    // otherwise observers receive silence even though frames are queued.
+    muted.store (policy == EndpointPolicy::physicalOnly, std::memory_order_release);
 }
 
 MonitorOutputClient::~MonitorOutputClient()
@@ -868,7 +895,10 @@ bool MonitorOutputClient::initialise()
 {
 #if JUCE_WINDOWS
     impl->clearError();
-    return impl->isThreadRunning() || impl->startThread (juce::Thread::Priority::high);
+    return impl->isThreadRunning() || impl->startThread (
+        endpointPolicy == EndpointPolicy::virtualCableOnly
+            ? juce::Thread::Priority::normal
+            : juce::Thread::Priority::high);
 #else
     impl->setError ("Physical monitoring currently requires the Windows WASAPI backend.");
     return false;
@@ -922,12 +952,14 @@ juce::StringArray MonitorOutputClient::getOutputDeviceNames()
         return names;
 
     EndpointInfo defaultEndpoint;
-    if (getDefaultEndpointInfo (defaultEndpoint)
-        && ! isUnsafeVirtualOutput (defaultEndpoint.friendlyName))
+    if (endpointPolicy == EndpointPolicy::physicalOnly
+        && getDefaultEndpointInfo (defaultEndpoint)
+        && acceptsEndpoint (defaultEndpoint.friendlyName))
         names.add (systemDefaultMonitorName);
 
     for (const auto& endpoint : enumerateActiveEndpoints())
-        names.addIfNotAlreadyThere (endpoint.label);
+        if (acceptsEndpoint (endpoint.friendlyName))
+            names.addIfNotAlreadyThere (endpoint.label);
 #endif
     return names;
 }
@@ -963,10 +995,10 @@ juce::String MonitorOutputClient::selectOutputDevice (const juce::String& name,
         return error;
     }
 
-    if (isUnsafeVirtualOutput (endpoint.friendlyName))
+    if (! acceptsEndpoint (endpoint.friendlyName))
     {
         const juce::String error =
-            "Monitor output must be a physical speaker or headphone endpoint, not VB-CABLE.";
+            "This output is unavailable on the selected physical/broadcast bus.";
         impl->setError (error);
         return error;
     }
@@ -1021,7 +1053,9 @@ MonitorOutputClient::Status MonitorOutputClient::getStatus() const
     status.overflows = impl->overflowCount.load (std::memory_order_acquire);
     status.reconnects = impl->reconnectCount.load (std::memory_order_acquire);
 #if JUCE_WINDOWS
-    status.backend = "WASAPI SHARED / OBS-STYLE";
+    status.backend = endpointPolicy == EndpointPolicy::virtualCableOnly
+        ? "WASAPI SHARED / BROADCAST BEST-EFFORT"
+        : "WASAPI SHARED / AUX MONITOR";
 #else
     status.backend = "UNAVAILABLE";
 #endif
@@ -1029,6 +1063,22 @@ MonitorOutputClient::Status MonitorOutputClient::getStatus() const
     status.deviceName = impl->currentDeviceName;
     status.lastError = impl->errorMessage;
     return status;
+}
+
+bool MonitorOutputClient::isVirtualCableInput (const juce::String& name) noexcept
+{
+    // A Windows PLAYBACK endpoint feeds its paired virtual RECORDING endpoint.
+    // Do not accept CABLE Output (capture), arbitrary speakers or ASIO here.
+    return (name.containsIgnoreCase ("CABLE")
+            && name.containsIgnoreCase ("Input"))
+        || name.containsIgnoreCase ("Voicemeeter Input");
+}
+
+bool MonitorOutputClient::acceptsEndpoint (const juce::String& name) const noexcept
+{
+    return endpointPolicy == EndpointPolicy::virtualCableOnly
+        ? isVirtualCableInput (name)
+        : ! isUnsafeVirtualOutput (name);
 }
 
 bool MonitorOutputClient::isUnsafeVirtualOutput (const juce::String& name) noexcept
